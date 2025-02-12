@@ -1,0 +1,3445 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>S-Next 請假及賀金系統</title>
+    <style>
+        /* Responsive styles */
+        @media screen and (max-width: 768px) {
+            /* Container adjustments */
+            .container {
+                margin: 10px;
+                padding: 10px;
+                width: auto;
+            }
+
+            /* Form adjustments */
+            form {
+                padding: 10px;
+            }
+
+            /* Table responsiveness */
+            table {
+                display: block;
+                overflow-x: auto;
+                white-space: nowrap;
+            }
+
+            /* Input field adjustments */
+            input[type="text"],
+            input[type="password"],
+            input[type="number"],
+            input[type="date"],
+            select {
+                font-size: 16px; /* Prevents zoom on iOS */
+                padding: 10px;
+            }
+
+            /* Button adjustments */
+            button {
+                width: 100%;
+                padding: 12px;
+                margin: 5px 0;
+                font-size: 16px;
+            }
+
+            /* Header adjustments */
+            header h1 {
+                font-size: 1.5rem;
+                padding: 10px;
+            }
+
+            /* Employee information adjustments */
+            #employee-page p strong {
+                width: 100%;
+                display: block;
+                margin-bottom: 5px;
+            }
+
+            /* Modal adjustments */
+            .proof-modal-content {
+                width: 90%;
+                margin: 5% auto;
+            }
+
+            /* Penalty form adjustments */
+            #penalty-form {
+                grid-template-columns: 1fr;
+            }
+
+            /* Status table adjustments */
+            .application-status table,
+            #employee-penalty-table {
+                font-size: 14px;
+            }
+
+            /* Make tables scrollable horizontally */
+            .application-list {
+                overflow-x: auto;
+            }
+
+            /* Adjust cell padding for better touch targets */
+            th, td {
+                padding: 8px;
+            }
+
+            /* Stack form elements vertically */
+            #add-employee-form,
+            #apply-leave-form {
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            /* Improve button touch targets */
+            .remove-btn,
+            .show-proof-btn,
+            .reject-btn,
+            .submit-proof-btn,
+            .view-proof-btn {
+                padding: 8px 16px;
+                margin: 5px 0;
+                min-height: 44px; /* Minimum touch target size */
+            }
+
+            /* Stack label-input pairs */
+            form label {
+                display: block;
+                margin-bottom: 5px;
+            }
+
+            /* Adjust spacing for stacked elements */
+            h2, h3 {
+                margin-top: 20px;
+                margin-bottom: 10px;
+            }
+        }
+
+        /* Additional adjustments for very small screens */
+        @media screen and (max-width: 480px) {
+            /* Further reduce font sizes */
+            body {
+                font-size: 14px;
+            }
+
+            header h1 {
+                font-size: 1.2rem;
+            }
+
+            /* Stack table cells for better readability */
+            #employee-penalty-table td,
+            #application-status-table td {
+                padding: 6px;
+            }
+
+            /* Adjust modal for smaller screens */
+            .proof-modal-content {
+                width: 95%;
+                margin: 2% auto;
+            }
+
+            /* Make sure buttons are easily tappable */
+            button {
+                min-height: 44px;
+            }
+        }
+
+        /* Improve table scrolling on mobile */
+        .table-container {
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            margin-bottom: 15px;
+        }
+
+        /* Add visual indication of scrollable tables */
+        .table-container::after {
+            content: '⟺';
+            position: absolute;
+            right: 10px;
+            color: #666;
+            animation: scroll-hint 1s infinite;
+            display: none;
+        }
+
+        @media screen and (max-width: 768px) {
+            .table-container::after {
+                display: block;
+            }
+        }
+
+        @keyframes scroll-hint {
+            0% { opacity: 0; }
+            50% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+
+        /* Color variables */
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #34495e;
+            --accent-color: #3498db;
+            --light-bg: #f5f6fa;
+            --text-color: #2c3e50;
+            --border-color: #dcdde1;
+        }
+
+        /* Base styles */
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--light-bg);
+            color: var(--text-color);
+            line-height: 1.6;
+        }
+
+        header {
+            background-color: var(--primary-color);
+            color: white;
+            text-align: center;
+            padding: 1rem 0;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 1.8rem;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+
+        /* Form styles */
+        form {
+            margin-top: 20px;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 6px;
+        }
+
+        input[type="text"],
+        input[type="password"],
+        input[type="number"],
+        input[type="date"],
+        select {
+            padding: 8px 12px;
+            width: 100%;
+            margin-bottom: 15px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        button {
+            padding: 8px 16px;
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #2980b9;
+        }
+
+        button:disabled {
+            background-color: #bdc3c7;
+            cursor: not-allowed;
+        }
+
+        /* Table styles */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            background-color: white;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        th, td {
+            padding: 12px 15px;
+            border: 1px solid var(--border-color);
+        }
+
+        th {
+            background-color: var(--secondary-color);
+            color: white;
+            font-weight: 500;
+        }
+
+        tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+
+        /* Button variations */
+        .remove-btn {
+            background-color: #e74c3c;
+        }
+
+        .remove-btn:hover {
+            background-color: #c0392b;
+        }
+
+        .show-proof-btn {
+            background-color: #27ae60;
+        }
+
+        .show-proof-btn:hover {
+            background-color: #219a52;
+        }
+
+        #proof-modal img {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 5px;
+            background-color: white;
+        }
+
+        /* Add smooth animation to modal */
+        #proof-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s ease-in-out;
+            /* Ensure modal is centered */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #proof-modal.show {
+            opacity: 1;
+        }
+
+        .status-approved {
+            color: green;
+            font-weight: bold;
+        }
+
+        .status-rejected {
+            color: red;
+            font-weight: bold;
+        }
+
+        .status-pending {
+            color: #ffc107;
+            font-weight: bold;
+        }
+
+        .reject-btn {
+            background-color: #e74c3c;
+            padding: 4px 8px;
+            font-size: 12px;
+            margin-top: 5px;
+        }
+
+        .reject-btn:hover {
+            background-color: #c82333;
+        }
+
+        /* Update the flex container for buttons */
+        .d-flex.flex-column > div {
+            display: flex;
+            gap: 5px;
+            margin-top: 5px;
+        }
+
+        /* Make all action buttons consistent in size */
+        .show-proof-btn,
+        .reject-btn,
+        .remove-btn-small {
+            padding: 5px 10px;
+            font-size: 12px;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        /* Adjust button container spacing */
+        .status-submitted,
+        .status-not-submitted {
+            margin-bottom: 5px;
+        }
+
+        /* Section headings */
+        h2, h3 {
+            color: var(--primary-color);
+            margin-top: 30px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        /* Company rules section */
+        #home-page p {
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-left: 4px solid var(--accent-color);
+            margin: 10px 0;
+        }
+
+        /* Employee information section */
+        #employee-page p {
+            padding: 8px;
+            margin: 5px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        #employee-page p strong {
+            color: var(--primary-color);
+            width: 200px;
+            display: inline-block;
+        }
+
+        /* Logout button */
+        #logout-btn, #logout-btn-employee {
+            background-color: #95a5a6;
+            margin-top: 30px;
+        }
+
+        #logout-btn:hover, #logout-btn-employee:hover {
+            background-color: #7f8c8d;
+        }
+
+        /* Modal styles update */
+        .proof-modal-content {
+            background-color: white;
+            padding: 20px;
+            width: 90%;
+            max-width: 700px;
+            border-radius: 8px;
+            position: relative;
+            /* Center the modal and handle overflow */
+            max-height: 90vh;
+            overflow-y: auto;
+            /* Add some animation */
+            transform: translateY(-20px);
+            transition: transform 0.3s ease-in-out;
+        }
+
+        #proof-modal.show .proof-modal-content {
+            transform: translateY(0);
+        }
+
+        .close-modal-btn {
+            position: absolute;
+            right: 10px;
+            top: 10px;
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 5px;
+            line-height: 1;
+            color: #666;
+            transition: color 0.3s ease;
+        }
+
+        .close-modal-btn:hover {
+            color: #000;
+        }
+
+        .close-modal {
+            color: #7f8c8d;
+        }
+
+        .close-modal:hover {
+            color: var(--primary-color);
+        }
+
+        #proof-content img {
+            max-width: 100%;
+            max-height: 70vh;
+            object-fit: contain;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 5px;
+            background-color: white;
+        }
+
+        /* Responsive adjustments */
+        @media screen and (max-width: 768px) {
+            .proof-modal-content {
+                width: 95%;
+                margin: 10px;
+                padding: 15px;
+            }
+
+            #proof-content img {
+                max-height: 60vh;
+            }
+        }
+
+        #penalty-form {
+            display: grid;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        #penalty-form select,
+        #penalty-form input {
+            padding: 8px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+        }
+
+        #penalty-form button {
+            justify-self: start;
+        }
+
+        #penalty-table {
+            margin-top: 20px;
+        }
+
+        #penalty-reason {
+            padding: 8px 12px;
+            width: 100%;
+            margin-bottom: 15px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        #penalty-form select,
+        #penalty-form input {
+            margin-bottom: 10px;
+        }
+
+        #employee-penalty-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            background-color: white;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        #employee-penalty-table th,
+        #employee-penalty-table td {
+            padding: 12px 15px;
+            border: 1px solid var(--border-color);
+        }
+
+        #employee-penalty-table th {
+            background-color: var(--secondary-color);
+            color: white;
+            font-weight: 500;
+        }
+
+        #employee-penalty-table tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+
+        .status-submitted {
+            color: green;
+            font-weight: bold;
+        }
+
+        .status-not-submitted {
+            color: red;
+            font-weight: bold;
+        }
+
+        .submit-proof-btn {
+            margin-top: 5px;
+            padding: 5px 10px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+
+        .submit-proof-btn:hover {
+            background-color: #45a049;
+        }
+
+        .view-proof-btn {
+            margin-left: 10px;
+            padding: 3px 8px;
+            background-color: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+
+        .view-proof-btn:hover {
+            background-color: #1976D2;
+        }
+
+        .status-submitted {
+            color: green;
+            font-weight: bold;
+        }
+
+        .status-not-submitted {
+            color: red;
+            font-weight: bold;
+        }
+
+        .view-proof-btn {
+            margin-left: 10px;
+            padding: 3px 8px;
+            background-color: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+
+        .view-proof-btn:hover {
+            background-color: #1976D2;
+        }
+
+        .cancel-double-btn {
+        margin-left: 5px;
+        padding: 3px 8px;
+        background-color: #ff9800;
+        color: white;
+        border: none;
+        border-radius: 3px;
+        cursor: pointer;
+        }
+
+        .cancel-double-btn:hover {
+            background-color: #f57c00;
+        }
+
+        /* Update button container styles */
+        .d-flex.flex-column > div {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin-top: 5px;
+        }
+
+        /* Make all action buttons consistent in size */
+        .show-proof-btn,
+        .reject-btn,
+        .cancel-double-btn,
+        .remove-btn-small {
+            padding: 5px 10px;
+            font-size: 12px;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            white-space: nowrap;
+        }
+
+        .export-btn {
+            background-color: #28a745;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+
+        .export-btn:hover {
+            background-color: #218838;
+        }
+
+        .add-btn {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        .add-btn:hover {
+            background-color: #45a049;
+        }
+
+        .add-btn:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+
+        #change-password-form {
+            max-width: 400px;
+            margin-top: 20px;
+        }
+
+        #change-password-form input[type="password"] {
+            width: 100%;
+            padding: 8px 12px;
+            margin-bottom: 15px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        #change-password-form button {
+            background-color: #2c3e50;
+        }
+
+        #change-password-form button:hover {
+            background-color: #34495e;
+        }
+
+        .sync-status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            border-radius: 4px;
+            display: none;
+            z-index: 1000;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        .sync-status.success {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        .sync-status.error {
+            background-color: #f44336;
+            color: white;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .remove-btn-small {
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .remove-btn-small:hover {
+            background-color: #c82333;
+        }
+
+        .d-flex {
+            display: flex;
+        }
+
+        .flex-column {
+            flex-direction: column;
+        }
+
+        .overdue-row {
+            background-color: rgba(220, 53, 69, 0.1) !important; /* Light red background */
+            color: #dc3545; /* Red text */
+            font-weight: 500;
+        }
+
+        /* Alternate row colors but keep overdue highlighting */
+        #penalty-table tbody tr:nth-child(even):not(.overdue-row) {
+            background-color: #f8f9fa;
+        }
+
+        #penalty-table tbody tr:hover:not(.overdue-row) {
+            background-color: #f2f2f2;
+        }
+
+        /* Keep overdue row styling even on hover */
+        .overdue-row:hover {
+            background-color: rgba(220, 53, 69, 0.15) !important;
+        }
+
+        .d-flex {
+            display: flex;
+        }
+
+        .clear-records-btn {
+            background-color: #dc3545;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+
+        .clear-records-btn:hover {
+            background-color: #c82333;
+        }
+
+        .clear-records-btn:active {
+            transform: translateY(1px);
+        }
+
+        .flex-column {
+            flex-direction: column;
+        }
+
+        .status-submitted {
+            color: green;
+            font-weight: bold;
+        }
+
+        .status-not-submitted {
+            color: red;
+            font-weight: bold;
+        }
+
+        .remove-btn-small {
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .remove-btn-small:hover {
+            background-color: #c82333;
+        }
+
+        /* Modern color palette */
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #34495e;
+            --accent-color: #3498db;
+            --success-color: #2ecc71;
+            --warning-color: #f1c40f;
+            --danger-color: #e74c3c;
+            --light-bg: #f5f6fa;
+            --card-bg: #ffffff;
+            --text-primary: #2c3e50;
+            --text-secondary: #7f8c8d;
+            --border-radius: 8px;
+        }
+
+        /* Body background with gradient */
+        body {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+        }
+
+        /* Header styling */
+        header {
+            background: linear-gradient(120deg, var(--primary-color), var(--secondary-color));
+            padding: 1.5rem 0;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        header h1 {
+            font-size: 2rem;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        /* Container styling */
+        .container {
+            background: var(--card-bg);
+            border-radius: var(--border-radius);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.05);
+            transition: transform 0.3s ease;
+            margin: 2rem auto;
+            padding: 2rem;
+        }
+
+        .container:hover {
+            transform: translateY(-5px);
+        }
+
+        /* Form styling */
+        form {
+            background: var(--light-bg);
+            border-radius: var(--border-radius);
+            padding: 2rem;
+            margin: 1.5rem 0;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        input[type="text"],
+        input[type="password"],
+        input[type="number"],
+        input[type="date"],
+        select {
+            border: 2px solid #eee;
+            border-radius: var(--border-radius);
+            padding: 0.8rem 1rem;
+            transition: all 0.3s ease;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
+
+        input:focus,
+        select:focus {
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+            outline: none;
+        }
+
+        /* Button styling */
+        button {
+            padding: 0.8rem 1.5rem;
+            border-radius: var(--border-radius);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        /* Table styling */
+        table {
+            border-radius: var(--border-radius);
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+        }
+
+        th {
+            background: linear-gradient(120deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 1rem 1.5rem;
+        }
+
+        td {
+            padding: 1rem 1.5rem;
+            transition: background-color 0.3s ease;
+        }
+
+        tr:hover td {
+            background-color: rgba(52, 152, 219, 0.05);
+        }
+
+        /* Status badges */
+        .status-submitted,
+        .status-approved,
+        .status-rejected,
+        .status-pending,
+        .status-not-submitted {
+            padding: 0.4rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            display: inline-block;
+        }
+
+        .status-submitted,
+        .status-approved {
+            background-color: rgba(46, 204, 113, 0.1);
+            color: #27ae60;
+        }
+
+        .status-rejected,
+        .status-not-submitted {
+            background-color: rgba(231, 76, 60, 0.1);
+            color: #c0392b;
+        }
+
+        .status-pending {
+            background-color: rgba(241, 196, 15, 0.1);
+            color: #f39c12;
+        }
+
+        /* Modal styling */
+        .proof-modal-content {
+            background: var(--card-bg);
+            border-radius: var(--border-radius);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            padding: 2rem;
+        }
+
+        /* Section headings */
+        h2, h3 {
+            color: var(--text-primary);
+            font-weight: 600;
+            position: relative;
+            padding-bottom: 0.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        h2::after, h3::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 50px;
+            height: 3px;
+            background: linear-gradient(90deg, var(--accent-color), transparent);
+            border-radius: 3px;
+        }
+
+        /* Employee info styling */
+        #employee-page p {
+            background: var(--light-bg);
+            border-radius: var(--border-radius);
+            padding: 1rem;
+            margin: 0.5rem 0;
+            transition: transform 0.3s ease;
+        }
+
+        #employee-page p:hover {
+            transform: translateX(5px);
+        }
+
+    </style>
+</head>
+
+<body>
+    <div id="sync-status" class="sync-status"></div>
+    <header>
+    <h1>S-Next 請假及賀金系統</h1>
+    </header>
+    <div class="container" id="home-page">
+        <h3>Login</h3>
+        <form id="login-form">
+            <input type="text" id="username" placeholder="Username" required>
+            <input type="password" id="password" placeholder="Password" required>
+            <p><strong>Username 請輸入自己名字 e.g. Sam Hui</span></p>
+            <p><strong>Password 請輸入 next(your agent code) e.g. next12345</span></p>
+            <button type="submit">Login</button>
+        </form>
+    </div>
+
+    <div class="container" id="admin-page" style="display: none;">
+    <h2>Admin Interface</h2>
+    <h3>Add Agents</h3>
+    <form id="add-employee-form">
+        <input type="text" id="emp-name" placeholder="Agent Name" required>
+        <input type="text" id="emp-code" placeholder="Agent Code" required>
+        <label for="emp-role">Role position:</label>
+        <select id="emp-role" required>
+            <option value="Agent">Agent</option>
+            <option value="AUM/UM">AUM/UM</option>
+            <option value="SUM">SUM</option>
+            <option value="BM">BM</option>
+            <option value="DM">DM</option>
+            <option value="DD">DD</option>
+        </select>
+        <label for="emp-mdrt">Clubs & Awards</label>
+        <select id="emp-mdrt" required>
+            <option value="no">NO</option>
+            <option value="mdrt">MDRT</option>
+            <option value="cot or above">COT or above</option>
+        </select>
+        <button type="button" id="add-employee-btn" class="add-btn">Add Agent</button>
+    </form>
+
+    <h3>賀金</h3>
+    <form id="penalty-form">
+        <select id="penalty-employee" required>
+            <option value="">Select Employee</option>
+        </select>
+        <input type="date" id="penalty-date" required>
+        <select id="penalty-reason" required>
+            <option value="Meeting">Meeting</option>
+        </select>
+        <input type="number" id="penalty-minutes" placeholder="Late Minutes" min="0" required>
+        <p><strong>備註：No Show請輸入500</span></p>
+        <button type="submit">Add 賀金</button>
+    </form>
+
+    <h3>Agent List</h3>
+    <div class="table-container">
+        <table id="employee-table">
+        <thead>
+            <tr>
+                <th style="padding: 10px;">Name</th>
+                <th style="padding: 10px;">Code</th>
+                <th style="padding: 10px;">Role</th>
+                <th style="padding: 10px;">Clubs & Awards</th>
+                <th style="padding: 10px;">Remaining Annual Leaves (Normal)</th>
+                <th style="padding: 10px;">Remaining Annual Leaves (黃金事假)</th>
+                <th style="padding: 10px;">Action</th>
+            </tr>
+        </thead>
+        <tbody id="employee-list">
+        </tbody>
+    </table>
+    </div>
+
+    <!-- Update the employee application table -->
+    <h3>Agent Leave Application Record</h3>
+    <div class="export-buttons" style="margin-top: 20px;">
+        <button id="export-applications-btn" class="export-btn">Export Applications to Excel</button>
+        <button id="clearRecordsBtn" class="clear-records-btn">Clear All Leave Records</button>
+    </div>
+    <div class="table-container">
+        <table id="application-list-table">
+            <thead>
+                <tr>
+                    <th>Agent Name</th>
+                    <th>Apply Date</th>
+                    <th>Leave Start Date</th>
+                    <th>Leave End Date</th>
+                    <th>Leave Type</th>
+                    <th>Status</th>
+                    <th>Proof</th>
+                </tr>
+            </thead>
+            <tbody id="application-list-body"></tbody>
+        </table>
+    </div>
+
+    <h3>賀金 Info</h3>
+    <div class="export-buttons" style="margin-top: 20px;">
+        <button id="export-penalties-btn" class="export-btn">Export Penalties to Excel</button>
+    </div>
+
+    <div class="table-container">
+        <table id="penalty-table">
+            <thead>
+                <tr>
+                    <th>Agent Name</th>
+                    <th>Date</th>
+                    <th>Reason</th>
+                    <th>Late Minutes</th>
+                    <th>Amount</th>
+                    <th>Deadline</th>
+                    <th>Status/Action</th>
+                </tr>
+            </thead>
+            <tbody id="penalty-list"></tbody>
+        </table>
+
+    </div>
+    <div class="container" style="margin-top: 20px;">
+        <h3>Change Admin Password</h3>
+        <form id="change-password-form">
+            <input type="password" id="current-password" placeholder="Current Password" required>
+            <input type="password" id="new-password" placeholder="New Password" required>
+            <input type="password" id="confirm-password" placeholder="Confirm New Password" required>
+            <button type="submit" class="add-btn">Change Password</button>
+        </form>
+    </div>
+
+    <div id="proof-modal" style="display: none;">
+        <div class="proof-modal-content">
+            <button onclick="closeProofModal()" class="close-modal-btn">×</button>
+            <h3 style="margin-bottom: 20px;">Proof Submitted</h3>
+            <div id="proof-content" style="text-align: center;">
+                <!-- Proof image will be displayed here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Add the logout button here -->
+    <button id="logout-btn">Logout</button>
+    </div>
+
+    <div class="container" id="employee-page" style="display: none;">
+    <h2>Agent Information</h2>
+    <p><strong>Name:</strong> <span id="employee-name"></span></p>
+    <p><strong>Code:</strong> <span id="employee-code"></span></p>
+    <p><strong>Role:</strong> <span id="employee-role"></span></p>
+    <p><strong>Clubs & Awards:</strong> <span id="employee-mdrt"></span></p>
+    <p><strong>Annual Leaves (Normal):</strong> <span id="employee-leave-normal"></span></p>
+    <p><strong>Annual Leaves (黃金事假):</strong> <span id="employee-leave-golden"></span></p>
+    <p><strong>Remaining Annual Leaves (Normal):</strong> <span id="remaining-leave-normal"></span></p>
+    <p><strong>Remaining Annual Leaves (黃金事假):</strong> <span id="remaining-leave-golden"></span></p>
+    <p><strong>Used Sick Leave Days:</strong> <span id="used-sick-leave">0</span></p>
+    <p><strong>Used 不可抗力因素 Days:</strong> <span id="used-force-majeure">0</span></p>
+    <p><strong>Used 離港 Days:</strong> <span id="used-overseas">0</span></p>
+    <p><strong>備註：Annual Leaves (黃金事假)包含於Annual Leaves (Normal)之內</span></p>
+
+    <!-- Update the leave application form -->
+    <h3>Apply for Leave</h3>
+    <form id="apply-leave-form">
+        <label for="apply-date">Apply Date:</label>
+        <input type="date" id="apply-date" required>
+        <label for="leave-start-date">Leave Start Date:</label>
+        <input type="date" id="leave-start-date" required>
+        <label for="leave-end-date">Leave End Date:</label>
+        <input type="date" id="leave-end-date" required>
+        <p>
+        <label for="leave-type">Leave Type:</label>
+        <select id="leave-type" required>
+            <option value="Annual Leave (Normal)">Annual Leave (Normal)</option>
+            <option value="Annual Leave (黃金事假)">Annual Leave (黃金事假)</option>
+            <option value="Sick Leave">Sick Leave</option>
+            <option value="不可抗力因素">不可抗力因素</option>
+            <option value="離港">離港</option>
+        </select>
+        <div id="force-majeure-options" style="display: none;">
+            <label for="force-majeure-reason">Reason:</label>
+            <select id="force-majeure-reason">
+                <option value="">Select a reason</option>
+                <option value="大學生考試">大學生考試</option>
+                <option value="IIQE PAPER 1 & 3 考試">IIQE PAPER 1 & 3 考試</option>
+                <option value="擔任公司/其他區域的分享嘉賓及伴同出席分享的同事">擔任公司/其他區域的分享嘉賓及伴同出席分享的同事</option>
+                <option value="參加公司活動(只有一個時間)">參加公司活動(只有一個時間)</option>
+                <option value="參加頒獎典禮及領獎">參加頒獎典禮及領獎</option>
+                <option value="CIAM課程">CIAM課程</option>
+                <option value="PA/EDP/PA & EDP Elite/FP/新UM課程">PA/EDP/PA & EDP Elite/FP/新UM課程</option>
+                <option value="正日莊務">正日莊務</option>
+                <option value="考車正日">考車正日</option>
+                <option value="直系親屬紅白二事(包括自己結婚)">直系親屬紅白二事(包括自己結婚)</option>
+                <option value="陪同行動不便的父母、子女、配偶見醫生(需當日提供合理證明)">陪同行動不便的父母、子女、配偶見醫生(需當日提供合理證明)</option>
+                <option value="陪同寵物見醫生(同事是唯一照顧者&需當日提供合理證明)">陪同寵物見醫生(同事是唯一照顧者&需當日提供合理證明)</option>
+            </select>
+        </div>
+        <div id="proof-container" style="display: none;">
+            <label for="proof-file">Proof:</label>
+            <input type="file" id="proof-file" accept="image/*">
+        </div>
+        <button type="submit">Apply</button>
+    </form>
+
+    <div class="application-status">
+        <h3>Application Status</h3>
+        <div class="table-container">
+            <table id="application-status-table">
+            <tr>
+                <th>Apply Date</th>
+                <th>Leave Start Date</th>
+                <th>Leave End Date</th>
+                <th>Leave Type</th>
+                <th>Status</th>
+            </tr>
+            </table>
+        </div>
+    </div>
+
+    <h3>賀金 Info</h3>
+    <div class="table-container">
+        <table id="employee-penalty-table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Reason</th>
+                    <th>Late Minutes</th>
+                    <th>Amount</th>
+                    <th>Deadline</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="employee-penalty-list"></tbody>
+        </table>
+    </div>
+
+    <div id="penalty-total" style="text-align: right; margin-top: 10px; padding: 10px; background-color: #f8f9fa; border-radius: 4px;">
+        <strong>Total (Not Submitted): $<span id="penalty-sum">0</span></strong>
+    </div>
+    
+    <input type="file" id="proof-upload" accept="image/*" style="display: none;">
+
+    <!-- Move the logout button downwards -->
+    <div style="margin-top: 20px;">
+        <button id="logout-btn-employee">Logout</button>
+    </div>
+
+    <div id="sync-status" style="position: fixed; bottom: 10px; right: 10px; padding: 8px; border-radius: 4px; background: #2ecc71; color: white; display: none;">
+        Changes synced ✓
+    </div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-auth-compat.js"></script>
+
+    <script>
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyD-VpMInHUcC8XyFZYhVP6ya3QdijbeEuo",
+            authDomain: "try1-a0f6e.firebaseapp.com",
+            databaseURL: "https://try1-a0f6e-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "try1-a0f6e",
+            storageBucket: "try1-a0f6e.firebasestorage.app",
+            messagingSenderId: "79009361074",
+            appId: "1:79009361074:web:ecde01e8292f8e41892dab"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        // You can add this function to run when the page loads
+        function initializeApplicationTable() {
+            const table = document.getElementById('application-status-table');
+            if (!table) return;
+
+            // Create thead and move the header row into it
+            const thead = document.createElement('thead');
+            const tbody = document.createElement('tbody');
+            
+            // Move the existing header row to thead
+            const headerRow = table.rows[0];
+            thead.appendChild(headerRow.cloneNode(true));
+            table.removeChild(headerRow);
+            
+            // Add thead and tbody to table
+            table.appendChild(thead);
+            table.appendChild(tbody);
+        }
+
+        // Global variables
+        let currentUser = null;
+        let isAdmin = false;
+        let employeeData = {};
+        let penaltyData = {};
+
+        // Event Listeners
+        document.getElementById('login-form').addEventListener('submit', handleLogin);
+
+        document.getElementById('add-employee-btn').addEventListener('click', function(e) {
+            e.preventDefault();
+            addEmployee();
+        });
+
+        document.getElementById('penalty-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            addPenalty();
+        });
+
+        document.getElementById('apply-leave-form')?.addEventListener('submit', function(e) {
+            e.preventDefault();
+            applyLeave();
+        });
+
+        // Show/hide force majeure options based on leave type
+        document.getElementById('leave-type')?.addEventListener('change', function() {
+            const forceMajeureOptions = document.getElementById('force-majeure-options');
+            const proofContainer = document.getElementById('proof-container');
+            
+            forceMajeureOptions.style.display = 
+                this.value === '不可抗力因素' ? 'block' : 'none';
+            
+            proofContainer.style.display = 
+                ['Sick Leave', '不可抗力因素'].includes(this.value) ? 'block' : 'none';
+        });
+
+        // Initialize Firebase Auth
+        const auth = firebase.auth();
+
+        // Login Function
+        async function handleLogin(event) {
+            if (event) {
+                event.preventDefault();
+            }
+            
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            if (!username || !password) {
+                alert('Please enter both username and password');
+                return;
+            }
+
+            try {
+                // Admin login
+                if (username === 'admin@snext.com') {
+                    try {
+                        const userCredential = await auth.signInWithEmailAndPassword(username, password);
+                        const user = userCredential.user;
+                        
+                        // Check if user is admin
+                        const adminSnapshot = await database.ref(`users/${user.uid}/isAdmin`).once('value');
+                        if (adminSnapshot.val() === true) {
+                            isAdmin = true;
+                            currentUser = { 
+                                uid: user.uid,
+                                username: 'admin',
+                                email: username
+                            };
+                            
+                            // Update last login timestamp
+                            await database.ref(`users/${user.uid}`).update({
+                                lastLogin: new Date().toISOString()
+                            });
+
+                            showAdminInterface();
+                            loadEmployees();
+                            loadAllApplications();
+                            loadAllPenalties();
+                            
+                            // Show success message
+                            showSyncStatus('Admin login successful');
+                        } else {
+                            await auth.signOut();
+                            throw new Error('Not authorized as admin');
+                        }
+                    } catch (error) {
+                        console.error('Admin login error:', error);
+                        if (error.code === 'auth/user-not-found') {
+                            // If admin doesn't exist, create it
+                            await initializeAdmin();
+                            // Try login again
+                            await handleLogin();
+                        } else {
+                            throw error;
+                        }
+                    }
+                } else {
+                    try {
+                        console.log("Attempting employee login for:", username);
+                        
+                        // Sanitize the email format
+                        const employeeEmail = `${username.replace(/[^a-zA-Z0-9]/g, '')}@snext.com`.toLowerCase();
+                        console.log("Using sanitized email:", employeeEmail);
+
+                        let userCredential;
+                        try {
+                            // Try to sign in
+                            userCredential = await auth.signInWithEmailAndPassword(employeeEmail, password);
+                            console.log("Authentication successful");
+                        } catch (error) {
+                            console.log("Sign-in error:", error.code);
+                            if (error.code === 'auth/user-not-found') {
+                                // Create new user if doesn't exist
+                                console.log("Creating new user account");
+                                try {
+                                    userCredential = await auth.createUserWithEmailAndPassword(employeeEmail, password);
+                                    console.log("New user account created successfully");
+                                } catch (createError) {
+                                    console.error("Error creating user:", createError);
+                                    throw createError;
+                                }
+                            } else {
+                                console.error("Authentication error:", error);
+                                throw error;
+                            }
+                        }
+
+                        // Wait for a moment to ensure auth state is updated
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+
+                        console.log("Fetching employee data");
+                        const employeeRef = database.ref('employees');
+                        const snapshot = await employeeRef.once('value');
+                        
+                        if (!snapshot.exists()) {
+                            console.log("No employees found");
+                            throw new Error('No employee records found');
+                        }
+
+                        const employees = snapshot.val();
+                        let employeeData = null;
+                        let employeeId = null;
+
+                        Object.entries(employees).forEach(([id, data]) => {
+                            if (data.name === username && data.code === password) {
+                                employeeData = data;
+                                employeeId = id;
+                            }
+                        });
+
+                        if (!employeeData) {
+                            console.log("No matching employee found");
+                            throw new Error('Invalid credentials');
+                        }
+
+                        console.log("Employee found:", employeeId);
+                        currentUser = {
+                            ...employeeData,
+                            id: employeeId,
+                            uid: userCredential.user.uid
+                        };
+
+                        console.log("Current user set:", currentUser);
+
+                        // Clean up existing listeners
+                        database.ref('penalties').off();
+
+                        // Update employee record with UID if needed
+                        if (!employeeData.uid) {
+                            await employeeRef.child(employeeId).update({
+                                uid: userCredential.user.uid
+                            });
+                        }
+
+                        console.log("Showing employee interface");
+                        showEmployeeInterface();
+                        loadEmployeeData(currentUser);
+                        loadEmployeeApplications(employeeId);
+                        loadEmployeePenalties(employeeId);
+
+                        showSyncStatus('Login successful');
+
+                    } catch (error) {
+                        console.error('Employee login error:', error);
+                        throw new Error('Login failed: ' + error.message);
+                    }
+                }
+
+                // Clear login form
+                document.getElementById('login-form').reset();
+
+            } catch (error) {
+                console.error('Login error:', error);
+                alert(error.message);
+                
+                // Clear password field on error
+                document.getElementById('password').value = '';
+            }
+        }
+
+        // Add this right after the login attempt in handleLogin function
+        console.log("Auth state:", auth.currentUser);
+        console.log("User ID:", auth.currentUser?.uid);
+
+        // Logout function
+        async function logout() {
+            try {
+                await auth.signOut();
+                isAdmin = false;
+                currentUser = null;
+                
+                // Clear any sensitive data
+                document.getElementById('username').value = '';
+                document.getElementById('password').value = '';
+                
+                // Reset display of pages
+                const homePage = document.getElementById('home-page');
+                const adminPage = document.getElementById('admin-page');
+                const employeePage = document.getElementById('employee-page');
+
+                if (homePage) homePage.style.display = 'block';
+                if (adminPage) adminPage.style.display = 'none';
+                if (employeePage) employeePage.style.display = 'none';
+
+                showSyncStatus('Logged out successfully');
+            } catch (error) {
+                console.error('Logout error:', error);
+                alert('Error logging out: ' + error.message);
+            }
+        }
+
+        // Auth state observer
+        auth.onAuthStateChanged(async (user) => {
+            try {
+                if (user) {
+                    // User is signed in
+                    console.log('User is signed in:', user.email);
+                    
+                    try {
+                        // Check if admin
+                        const adminSnapshot = await database.ref(`users/${user.uid}/isAdmin`).once('value');
+                        if (adminSnapshot.val() === true) {
+                            isAdmin = true;
+                            showAdminInterface();
+                        }
+                    } catch (error) {
+                        console.error('Error checking admin status:', error);
+                    }
+                } else {
+                    // User is signed out
+                    console.log('User is signed out');
+                    currentUser = null;
+                    isAdmin = false;
+                    showLoginInterface();
+                }
+            } catch (error) {
+                console.error('Auth state change error:', error);
+                showSyncStatus('Authentication error occurred', 'error');
+            }
+        });
+        
+        // Utility function to show status messages
+        function showSyncStatus(message, type = 'success') {
+            const statusDiv = document.getElementById('sync-status');
+            if (statusDiv) {
+                statusDiv.textContent = message;
+                statusDiv.className = `sync-status ${type}`;
+                statusDiv.style.display = 'block';
+                setTimeout(() => {
+                    statusDiv.style.display = 'none';
+                }, 3000);
+            }
+        }
+
+        // Add necessary event listeners
+        document.addEventListener('DOMContentLoaded', () => {
+            const loginForm = document.getElementById('login-form');
+            if (loginForm) {
+                loginForm.addEventListener('submit', handleLogin);
+            }
+
+            const logoutButtons = document.querySelectorAll('.logout-btn');
+            logoutButtons.forEach(button => {
+                button.addEventListener('click', logout);
+            });
+
+            // Add this line
+            initializeApplicationTable();            
+
+            // Initialize admin if needed
+            if (!auth.currentUser) {
+                initializeAdmin().catch(console.error);
+            }
+        });
+
+        // Add event listeners for logout buttons
+        document.addEventListener('DOMContentLoaded', () => {
+            // Add event listeners for logout buttons
+            const adminLogoutBtn = document.getElementById('logout-btn');
+            const employeeLogoutBtn = document.getElementById('logout-btn-employee');
+
+            if (adminLogoutBtn) {
+                adminLogoutBtn.addEventListener('click', logout);
+            }
+
+            if (employeeLogoutBtn) {
+                employeeLogoutBtn.addEventListener('click', logout);
+            }
+
+            // Existing login form listener
+            const loginForm = document.getElementById('login-form');
+            if (loginForm) {
+                loginForm.addEventListener('submit', handleLogin);
+            }
+        });
+
+        // Function to change admin password
+        async function changeAdminPassword(currentPassword, newPassword) {
+            try {
+                // Get current user
+                const user = auth.currentUser;
+                if (!user) {
+                    throw new Error('No user is currently logged in');
+                }
+
+                // Verify current password by reauthenticating
+                const credential = firebase.auth.EmailAuthProvider.credential(
+                    user.email,
+                    currentPassword
+                );
+                
+                await user.reauthenticateWithCredential(credential);
+
+                // Change password
+                await user.updatePassword(newPassword);
+
+                // Clear the form
+                document.getElementById('change-password-form').reset();
+                
+                // Show success message
+                showSyncStatus('Password changed successfully');
+                alert('Password has been changed successfully. Please login again.');
+                
+                // Log out the user
+                await logout();
+
+            } catch (error) {
+                console.error('Error changing password:', error);
+                if (error.code === 'auth/wrong-password') {
+                    alert('Current password is incorrect');
+                } else {
+                    alert('Error changing password: ' + error.message);
+                }
+            }
+        }
+
+        // Add event listener for password change form
+        document.getElementById('change-password-form')?.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const currentPassword = document.getElementById('current-password').value;
+            const newPassword = document.getElementById('new-password').value;
+            const confirmPassword = document.getElementById('confirm-password').value;
+
+            // Validate password length
+            if (newPassword.length < 6) {
+                alert('New password must be at least 6 characters long');
+                return;
+            }
+
+            // Check if passwords match
+            if (newPassword !== confirmPassword) {
+                alert('New passwords do not match');
+                return;
+            }
+
+            // Confirm password change
+            if (confirm('Are you sure you want to change your password?')) {
+                await changeAdminPassword(currentPassword, newPassword);
+            }
+        });
+
+        // Load employee data
+        async function loadEmployeeData(employeeData) {
+            try {
+                document.getElementById('employee-name').textContent = employeeData.name;
+                document.getElementById('employee-id').textContent = employeeData.id;
+                document.getElementById('employee-role').textContent = employeeData.role || 'N/A';
+            } catch (error) {
+                console.error('Error loading employee data:', error);
+                showSyncStatus('Error loading employee data', 'error');
+            }
+        }
+
+        // Update loadEmployeePenalties function
+        async function loadEmployeePenalties(employeeId) {
+            console.log('Loading penalties for employee ID:', employeeId);
+            if (!employeeId) {
+                console.error('No employee ID provided');
+                return;
+            }
+
+            try {
+                const penaltiesRef = database.ref('penalties');
+                // Remove any existing listeners first
+                penaltiesRef.off('value');
+                
+                // Set up a new real-time listener for penalties
+                penaltiesRef.on('value', (snapshot) => {
+                    const allPenalties = snapshot.val() || {};
+                    console.log('All penalties:', allPenalties);
+                    
+                    // Filter penalties for this employee
+                    const employeePenalties = Object.entries(allPenalties)
+                        .filter(([_, penalty]) => penalty.employeeId === employeeId)
+                        .reduce((acc, [key, value]) => ({...acc, [key]: value}), {});
+                    
+                    console.log('Filtered penalties for employee:', employeePenalties);
+                    
+                    // Update the employee's penalty table
+                    updateEmployeePenaltyTable(employeePenalties);
+                });
+            } catch (error) {
+                console.error('Error loading penalties:', error);
+                showSyncStatus('Error loading penalties', 'error');
+            }
+        }
+
+        // Add updateEmployeePenaltyTable function
+        function updateEmployeePenaltyTable(penalties) {
+            const tableBody = document.getElementById('employee-penalty-list');
+            if (!tableBody) {
+                console.error('Employee penalty table body not found');
+                return;
+            }
+
+            tableBody.innerHTML = '';
+            let totalUnsubmitted = 0;
+
+            // Sort penalties by date (newest first)
+            const sortedPenalties = Object.entries(penalties)
+                .sort(([, a], [, b]) => new Date(b.date) - new Date(a.date));
+
+            for (const [id, penalty] of sortedPenalties) {
+                const row = document.createElement('tr');
+                const isOverdue = new Date() > new Date(penalty.deadline) && penalty.status !== 'Submitted';
+                const displayAmount = isOverdue && !penalty.doubleAmountCancelled ? penalty.amount * 2 : penalty.amount;
+
+                // Add to total if not submitted
+                if (penalty.status !== 'Submitted') {
+                    totalUnsubmitted += displayAmount;
+                }
+
+                // Add overdue class if penalty is overdue and double amount is not cancelled
+                if (isOverdue && !penalty.doubleAmountCancelled) {
+                    row.classList.add('overdue-row');
+                }
+
+                row.innerHTML = `
+                    <td>${penalty.date}</td>
+                    <td>${penalty.reason}</td>
+                    <td>${penalty.minutes}</td>
+                    <td>$${displayAmount}${isOverdue && !penalty.doubleAmountCancelled ? ' (Doubled)' : ''}
+                        ${penalty.doubleAmountCancelled ? ' (Double Cancelled)' : ''}</td>
+                    <td>${penalty.deadline}${isOverdue && !penalty.doubleAmountCancelled ? ' (Overdue)' : ''}</td>
+                    <td>
+                        <div class="d-flex flex-column">
+                            <span class="${penalty.status === 'Submitted' ? 'status-submitted' : 'status-not-submitted'}">
+                                ${penalty.status}
+                            </span>
+                            ${penalty.status !== 'Submitted' ? `
+                                <button onclick="submitPenalty('${id}')" 
+                                        class="submit-proof-btn">
+                                    Submit Proof
+                                </button>
+                            ` : ''}
+                        </div>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            }
+
+            // Update total penalties display
+            const penaltySum = document.getElementById('penalty-sum');
+            if (penaltySum) {
+                penaltySum.textContent = totalUnsubmitted.toFixed(2);
+            }
+        }
+
+        function showPenaltyProof(penaltyId) {
+            const modal = document.getElementById('proof-modal');
+            const proofContent = document.getElementById('proof-content');
+            
+            // Show loading state
+            proofContent.innerHTML = 'Loading proof...';
+            modal.style.display = 'block';
+            
+            // Add animation
+            setTimeout(() => {
+                modal.classList.add('show');
+            }, 10);
+
+            // Fetch the proof from Firebase
+            database.ref(`penalties/${penaltyId}/proof`).once('value')
+                .then((snapshot) => {
+                    const proofData = snapshot.val();
+                    if (proofData) {
+                        proofContent.innerHTML = `
+                            <img src="${proofData}" 
+                                style="max-width: 100%; max-height: 60vh; object-fit: contain;"
+                                alt="Submitted Proof">
+                        `;
+                    } else {
+                        proofContent.innerHTML = 'No proof available';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading proof:', error);
+                    proofContent.innerHTML = 'Error loading proof';
+                });
+        }
+
+        function closeProofModal() {
+            const modal = document.getElementById('proof-modal');
+            modal.classList.remove('show');
+            setTimeout(() => {
+                modal.style.display = 'none';
+            }, 300);
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('proof-modal');
+            if (event.target === modal) {
+                closeProofModal();
+            }
+        }
+
+        // Load employee applications
+        async function loadEmployeeApplications(employeeId) {
+            console.log("Loading applications for employee:", employeeId);
+            try {
+                const applicationsRef = database.ref('applications');
+                const snapshot = await applicationsRef
+                    .orderByChild('employeeId')
+                    .equalTo(employeeId)
+                    .once('value');
+
+                const applications = snapshot.val() || {};
+                
+                const table = document.getElementById('application-status-table');
+                // Clear existing rows except header
+                while (table.rows.length > 1) {
+                    table.deleteRow(1);
+                }
+
+                // Sort applications by date (newest first)
+                const sortedApplications = Object.entries(applications)
+                    .sort(([, a], [, b]) => new Date(b.applyDate) - new Date(a.applyDate));
+
+                for (const [id, application] of sortedApplications) {
+                    const row = table.insertRow(-1);
+                    
+                    // Format the dates for display
+                    const applyDate = new Date(application.applyDate);
+                    const startDate = new Date(application.leaveStartDate);
+                    const endDate = new Date(application.leaveEndDate);
+
+                    const formattedApplyDate = formatDate(applyDate);
+                    const formattedStartDate = formatDate(startDate);
+                    const formattedEndDate = formatDate(endDate);
+
+                    row.innerHTML = `
+                        <td>${formattedApplyDate}</td>
+                        <td>${formattedStartDate}</td>
+                        <td>${formattedEndDate}</td>
+                        <td>${application.leaveType || 'N/A'}</td>
+                        <td><span class="status-${application.status.toLowerCase()}">${application.status || 'Pending'}</span></td>
+                    `;
+                }
+
+                // Calculate and update used days
+                const usedDays = await calculateUsedDays(employeeId);
+                updateDisplayedUsedDays(
+                    usedDays.sickLeaveDays,
+                    usedDays.forceMajeureDays,
+                    usedDays.overseasDays
+                );
+
+            } catch (error) {
+                console.error("Error loading applications:", error);
+                showSyncStatus('Error loading applications', 'error');
+            }
+        }
+
+        // Add this to your event listeners section
+        document.getElementById('apply-leave-form')?.addEventListener('DOMContentLoaded', function() {
+            const today = new Date();
+            const formattedToday = formatDate(today);
+            document.getElementById('apply-date').value = formattedToday;
+        });
+
+        async function submitPenalty(penaltyId) {
+            try {
+                const user = auth.currentUser;
+                if (!user) {
+                    throw new Error('You must be logged in to submit proof');
+                }
+
+                // Get the file input
+                const fileInput = document.getElementById('proof-upload');
+                
+                // Trigger file selection
+                fileInput.click();
+
+                // Handle file selection
+                fileInput.onchange = async function(e) {
+                    const file = e.target.files[0];
+                    if (!file) {
+                        return;
+                    }
+
+                    try {
+                        // Convert file to base64
+                        const base64 = await convertFileToBase64(file);
+
+                        // Update penalty status in Firebase
+                        await database.ref(`penalties/${penaltyId}`).update({
+                            status: 'Submitted',
+                            proofSubmitted: true,
+                            proofDate: new Date().toISOString(),
+                            proof: base64
+                        });
+
+                        showSyncStatus('Proof submitted successfully');
+                        
+                        // Clear the file input
+                        fileInput.value = '';
+                        
+                    } catch (error) {
+                        console.error('Error submitting proof:', error);
+                        alert('Error submitting proof: ' + error.message);
+                    }
+                };
+
+            } catch (error) {
+                console.error('Error in submit penalty:', error);
+                alert('Error: ' + error.message);
+            }
+        }
+
+        // Helper function to convert file to base64
+        function convertFileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = error => reject(error);
+                reader.readAsDataURL(file);
+            });
+        }
+
+        // Show/Hide interfaces
+        function showLoginInterface() {
+            const homePage = document.getElementById('home-page');
+            const adminPage = document.getElementById('admin-page');
+            const employeePage = document.getElementById('employee-page');
+
+            if (homePage) homePage.style.display = 'block';
+            if (adminPage) adminPage.style.display = 'none';
+            if (employeePage) employeePage.style.display = 'none';
+        }
+
+        function showAdminInterface() {
+            const homePage = document.getElementById('home-page');
+            const adminPage = document.getElementById('admin-page');
+            const employeePage = document.getElementById('employee-page');
+
+            if (homePage) homePage.style.display = 'none';
+            if (adminPage) adminPage.style.display = 'block';
+            if (employeePage) employeePage.style.display = 'none';
+        }
+
+        // Update addEmployee function
+        async function addEmployee() {
+            try {
+                // Check if user is authenticated and is admin
+                const user = auth.currentUser;
+                if (!user) {
+                    throw new Error('You must be logged in to add employees');
+                }
+
+                const adminSnapshot = await database.ref(`users/${user.uid}/isAdmin`).once('value');
+                if (!adminSnapshot.val()) {
+                    throw new Error('Only administrators can add employees');
+                }
+
+                // Get form values
+                const name = document.getElementById('emp-name').value;
+                const code = document.getElementById('emp-code').value;
+                const role = document.getElementById('emp-role').value;
+                const mdrt = document.getElementById('emp-mdrt').value;
+
+                // Validation
+                if (!name || !code || !role || !mdrt) {
+                    throw new Error('Please fill in all fields');
+                }
+
+                // Check if employee code already exists
+                const existingEmployeeSnapshot = await database.ref('employees')
+                    .orderByChild('code')
+                    .equalTo(code)
+                    .once('value');
+                
+                if (existingEmployeeSnapshot.exists()) {
+                    throw new Error('An employee with this code already exists');
+                }
+
+                // Initialize leave values
+                let normalLeaves, goldenLeaves;
+
+                // Calculate leaves based on Clubs & Awards (MDRT status)
+                switch(mdrt) {
+                    case 'no':
+                        normalLeaves = 10;
+                        goldenLeaves = 3;
+                        break;
+                    case 'mdrt':
+                        normalLeaves = 13;
+                        goldenLeaves = 3;
+                        break;
+                    case 'cot or above':
+                        normalLeaves = 999; // Using 999 to represent infinity
+                        goldenLeaves = 999; // Using 999 to represent infinity
+                        break;
+                    default:
+                        normalLeaves = 10;
+                        goldenLeaves = 3;
+                }
+
+                // Create employee data object
+                const newEmployee = {
+                    name: name,
+                    code: code,
+                    role: role,
+                    mdrt: mdrt,
+                    normalLeaves: normalLeaves,
+                    goldenLeaves: goldenLeaves,
+                    remainingNormalLeaves: normalLeaves,
+                    remainingGoldenLeaves: goldenLeaves,
+                    dateAdded: new Date().toISOString(),
+                    createdBy: user.uid,
+                    lastModified: new Date().toISOString(),
+                    sickLeaveDays: 0,
+                    forceMajeureDays: 0,
+                    overseasDays: 0
+                };
+
+                // Add to Firebase
+                console.log('Attempting to add employee:', newEmployee);
+                
+                const employeesRef = database.ref('employees');
+                const newEmployeeRef = await employeesRef.push();
+                await newEmployeeRef.set(newEmployee);
+
+                console.log('Employee added successfully');
+
+                // Create auth account for the new employee
+                try {
+                    const employeeEmail = `${name.replace(/\s+/g, '')}@snext.com`.toLowerCase();
+                    await auth.createUserWithEmailAndPassword(employeeEmail, code);
+                    
+                    // Set employee role in users collection
+                    await database.ref(`users/${auth.currentUser.uid}/role`).set('employee');
+                    
+                    console.log('Employee auth account created');
+                } catch (authError) {
+                    console.log('Auth account creation skipped:', authError.message);
+                    // Continue even if auth account creation fails
+                }
+
+                // Update local data
+                employeeData[newEmployeeRef.key] = newEmployee;
+                
+                // Update the table
+                updateEmployeeTable();
+                
+                // Clear the form
+                document.getElementById('add-employee-form').reset();
+                
+                // Show success message
+                showSyncStatus('Agent added successfully');
+
+                // Refresh the penalty employee select
+                updatePenaltyEmployeeSelect();
+
+            } catch (error) {
+                console.error('Error details:', error);
+                alert('Error adding agent: ' + error.message);
+            }
+        }
+
+        async function addPenalty() {
+            try {
+                // First check if user is authenticated and is admin
+                const user = auth.currentUser;
+                if (!user) {
+                    throw new Error('You must be logged in to add penalties');
+                }
+
+                // Check admin status
+                const adminSnapshot = await database.ref(`users/${user.uid}/isAdmin`).once('value');
+                if (!adminSnapshot.val()) {
+                    throw new Error('Only administrators can add penalties');
+                }
+
+                const employeeId = document.getElementById('penalty-employee').value;
+                const date = document.getElementById('penalty-date').value;
+                const reason = document.getElementById('penalty-reason').value;
+                const lateMinutes = parseInt(document.getElementById('penalty-minutes').value);
+
+                if (!employeeId || !date || !reason || !lateMinutes) {
+                    throw new Error('Please fill in all fields');
+                }
+
+                // Get the employee data from Firebase
+                const employeeSnapshot = await database.ref(`employees/${employeeId}`).once('value');
+                const employeeData = employeeSnapshot.val();
+
+                if (!employeeData) {
+                    throw new Error('Employee not found');
+                }
+
+                const employeeRole = employeeData.role;
+                const employeeName = employeeData.name;
+
+                // Calculate base amount based on minutes
+                let amount;
+                if (reason === 'Meeting') {
+                    if (lateMinutes >= 480) { // No show
+                        amount = 200;
+                    } else if (lateMinutes <= 5) {
+                        amount = 20;
+                    } else if (5 < lateMinutes && lateMinutes <= 10) {
+                        amount = 40;
+                    } else if (10 < lateMinutes && lateMinutes <= 15) {
+                        amount = 60;
+                    } else {
+                        amount = 100;
+                    }
+
+                    // Apply role multiplier
+                    switch (employeeRole) {
+                        case 'AUM/UM':
+                            amount *= 1.5;
+                            break;
+                        case 'SUM':
+                            amount *= 2;
+                            break;
+                        case 'BM':
+                            amount *= 3;
+                            break;
+                        case 'DM':
+                            amount *= 4;
+                            break;
+                        case 'DD':
+                            amount *= 6;
+                            break;
+                        default:
+                            // No multiplier for other roles
+                            break;
+                    }
+                }
+
+                // Round amount to nearest integer
+                amount = Math.round(amount);
+
+                // Calculate deadline (7 days from penalty date)
+                const deadlineDate = new Date(date);
+                deadlineDate.setDate(deadlineDate.getDate() + 7);
+                const deadline = deadlineDate.toISOString().split('T')[0];
+
+                // Calculate current date
+                const currentDate = new Date();
+                const penaltyDate = new Date(date);
+                const daysPassed = Math.floor((currentDate - penaltyDate) / (1000 * 60 * 60 * 24));
+
+                // Double the amount if past deadline
+                const finalAmount = daysPassed > 7 ? amount * 2 : amount;
+
+                const newPenalty = {
+                    employeeId: employeeId,  // Make sure this is the correct Firebase key
+                    employeeName: employeeName,
+                    employeeRole: employeeRole,
+                    date: date,
+                    reason: reason,
+                    minutes: lateMinutes,
+                    baseAmount: amount,
+                    amount: finalAmount,
+                    deadline: deadline,
+                    isOverdue: daysPassed > 7,
+                    status: 'Not Submitted',
+                    createdAt: new Date().toISOString(),
+                    lastModified: new Date().toISOString(),
+                    createdBy: user.uid
+                };
+
+                // Add to Firebase
+                const penaltyRef = database.ref('penalties');
+                const newPenaltyRef = await penaltyRef.push();
+                await newPenaltyRef.set(newPenalty);
+
+                // Clear form
+                document.getElementById('penalty-form').reset();
+                
+                // Show success message
+                showSyncStatus('賀金 added successfully');
+
+            } catch (error) {
+                console.error('Error adding penalty:', error);
+                alert('Error adding 賀金: ' + error.message);
+            }
+        }
+
+        // Update the penalty table display function
+        function updatePenaltyTable() {
+            const tableBody = document.getElementById('penalty-list');
+            if (!tableBody) return;
+
+            tableBody.innerHTML = '';
+
+            // Sort penalties by date (newest first)
+            const sortedPenalties = Object.entries(penaltyData || {})
+                .sort(([, a], [, b]) => new Date(b.date) - new Date(a.date));
+
+            for (const [id, penalty] of sortedPenalties) {
+                const row = document.createElement('tr');
+                const isOverdue = new Date() > new Date(penalty.deadline) && penalty.status !== 'Submitted';
+                const displayAmount = isOverdue ? penalty.amount * 2 : penalty.amount;
+
+                row.innerHTML = `
+                    <td>${penalty.employeeName}</td>
+                    <td>${penalty.date}</td>
+                    <td>${penalty.reason}</td>
+                    <td>${penalty.minutes}</td>
+                    <td>$${displayAmount}${isOverdue ? ' (Doubled)' : ''}</td>
+                    <td>${penalty.deadline}${isOverdue ? ' (Overdue)' : ''}</td>
+                    <td class="${penalty.status === 'Submitted' ? 'status-submitted' : 'status-not-submitted'}">
+                        ${penalty.status}
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            }
+        }
+
+        // Helper function to show sync status
+        function showSyncStatus(message) {
+            const syncStatus = document.getElementById('sync-status');
+            syncStatus.textContent = message;
+            syncStatus.style.display = 'block';
+            setTimeout(() => {
+                syncStatus.style.display = 'none';
+            }, 3000);
+        }
+
+        // Helper function to update penalty employee select
+        function updatePenaltyEmployeeSelect() {
+            const penaltySelect = document.getElementById('penalty-employee');
+            penaltySelect.innerHTML = '<option value="">Select Employee</option>';
+            
+            const sortedEmployees = Object.entries(employeeData)
+                .sort(([, a], [, b]) => a.name.localeCompare(b.name));
+
+            for (const [id, employee] of sortedEmployees) {
+                const option = document.createElement('option');
+                option.value = id;
+                option.textContent = employee.name;
+                penaltySelect.appendChild(option);
+            }
+        }
+
+        // Update the event listener for leave type dropdown
+        document.getElementById('leave-type')?.addEventListener('change', function() {
+            const proofContainer = document.getElementById('proof-container');
+            const proofFileInput = document.getElementById('proof-file');
+            const forceMajeureOptions = document.getElementById('force-majeure-options');
+            const forceMajeureReasonSelect = document.getElementById('force-majeure-reason');
+
+            if (this.value === 'Sick Leave' || this.value === '不可抗力因素' || this.value === '離港') {
+                proofContainer.style.display = 'block';
+                proofFileInput.disabled = false;
+                proofFileInput.required = true;
+
+                if (this.value === '不可抗力因素') {
+                    forceMajeureOptions.style.display = 'block';
+                    forceMajeureReasonSelect.required = true;
+                } else {
+                    forceMajeureOptions.style.display = 'none';
+                    forceMajeureReasonSelect.required = false;
+                }
+            } else {
+                proofContainer.style.display = 'none';
+                proofFileInput.disabled = true;
+                proofFileInput.required = false;
+                forceMajeureOptions.style.display = 'none';
+                forceMajeureReasonSelect.required = false;
+            }
+        });
+
+        // Update the event listener for leave application form submission
+        document.getElementById('apply-leave-form')?.addEventListener('submit', async function(event) {
+            event.preventDefault();
+            const applyDate = new Date();
+            const leaveStartDate = new Date(document.getElementById('leave-start-date').value);
+            const leaveEndDate = new Date(document.getElementById('leave-end-date').value);
+            const leaveType = document.getElementById('leave-type').value;
+
+            if (leaveType === 'Annual Leave (Normal)') {
+                // Calculate the minimum allowed Leave Start Date (2 days after Apply Date)
+                const minLeaveStartDate = new Date(applyDate);
+                minLeaveStartDate.setDate(minLeaveStartDate.getDate() + 1);
+
+                if (leaveStartDate < minLeaveStartDate) {
+                    alert("Leave Start Date must be at least 3 days after Apply Date for Annual Leave (Normal). (Include Apply Date)");
+                    return;
+                }
+            } else if (leaveType === 'Annual Leave (黃金事假)' || leaveType === 'Sick Leave' || leaveType === '不可抗力因素') {
+                // Allow immediate application for these leave types
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const startDate = new Date(leaveStartDate);
+                startDate.setHours(0, 0, 0, 0);
+                
+                // Allow start date to be today or future date
+                if (startDate < today) {
+                    alert("Leave Start Date cannot be earlier than today.");
+                    return;
+                }
+            }
+
+            if (leaveEndDate < leaveStartDate) {
+                alert("Leave End Date must be on or after Leave Start Date.");
+                return;
+            }
+
+            // Process leave application based on type
+            if (leaveType === 'Sick Leave' || leaveType === '不可抗力因素' || leaveType === '離港') {
+                const proofFile = document.getElementById('proof-file').files[0];
+                if (!proofFile) {
+                    alert(`Please submit proof for ${leaveType}.`);
+                    return;
+                }
+
+                // Convert proof file to base64 and process application
+                const reader = new FileReader();
+                reader.onloadend = function() {
+                    const proofDataUrl = reader.result;
+                    processLeaveApplication(applyDate, leaveStartDate, leaveEndDate, leaveType, proofDataUrl);
+                };
+                reader.readAsDataURL(proofFile);
+            } else {
+                processLeaveApplication(applyDate, leaveStartDate, leaveEndDate, leaveType, null);
+            }
+        });
+
+        function formatDate(date) {
+            // If date is a string, convert it to Date object
+            if (typeof date === 'string') {
+                date = new Date(date);
+            }
+            
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        async function processLeaveApplication(applyDate, leaveStartDate, leaveEndDate, leaveType, proofDataUrl) {
+            try {
+                // Calculate leave days
+                const leaveDays = Math.ceil((leaveEndDate - leaveStartDate) / (1000 * 60 * 60 * 24)) + 1;
+                
+                // Get current employee data
+                const employeeRef = database.ref(`employees/${currentUser.id}`);
+                const employeeSnapshot = await employeeRef.once('value');
+                const employeeData = employeeSnapshot.val();
+
+                if (!employeeData) {
+                    throw new Error('Employee data not found');
+                }
+
+                // Initialize used days if they don't exist
+                const currentSickDays = employeeData.usedSickLeaveDays || 0;
+                const currentForceDays = employeeData.usedForceMajeureDays || 0;
+                const currentOverseasDays = employeeData.usedOverseasDays || 0;
+
+                // Create updates object for the employee
+                const updates = {};
+
+                // Update used days based on leave type
+                switch (leaveType) {
+                    case 'Sick Leave':
+                        updates.usedSickLeaveDays = currentSickDays + leaveDays;
+                        break;
+                    case '不可抗力因素':
+                        updates.usedForceMajeureDays = currentForceDays + leaveDays;
+                        break;
+                    case '離港':
+                        updates.usedOverseasDays = currentOverseasDays + leaveDays;
+                        break;
+                }
+
+                // Add normal leave updates if applicable
+                if (leaveType === 'Annual Leave (Normal)' && employeeData.remainingNormalLeaves !== 999) {
+                    updates.remainingNormalLeaves = employeeData.remainingNormalLeaves - leaveDays;
+                } else if (leaveType === 'Annual Leave (黃金事假)') {
+                    if (employeeData.remainingGoldenLeaves !== 999) {
+                        updates.remainingGoldenLeaves = employeeData.remainingGoldenLeaves - leaveDays;
+                    }
+                    if (employeeData.remainingNormalLeaves !== 999) {
+                        updates.remainingNormalLeaves = employeeData.remainingNormalLeaves - leaveDays;
+                    }
+                }
+
+                // Format dates
+                const formattedApplyDate = formatDate(applyDate);
+                const formattedStartDate = formatDate(leaveStartDate);
+                const formattedEndDate = formatDate(leaveEndDate);
+
+                // Create the application object
+                const newApplication = {
+                    employeeId: currentUser.id,
+                    employeeName: currentUser.name,
+                    applyDate: formattedApplyDate,
+                    leaveStartDate: formattedStartDate,
+                    leaveEndDate: formattedEndDate,
+                    leaveType: leaveType,
+                    leaveDays: leaveDays,
+                    status: 'Approved',
+                    proof: proofDataUrl,
+                    createdAt: new Date().toISOString()
+                };
+
+                // Add to Firebase
+                const applicationsRef = database.ref('applications');
+                await applicationsRef.push(newApplication);
+
+                // Update employee data if there are any updates
+                if (Object.keys(updates).length > 0) {
+                    await employeeRef.update(updates);
+
+                    // Update displayed values
+                    if (updates.remainingNormalLeaves !== undefined || updates.remainingGoldenLeaves !== undefined) {
+                        updateDisplayedRemainingLeaves(
+                            updates.remainingNormalLeaves ?? employeeData.remainingNormalLeaves,
+                            updates.remainingGoldenLeaves ?? employeeData.remainingGoldenLeaves
+                        );
+                    }
+
+                    // Update displayed used days
+                    updateDisplayedUsedDays(
+                        updates.usedSickLeaveDays ?? currentSickDays,
+                        updates.usedForceMajeureDays ?? currentForceDays,
+                        updates.usedOverseasDays ?? currentOverseasDays
+                    );
+                }
+
+                // Clear form
+                document.getElementById('apply-leave-form').reset();
+                
+                // Reset file input and hide containers
+                const proofContainer = document.getElementById('proof-container');
+                const forceMajeureOptions = document.getElementById('force-majeure-options');
+                if (proofContainer) proofContainer.style.display = 'none';
+                if (forceMajeureOptions) forceMajeureOptions.style.display = 'none';
+
+                // Refresh the application status table
+                await loadEmployeeApplications(currentUser.id);
+                
+                // Show success message
+                showSyncStatus('Leave application submitted successfully');
+
+            } catch (error) {
+                console.error('Error processing leave application:', error);
+                alert('Error submitting leave application: ' + error.message);
+            }
+        }
+
+        async function updateRemainingLeaves(employeeId, leaveType, leaveDays) {
+            const employeeRef = database.ref(`employees/${employeeId}`);
+            const snapshot = await employeeRef.once('value');
+            const employeeData = snapshot.val();
+
+            if (!employeeData) return;
+
+            const updates = {};
+            
+            if (leaveType === 'Annual Leave (Normal)') {
+                if (employeeData.remainingNormalLeaves !== 999) { // Don't update if unlimited
+                    updates.remainingNormalLeaves = employeeData.remainingNormalLeaves - leaveDays;
+                }
+            } else if (leaveType === 'Annual Leave (黃金事假)') {
+                if (employeeData.remainingGoldenLeaves !== 999) { // Don't update if unlimited
+                    updates.remainingGoldenLeaves = employeeData.remainingGoldenLeaves - leaveDays;
+                }
+                if (employeeData.remainingNormalLeaves !== 999) { // Don't update if unlimited
+                    updates.remainingNormalLeaves = employeeData.remainingNormalLeaves - leaveDays;
+                }
+            }
+
+            if (Object.keys(updates).length > 0) {
+                await employeeRef.update(updates);
+            }
+        }        
+
+        // Helper function to update employee table
+        function updateEmployeeTable() {
+            const tableBody = document.getElementById('employee-list');
+            tableBody.innerHTML = ''; // Clear current table
+
+            // Sort employees by name
+            const sortedEmployees = Object.entries(employeeData)
+                .sort(([, a], [, b]) => a.name.localeCompare(b.name));
+
+            for (const [id, employee] of sortedEmployees) {
+                const row = document.createElement('tr');
+                
+                // Format leave display - show "∞" for 999 (infinity)
+                const normalLeavesDisplay = employee.remainingNormalLeaves === 999 ? "∞" : employee.remainingNormalLeaves;
+                const goldenLeavesDisplay = employee.remainingGoldenLeaves === 999 ? "∞" : employee.remainingGoldenLeaves;
+                
+                row.innerHTML = `
+                    <td style="padding: 10px;">${employee.name}</td>
+                    <td style="padding: 10px;">${employee.code}</td>
+                    <td style="padding: 10px;">${employee.role}</td>
+                    <td style="padding: 10px;">${employee.mdrt}</td>
+                    <td style="padding: 10px;">${normalLeavesDisplay}</td>
+                    <td style="padding: 10px;">${goldenLeavesDisplay}</td>
+                    <td style="padding: 10px;">
+                        <button class="remove-btn" onclick="removeEmployee('${id}')">Remove</button>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            }
+        }
+
+        // Initialize admin user (Run this once to set up admin)
+        async function initializeAdmin() {
+            try {
+                const adminEmail = 'admin@snext.com';
+                const adminPassword = 'admin123'; // Default admin password
+                
+                // Create admin user
+                const userCredential = await auth.createUserWithEmailAndPassword(adminEmail, adminPassword);
+                const user = userCredential.user;
+                
+                // Set admin privileges
+                await database.ref(`users/${user.uid}`).set({
+                    isAdmin: true,
+                    email: adminEmail,
+                    createdAt: new Date().toISOString(),
+                    lastModified: new Date().toISOString()
+                });
+                
+                console.log('Admin user created successfully');
+                alert('Admin account created successfully. Please login with admin@snext.com and admin123');
+            } catch (error) {
+                console.error('Error creating admin:', error);
+                if (error.code !== 'auth/email-already-in-use') {
+                    throw error;
+                }
+            }
+        }
+
+        async function loadAllApplications() {
+            try {
+                const applicationsRef = database.ref('applications');
+                applicationsRef.on('value', (snapshot) => {
+                    const applications = snapshot.val() || {};
+                    const tableBody = document.getElementById('application-list-body');
+                    if (!tableBody) return;
+
+                    tableBody.innerHTML = '';
+
+                    // Sort applications by date (newest first)
+                    const sortedApplications = Object.entries(applications)
+                        .sort(([, a], [, b]) => new Date(b.applyDate) - new Date(a.applyDate));
+
+                    for (const [id, application] of sortedApplications) {
+                        const row = document.createElement('tr');
+                        
+                        // Format dates
+                        const applyDate = new Date(application.applyDate);
+                        const startDate = new Date(application.leaveStartDate);
+                        const endDate = new Date(application.leaveEndDate);
+
+                        const formattedApplyDate = `${applyDate.getFullYear()}-${String(applyDate.getMonth() + 1).padStart(2, '0')}-${String(applyDate.getDate()).padStart(2, '0')}`;
+                        const formattedStartDate = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')}`;
+                        const formattedEndDate = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}`;
+
+                        row.innerHTML = `
+                            <td>${application.employeeName}</td>
+                            <td>${formattedApplyDate}</td>
+                            <td>${formattedStartDate}</td>
+                            <td>${formattedEndDate}</td>
+                            <td>${application.leaveType}</td>
+                            <td>
+                                <span class="status-${application.status.toLowerCase()}">${application.status}</span>
+                                ${application.status === 'Approved' ? `
+                                    <button class="reject-btn" onclick="rejectApplication('${id}', '${application.employeeId}', '${application.leaveType}')">
+                                        Reject
+                                    </button>
+                                ` : ''}
+                            </td>
+                            <td>
+                                ${(application.leaveType === 'Sick Leave' || 
+                                application.leaveType === '不可抗力因素' || 
+                                application.leaveType === '離港') && application.proof ? 
+                                    `<button class="show-proof-btn" onclick="showProof('${id}')">View Proof</button>` : 
+                                    'N/A'}
+                            </td>
+                        `;
+                        tableBody.appendChild(row);
+                    }
+                });
+            } catch (error) {
+                console.error('Error loading applications:', error);
+                showSyncStatus('Error loading applications', 'error');
+            }
+        }
+
+        // Add the rejectApplication function to handle rejection
+        async function rejectApplication(applicationId, employeeId, leaveType) {
+            try {
+                if (!confirm('Are you sure you want to reject this application?')) {
+                    return;
+                }
+
+                // Get the application data
+                const applicationSnapshot = await database.ref(`applications/${applicationId}`).once('value');
+                const application = applicationSnapshot.val();
+
+                if (!application) {
+                    throw new Error('Application not found');
+                }
+
+                // Update application status
+                await database.ref(`applications/${applicationId}`).update({
+                    status: 'Rejected',
+                    rejectedAt: new Date().toISOString(),
+                    rejectedBy: auth.currentUser.uid
+                });
+
+                // Restore the leave days for annual leaves
+                if (leaveType.includes('Annual Leave')) {
+                    const startDate = new Date(application.leaveStartDate);
+                    const endDate = new Date(application.leaveEndDate);
+                    const leaveDays = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
+
+                    const employeeRef = database.ref(`employees/${employeeId}`);
+                    const employeeSnapshot = await employeeRef.once('value');
+                    const employeeData = employeeSnapshot.val();
+
+                    if (employeeData) {
+                        const updates = {};
+                        if (leaveType === 'Annual Leave (Normal)' && employeeData.remainingNormalLeaves !== 999) {
+                            updates.remainingNormalLeaves = employeeData.remainingNormalLeaves + leaveDays;
+                        } else if (leaveType === 'Annual Leave (黃金事假)') {
+                            if (employeeData.remainingGoldenLeaves !== 999) {
+                                updates.remainingGoldenLeaves = employeeData.remainingGoldenLeaves + leaveDays;
+                            }
+                            if (employeeData.remainingNormalLeaves !== 999) {
+                                updates.remainingNormalLeaves = employeeData.remainingNormalLeaves + leaveDays;
+                            }
+                        }
+
+                        if (Object.keys(updates).length > 0) {
+                            await employeeRef.update(updates);
+                        }
+                    }
+                }
+
+                // Recalculate used days
+                const usedDays = await calculateUsedDays(employeeId);
+                updateDisplayedUsedDays(
+                    usedDays.sickLeaveDays,
+                    usedDays.forceMajeureDays,
+                    usedDays.overseasDays
+                );
+
+                showSyncStatus('Application rejected successfully');
+            } catch (error) {
+                console.error('Error rejecting application:', error);
+                alert('Error rejecting application: ' + error.message);
+            }
+        }
+
+        async function updateUsedLeaveDays(employeeId, leaveType, daysToAdd) {
+            try {
+                // Get current employee data
+                const employeeRef = database.ref(`employees/${employeeId}`);
+                const snapshot = await employeeRef.once('value');
+                const employeeData = snapshot.val();
+
+                if (!employeeData) {
+                    throw new Error('Employee not found');
+                }
+
+                // Initialize used days fields if they don't exist
+                if (!employeeData.usedSickLeaveDays) employeeData.usedSickLeaveDays = 0;
+                if (!employeeData.usedForceLeavesDays) employeeData.usedForceLeavesDays = 0;
+                if (!employeeData.usedTravelDays) employeeData.usedTravelDays = 0;
+
+                // Update the appropriate field based on leave type
+                const updates = {};
+                switch (leaveType) {
+                    case 'Sick Leave':
+                        updates.usedSickLeaveDays = employeeData.usedSickLeaveDays + daysToAdd;
+                        break;
+                    case '不可抗力因素':
+                        updates.usedForceLeavesDays = employeeData.usedForceLeavesDays + daysToAdd;
+                        break;
+                    case '離港':
+                        updates.usedTravelDays = employeeData.usedTravelDays + daysToAdd;
+                        break;
+                }
+
+                // Update the database
+                if (Object.keys(updates).length > 0) {
+                    await employeeRef.update(updates);
+                    console.log(`Updated ${leaveType} days for employee ${employeeId}`);
+                }
+
+            } catch (error) {
+                console.error('Error updating used leave days:', error);
+                throw error;
+            }
+        }
+
+        function updateDisplayedUsedDays(sickDays, forceDays, travelDays) {
+            const sickLeaveElement = document.getElementById('used-sick-leave');
+            const forceMajeureElement = document.getElementById('used-force-majeure');
+            const overseasElement = document.getElementById('used-overseas');
+
+            if (sickLeaveElement) sickLeaveElement.textContent = sickDays;
+            if (forceMajeureElement) forceMajeureElement.textContent = forceDays;
+            if (overseasElement) overseasElement.textContent = travelDays;
+        }
+
+        async function updateLeaveStatus(applicationId, newStatus, rejectionReason = '') {
+            try {
+                const user = auth.currentUser;
+                if (!user) {
+                    throw new Error('You must be logged in to update leave status');
+                }
+
+                // Get the application data first
+                const applicationRef = database.ref(`applications/${applicationId}`);
+                const snapshot = await applicationRef.once('value');
+                const application = snapshot.val();
+
+                if (!application) {
+                    throw new Error('Application not found');
+                }
+
+                // Calculate the number of days
+                const startDate = new Date(application.leaveStartDate);
+                const endDate = new Date(application.leaveEndDate);
+                const daysDifference = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
+
+                // Prepare updates object
+                const updates = {
+                    status: newStatus,
+                    updatedAt: new Date().toISOString(),
+                    updatedBy: user.uid
+                };
+
+                if (rejectionReason) {
+                    updates.rejectionReason = rejectionReason;
+                }
+
+                // Update the application status
+                await applicationRef.update(updates);
+
+                // If the application is approved, update the used days count
+                if (newStatus === 'Approved') {
+                    await updateUsedLeaveDays(
+                        application.employeeId,
+                        application.leaveType,
+                        daysDifference
+                    );
+                }
+
+                // Show success message
+                showSyncStatus(`Leave application ${newStatus.toLowerCase()} successfully`);
+
+                // Refresh the applications table
+                loadAllApplications();
+
+            } catch (error) {
+                console.error('Error updating leave status:', error);
+                showSyncStatus(`Error updating leave status: ${error.message}`, 'error');
+            }
+        }
+
+        // Function to show admin interface
+        function showAdminInterface() {
+            document.getElementById('home-page').style.display = 'none';
+            document.getElementById('admin-page').style.display = 'block';
+            document.getElementById('employee-page').style.display = 'none';
+            
+            // Initialize employee data storage
+            window.employeeData = {};
+            window.penaltyData = {};
+
+            // Load data
+            loadEmployees();
+            loadAllPenalties();
+            loadAllApplications();
+            
+            // Add event listeners for logout buttons
+            document.getElementById('logout-btn').addEventListener('click', logout);
+            document.getElementById('export-applications-btn').addEventListener('click', exportApplicationsToExcel);
+            document.getElementById('export-penalties-btn').addEventListener('click', exportPenaltiesToExcel);
+        }
+
+        // Function to show proof for leave applications
+        function showProof(applicationId) {
+            const modal = document.getElementById('proof-modal');
+            const proofContent = document.getElementById('proof-content');
+            
+            // Show loading state
+            proofContent.innerHTML = '<div style="text-align: center; padding: 20px;">Loading proof...</div>';
+            modal.style.display = 'flex'; // Changed from 'block' to 'flex'
+            
+            // Add animation
+            requestAnimationFrame(() => {
+                modal.classList.add('show');
+            });
+
+            // Fetch the proof from Firebase
+            database.ref(`applications/${applicationId}/proof`).once('value')
+                .then((snapshot) => {
+                    const proofData = snapshot.val();
+                    if (proofData) {
+                        const img = new Image();
+                        img.onload = function() {
+                            proofContent.innerHTML = `
+                                <img src="${proofData}" 
+                                    alt="Submitted Proof"
+                                    style="max-width: 100%; max-height: 70vh; object-fit: contain;">
+                            `;
+                        };
+                        img.src = proofData;
+                    } else {
+                        proofContent.innerHTML = '<div style="text-align: center; padding: 20px;">No proof available</div>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading proof:', error);
+                    proofContent.innerHTML = '<div style="text-align: center; padding: 20px; color: red;">Error loading proof</div>';
+                });
+        }
+
+        // Function to export applications to Excel
+        function exportApplicationsToExcel() {
+            try {
+                // Get the applications data
+                const table = document.getElementById('application-list-table');
+                if (!table) {
+                    throw new Error('Table not found');
+                }
+
+                // Create CSV content
+                let csvContent = '\uFEFF'; // Add BOM for Excel to handle Chinese characters correctly
+                
+                // Add headers
+                const headers = [];
+                table.querySelectorAll('thead th').forEach(header => {
+                    headers.push(header.innerText);
+                });
+                csvContent += headers.join(',') + '\n';
+
+                // Add data rows
+                table.querySelectorAll('tbody tr').forEach(row => {
+                    const rowData = [];
+                    row.querySelectorAll('td').forEach(cell => {
+                        // Get only the text content, remove any HTML
+                        let cellText = cell.innerText.replace(/,/g, '，'); // Replace commas with Chinese comma
+                        // Remove any new lines
+                        cellText = cellText.replace(/\n/g, ' ');
+                        rowData.push('"' + cellText + '"');
+                    });
+                    csvContent += rowData.join(',') + '\n';
+                });
+
+                // Create blob and download
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                const url = URL.createObjectURL(blob);
+                
+                // Get current date for filename
+                const date = new Date().toISOString().slice(0,10);
+                
+                link.setAttribute('href', url);
+                link.setAttribute('download', `Leave_Applications_${date}.csv`);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+
+                showSyncStatus('Applications exported successfully');
+            } catch (error) {
+                console.error('Error exporting applications:', error);
+                alert('Error exporting applications: ' + error.message);
+            }
+        }
+
+        // Function to export penalties to Excel
+        function exportPenaltiesToExcel() {
+            try {
+                // Get the penalties data
+                const table = document.getElementById('penalty-table');
+                if (!table) {
+                    throw new Error('Table not found');
+                }
+
+                // Create CSV content
+                let csvContent = '\uFEFF'; // Add BOM for Excel to handle Chinese characters correctly
+                
+                // Add headers
+                const headers = [];
+                table.querySelectorAll('thead th').forEach(header => {
+                    headers.push(header.innerText);
+                });
+                csvContent += headers.join(',') + '\n';
+
+                // Add data rows
+                table.querySelectorAll('tbody tr').forEach(row => {
+                    const rowData = [];
+                    row.querySelectorAll('td').forEach(cell => {
+                        // Get text content and handle special cases
+                        let cellText = cell.innerText;
+                        
+                        // Handle amount column (remove currency symbol and 'Doubled' text)
+                        if (cellText.includes('$')) {
+                            cellText = cellText.replace('$', '')
+                                            .replace(' (Doubled)', '')
+                                            .replace(' (Double Cancelled)', '');
+                        }
+                        
+                        // Clean up the text
+                        cellText = cellText.replace(/,/g, '，') // Replace commas with Chinese comma
+                                        .replace(/\n/g, ' ') // Remove new lines
+                                        .trim();
+                        
+                        rowData.push('"' + cellText + '"');
+                    });
+                    csvContent += rowData.join(',') + '\n';
+                });
+
+                // Create blob and download
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                const url = URL.createObjectURL(blob);
+                
+                // Get current date for filename
+                const date = new Date().toISOString().slice(0,10);
+                
+                link.setAttribute('href', url);
+                link.setAttribute('download', `Penalties_${date}.csv`);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+
+                showSyncStatus('Penalties exported successfully');
+            } catch (error) {
+                console.error('Error exporting penalties:', error);
+                alert('Error exporting penalties: ' + error.message);
+            }
+        }
+
+        // Function to show employee interface
+        function showEmployeeInterface() {
+            // Hide/show appropriate pages
+            document.getElementById('home-page').style.display = 'none';
+            document.getElementById('admin-page').style.display = 'none';
+            document.getElementById('employee-page').style.display = 'block';
+
+            // Only load data if we have a current user
+            if (currentUser && currentUser.id) {
+                console.log('Current user:', currentUser);
+                
+                // Load employee data
+                loadEmployeeData(currentUser);
+                
+                // Remove any existing penalty listeners
+                database.ref('penalties').off('value');
+                
+                // Load penalties
+                loadEmployeePenalties(currentUser.id);
+            } else {
+                console.error('No current user data available');
+            }
+
+            // Initialize the application status table if needed
+            const applicationTable = document.getElementById('application-status-table');
+            if (applicationTable && !applicationTable.getElementsByTagName('tbody').length) {
+                const tbody = document.createElement('tbody');
+                applicationTable.appendChild(tbody);
+            }
+
+            // Add event listener for logout
+            const logoutBtn = document.getElementById('logout-btn-employee');
+            if (logoutBtn) {
+                // Remove existing listeners to prevent duplicates
+                const newLogoutBtn = logoutBtn.cloneNode(true);
+                logoutBtn.parentNode.replaceChild(newLogoutBtn, logoutBtn);
+                newLogoutBtn.addEventListener('click', logout);
+            }
+        }
+
+        async function calculateUsedDays(employeeId) {
+            try {
+                const applicationsRef = database.ref('applications');
+                const snapshot = await applicationsRef
+                    .orderByChild('employeeId')
+                    .equalTo(employeeId)
+                    .once('value');
+
+                const applications = snapshot.val() || {};
+
+                let sickLeaveDays = 0;
+                let forceMajeureDays = 0;
+                let overseasDays = 0;
+
+                // Calculate days for each approved application
+                Object.values(applications).forEach(application => {
+                    if (application.status === 'Approved') {
+                        const startDate = new Date(application.leaveStartDate);
+                        const endDate = new Date(application.leaveEndDate);
+                        const days = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
+
+                        switch (application.leaveType) {
+                            case 'Sick Leave':
+                                sickLeaveDays += days;
+                                break;
+                            case '不可抗力因素':
+                                forceMajeureDays += days;
+                                break;
+                            case '離港':
+                                overseasDays += days;
+                                break;
+                        }
+                    }
+                });
+
+                return { sickLeaveDays, forceMajeureDays, overseasDays };
+            } catch (error) {
+                console.error('Error calculating used days:', error);
+                throw error;
+            }
+        }
+
+        // Function to load employee data
+        function loadEmployeeData(employee) {
+            console.log("Loading employee data:", employee);
+            try {
+                if (employee) {
+                    document.getElementById('employee-name').textContent = employee.name || 'N/A';
+                    document.getElementById('employee-code').textContent = employee.code || 'N/A';
+                    document.getElementById('employee-role').textContent = employee.role || 'N/A';
+                    document.getElementById('employee-mdrt').textContent = employee.mdrt || 'N/A';
+                    
+                    // Format leave displays
+                    const normalLeaves = employee.normalLeaves === 999 ? "∞" : (employee.normalLeaves || '0');
+                    const goldenLeaves = employee.goldenLeaves === 999 ? "∞" : (employee.goldenLeaves || '0');
+                    const remainingNormal = employee.remainingNormalLeaves === 999 ? "∞" : (employee.remainingNormalLeaves || '0');
+                    const remainingGolden = employee.remainingGoldenLeaves === 999 ? "∞" : (employee.remainingGoldenLeaves || '0');
+                    
+                    document.getElementById('employee-leave-normal').textContent = normalLeaves;
+                    document.getElementById('employee-leave-golden').textContent = goldenLeaves;
+                    document.getElementById('remaining-leave-normal').textContent = remainingNormal;
+                    document.getElementById('remaining-leave-golden').textContent = remainingGolden;
+
+                    // Update used days display
+                    updateDisplayedUsedDays(
+                        employee.usedSickLeaveDays || 0,
+                        employee.usedForceMajeureDays || 0,
+                        employee.usedOverseasDays || 0
+                    );
+                } else {
+                    console.error("No employee data provided");
+                }
+            } catch (error) {
+                console.error("Error loading employee data:", error);
+            }
+        }
+
+        // Update loadAllPenalties function to use the new updatePenaltyTable
+        function loadAllPenalties() {
+            const penaltyRef = database.ref('penalties');
+            penaltyRef.on('value', (snapshot) => {
+                const penalties = snapshot.val() || {};
+                updatePenaltyTable(penalties);
+            });
+        }
+
+        // Update the penalty table display function
+        function updatePenaltyTable(penalties) {
+            const tableBody = document.getElementById('penalty-list');
+            if (!tableBody) return;
+
+            tableBody.innerHTML = '';
+
+            // Sort penalties by date (newest first)
+            const sortedPenalties = Object.entries(penalties || {})
+                .sort(([, a], [, b]) => new Date(b.date) - new Date(a.date));
+
+            for (const [id, penalty] of sortedPenalties) {
+                const row = document.createElement('tr');
+                const isOverdue = new Date() > new Date(penalty.deadline) && penalty.status !== 'Submitted';
+                const displayAmount = isOverdue && !penalty.doubleAmountCancelled ? penalty.amount * 2 : penalty.amount;
+
+                // Add overdue class to row if penalty is overdue and double amount is not cancelled
+                if (isOverdue && !penalty.doubleAmountCancelled) {
+                    row.classList.add('overdue-row');
+                }
+
+                row.innerHTML = `
+                    <td>${penalty.employeeName}</td>
+                    <td>${penalty.date}</td>
+                    <td>${penalty.reason}</td>
+                    <td>${penalty.minutes}</td>
+                    <td>$${displayAmount}${isOverdue && !penalty.doubleAmountCancelled ? ' (Doubled)' : ''}
+                        ${penalty.doubleAmountCancelled ? ' (Double Cancelled)' : ''}</td>
+                    <td>${penalty.deadline}${isOverdue && !penalty.doubleAmountCancelled ? ' (Overdue)' : ''}</td>
+                    <td>
+                        <div class="d-flex flex-column">
+                            <span class="${penalty.status === 'Submitted' ? 'status-submitted' : 'status-not-submitted'}">
+                                ${penalty.status}
+                            </span>
+                            <div style="display: flex; gap: 5px; margin-top: 5px;">
+                                ${penalty.status === 'Submitted' ? `
+                                    <button onclick="showPenaltyProof('${id}')" 
+                                            class="show-proof-btn">
+                                        Show Proof
+                                    </button>
+                                    <button onclick="rejectPenalty('${id}')" 
+                                            class="reject-btn">
+                                        Reject
+                                    </button>
+                                ` : ''}
+                                ${isOverdue && !penalty.doubleAmountCancelled && penalty.status !== 'Submitted' ? `
+                                    <button onclick="cancelDoublePenalty('${id}')" 
+                                            class="cancel-double-btn">
+                                        Cancel Double
+                                    </button>
+                                ` : ''}
+                                <button onclick="removePenalty('${id}')" 
+                                        class="remove-btn-small">
+                                    Remove
+                                </button>
+                            </div>
+                        </div>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            }
+        }
+
+        // cancelDoublePenalty function
+        async function cancelDoublePenalty(penaltyId) {
+            try {
+                // Check if user is authenticated and is admin
+                const user = auth.currentUser;
+                if (!user) {
+                    throw new Error('You must be logged in to cancel double penalties');
+                }
+
+                // Check admin status
+                const adminSnapshot = await database.ref(`users/${user.uid}/isAdmin`).once('value');
+                if (!adminSnapshot.val()) {
+                    throw new Error('Only administrators can cancel double penalties');
+                }
+
+                // Confirm cancellation
+                if (confirm('Are you sure you want to cancel the double amount for this penalty?')) {
+                    // Get the current penalty data
+                    const penaltySnapshot = await database.ref(`penalties/${penaltyId}`).once('value');
+                    const penaltyData = penaltySnapshot.val();
+
+                    if (!penaltyData) {
+                        throw new Error('Penalty not found');
+                    }
+
+                    // Update the penalty to mark double amount as cancelled
+                    const updates = {
+                        doubleAmountCancelled: true,
+                        doubleAmountCancelledAt: new Date().toISOString(),
+                        doubleAmountCancelledBy: user.uid,
+                        lastModified: new Date().toISOString()
+                    };
+
+                    await database.ref(`penalties/${penaltyId}`).update(updates);
+                    
+                    // Show success message
+                    showSyncStatus('Double penalty cancelled successfully');
+                }
+            } catch (error) {
+                console.error('Error cancelling double penalty:', error);
+                alert('Error cancelling double penalty: ' + error.message);
+            }
+        }
+
+        // Function to remove a penalty
+        async function removePenalty(penaltyId) {
+            try {
+                // Check if user is authenticated and is admin
+                const user = auth.currentUser;
+                if (!user) {
+                    throw new Error('You must be logged in to remove penalties');
+                }
+
+                // Check admin status
+                const adminSnapshot = await database.ref(`users/${user.uid}/isAdmin`).once('value');
+                if (!adminSnapshot.val()) {
+                    throw new Error('Only administrators can remove penalties');
+                }
+
+                // Confirm deletion
+                if (confirm('Are you sure you want to remove this penalty?')) {
+                    // Remove from Firebase
+                    await database.ref(`penalties/${penaltyId}`).remove();
+                    
+                    // Show success message
+                    showSyncStatus('Penalty removed successfully');
+                }
+            } catch (error) {
+                console.error('Error removing penalty:', error);
+                alert('Error removing penalty: ' + error.message);
+            }
+        }
+
+        async function rejectPenalty(penaltyId) {
+            try {
+                // Check if user is authenticated and is admin
+                const user = auth.currentUser;
+                if (!user) {
+                    throw new Error('You must be logged in to reject penalties');
+                }
+
+                // Check admin status
+                const adminSnapshot = await database.ref(`users/${user.uid}/isAdmin`).once('value');
+                if (!adminSnapshot.val()) {
+                    throw new Error('Only administrators can reject penalties');
+                }
+
+                // Confirm rejection
+                if (confirm('Are you sure you want to reject this penalty submission?')) {
+                    // Get the current penalty data
+                    const penaltySnapshot = await database.ref(`penalties/${penaltyId}`).once('value');
+                    const penaltyData = penaltySnapshot.val();
+
+                    if (!penaltyData) {
+                        throw new Error('Penalty not found');
+                    }
+
+                    // Update the penalty status and remove the proof
+                    const updates = {
+                        status: 'Not Submitted',
+                        proof: null,
+                        proofSubmitted: false,
+                        rejectedAt: new Date().toISOString(),
+                        rejectedBy: user.uid,
+                        lastModified: new Date().toISOString()
+                    };
+
+                    await database.ref(`penalties/${penaltyId}`).update(updates);
+                    
+                    // Show success message
+                    showSyncStatus('Penalty submission rejected successfully');
+                }
+            } catch (error) {
+                console.error('Error rejecting penalty:', error);
+                alert('Error rejecting penalty: ' + error.message);
+            }
+        }
+
+        // Add event listener to MDRT select to show alert for COT or above selection
+        document.getElementById('emp-mdrt').addEventListener('change', function() {
+            if (this.value === 'cot or above') {
+                alert('Note: COT or above members have unlimited (∞) leaves for both Normal and 黃金事假.');
+            }
+        });
+
+        async function loadEmployees() {
+            const employeeRef = database.ref('employees');
+            employeeRef.on('value', (snapshot) => {
+                const employees = snapshot.val();
+                const employeeList = document.getElementById('employee-list');
+                employeeList.innerHTML = '';
+
+                for (let id in employees) {
+                    const emp = employees[id];
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${emp.name}</td>
+                        <td>${emp.code}</td>
+                        <td>${emp.role}</td>
+                        <td>${emp.mdrt}</td>
+                        <td>${emp.remainingNormalLeaves === 999 ? "∞" : emp.remainingNormalLeaves}</td>
+                        <td>${emp.remainingGoldenLeaves === 999 ? "∞" : emp.remainingGoldenLeaves}</td>
+                        <td>
+                            <button class="remove-btn" onclick="removeAgent('${id}', this.parentElement.parentElement)">Remove</button>
+                        </td>
+                    `;
+                    employeeList.appendChild(row);
+                }
+
+                // Update penalty employee select options
+                const penaltySelect = document.getElementById('penalty-employee');
+                penaltySelect.innerHTML = '<option value="">Select Employee</option>';
+                for (let id in employees) {
+                    const emp = employees[id];
+                    penaltySelect.innerHTML += `
+                        <option value="${id}">${emp.name}</option>
+                    `;
+                }
+            });
+        }
+
+        // Function to clear all leave application records
+        async function clearAllLeaveRecords() {
+            try {
+                if (!confirm('Are you sure you want to clear all leave application records? This action cannot be undone.')) {
+                    return;
+                }
+
+                // Reference to the applications node
+                const applicationsRef = database.ref('applications');
+                
+                // Remove all applications
+                await applicationsRef.remove();
+                
+                // Clear the table in the UI
+                const tableBody = document.getElementById('application-list-body');
+                if (tableBody) {
+                    tableBody.innerHTML = '';
+                }
+
+                showSyncStatus('All leave application records have been cleared successfully');
+            } catch (error) {
+                console.error('Error clearing leave records:', error);
+                showSyncStatus('Error clearing leave records', 'error');
+            }
+        }
+
+        // Add event listener when the document is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            const exportApplicationsBtn = document.getElementById('export-applications-btn');
+            const exportPenaltiesBtn = document.getElementById('export-penalties-btn');
+
+            if (exportApplicationsBtn) {
+                exportApplicationsBtn.addEventListener('click', exportApplicationsToExcel);
+            }
+
+            if (exportPenaltiesBtn) {
+                exportPenaltiesBtn.addEventListener('click', exportPenaltiesToExcel);
+            }
+        });
+
+        function updateDisplayedRemainingLeaves(normalLeaves, goldenLeaves) {
+            const remainingNormalElement = document.getElementById('remaining-leave-normal');
+            const remainingGoldenElement = document.getElementById('remaining-leave-golden');
+
+            if (remainingNormalElement) {
+                remainingNormalElement.textContent = normalLeaves === 999 ? "∞" : normalLeaves;
+            }
+            if (remainingGoldenElement) {
+                remainingGoldenElement.textContent = goldenLeaves === 999 ? "∞" : goldenLeaves;
+            }
+        }
+
+        // Function to remove an employee and their associated penalties
+        async function removeAgent(employeeId, rowElement) {
+            try {
+                if (!confirm('Are you sure you want to remove this agent?')) {
+                    return;
+                }
+
+                // Remove agent's applications first
+                const applicationsRef = database.ref('applications');
+                const applicationsSnapshot = await applicationsRef
+                    .orderByChild('employeeId')
+                    .equalTo(employeeId)
+                    .once('value');
+                
+                const applicationUpdates = {};
+                applicationsSnapshot.forEach(childSnapshot => {
+                    applicationUpdates[`applications/${childSnapshot.key}`] = null;
+                });
+
+                // Also remove any penalties associated with this employee
+                const penaltiesRef = database.ref('penalties');
+                const penaltiesSnapshot = await penaltiesRef
+                    .orderByChild('employeeId')
+                    .equalTo(employeeId)
+                    .once('value');
+                
+                const penaltyUpdates = {};
+                penaltiesSnapshot.forEach(childSnapshot => {
+                    penaltyUpdates[`penalties/${childSnapshot.key}`] = null;
+                });
+
+                // Remove agent from employees
+                const employeeRef = database.ref(`employees/${employeeId}`);
+                
+                // Combine all deletions in a single update
+                const updates = {
+                    [`employees/${employeeId}`]: null,
+                    ...applicationUpdates,
+                    ...penaltyUpdates
+                };
+
+                // Perform the combined update
+                await database.ref().update(updates);
+
+                // Remove the row from the table if a row element was provided
+                if (rowElement && rowElement.parentNode) {
+                    rowElement.parentNode.removeChild(rowElement);
+                }
+
+                showSyncStatus('Agent removed successfully');
+            } catch (error) {
+                console.error('Error removing agent:', error);
+                showSyncStatus('Error removing agent', 'error');
+            }
+        }
+
+    </script>
+</body>
+</html>
+
