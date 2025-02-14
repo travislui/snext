@@ -1051,7 +1051,51 @@
         <button type="button" id="add-employee-btn" class="add-btn">Add Agent</button>
     </form>
 
-    <h3>賀金</h3>
+    <h3>Add Leave Record</h3>
+    <form id="admin-leave-form">
+        <select id="admin-leave-employee" required>
+            <option value="">Select Agent</option>
+        </select>
+        <label for="admin-apply-date">Apply Date:</label>
+        <input type="date" id="admin-apply-date" required>
+        <label for="admin-leave-start-date">Leave Start Date:</label>
+        <input type="date" id="admin-leave-start-date" required>
+        <label for="admin-leave-end-date">Leave End Date:</label>
+        <input type="date" id="admin-leave-end-date" required>
+        <label for="admin-leave-type">Leave Type:</label>
+        <select id="admin-leave-type" required>
+            <option value="Annual Leave (Normal)">Annual Leave (Normal)</option>
+            <option value="Annual Leave (黃金事假)">Annual Leave (黃金事假)</option>
+            <option value="Sick Leave">Sick Leave</option>
+            <option value="不可抗力因素">不可抗力因素</option>
+            <option value="離港">離港</option>
+        </select>
+        <div id="admin-force-majeure-options" style="display: none;">
+            <label for="admin-force-majeure-reason">Reason:</label>
+            <select id="admin-force-majeure-reason">
+                <option value="">Select a reason</option>
+                <option value="大學生考試">大學生考試</option>
+                <option value="IIQE PAPER 1 & 3 考試">IIQE PAPER 1 & 3 考試</option>
+                <option value="擔任公司/其他區域的分享嘉賓及伴同出席分享的同事">擔任公司/其他區域的分享嘉賓及伴同出席分享的同事</option>
+                <option value="參加公司活動(只有一個時間)">參加公司活動(只有一個時間)</option>
+                <option value="參加頒獎典禮及領獎">參加頒獎典禮及領獎</option>
+                <option value="CIAM課程">CIAM課程</option>
+                <option value="PA/EDP/PA & EDP Elite/FP/新UM課程">PA/EDP/PA & EDP Elite/FP/新UM課程</option>
+                <option value="正日莊務">正日莊務</option>
+                <option value="考車正日">考車正日</option>
+                <option value="直系親屬紅白二事(包括自己結婚)">直系親屬紅白二事(包括自己結婚)</option>
+                <option value="陪同行動不便的父母、子女、配偶見醫生(需當日提供合理證明)">陪同行動不便的父母、子女、配偶見醫生(需當日提供合理證明)</option>
+                <option value="陪同寵物見醫生(同事是唯一照顧者&需當日提供合理證明)">陪同寵物見醫生(同事是唯一照顧者&需當日提供合理證明)</option>
+            </select>
+        </div>
+        <div id="admin-proof-container" style="display: none;">
+            <label for="admin-proof-file">Proof:</label>
+            <input type="file" id="admin-proof-file" accept="image/*">
+        </div>
+        <button type="submit">Add Leave Record</button>
+    </form>
+
+    <h3>Add 賀金</h3>
     <form id="penalty-form">
         <select id="penalty-employee" required>
             <option value="">Select Employee</option>
@@ -1101,6 +1145,7 @@
                     <th>Leave Type</th>
                     <th>Status</th>
                     <th>Proof</th>
+                    <th>Action</th>
                 </tr>
             </thead>
             <tbody id="application-list-body"></tbody>
@@ -2608,7 +2653,7 @@
                             <td>
                                 <span class="status-${application.status.toLowerCase()}">${application.status}</span>
                                 ${application.status === 'Approved' ? `
-                                    <button class="reject-btn" onclick="rejectApplication('${id}', '${application.employeeId}', '${application.leaveType}')">
+                                    <button type="button" class="reject-btn" onclick="rejectApplication('${id}', '${application.employeeId}', '${application.leaveType}')">
                                         Reject
                                     </button>
                                 ` : ''}
@@ -2617,8 +2662,15 @@
                                 ${(application.leaveType === 'Sick Leave' || 
                                 application.leaveType === '不可抗力因素' || 
                                 application.leaveType === '離港') && application.proof ? 
-                                    `<button class="show-proof-btn" onclick="showProof('${id}')">View Proof</button>` : 
+                                    `<button type="button" class="show-proof-btn" onclick="showProof('${id}')">View Proof</button>` : 
                                     'N/A'}
+                            </td>
+                            <td>
+                                <button type="button" 
+                                        class="remove-btn-small" 
+                                        onclick="handleRemoveSingleApplication(event, '${id}', '${application.employeeId}', '${application.leaveType}', ${application.leaveDays}, '${application.status}')">
+                                    Remove
+                                </button>
                             </td>
                         `;
                         tableBody.appendChild(row);
@@ -2628,6 +2680,13 @@
                 console.error('Error loading applications:', error);
                 showSyncStatus('Error loading applications', 'error');
             }
+        }
+
+        // Add this new handler function
+        function handleRemoveSingleApplication(event, ...args) {
+            event.preventDefault();
+            event.stopPropagation();
+            removeSingleApplication(...args);
         }
 
         // Add the rejectApplication function to handle rejection
@@ -2735,6 +2794,83 @@
             } catch (error) {
                 console.error('Error updating used leave days:', error);
                 throw error;
+            }
+        }
+
+        // Update the removeSingleApplication function
+        async function removeSingleApplication(applicationId, employeeId, leaveType, leaveDays, status) {
+            try {
+                // Check if user is admin
+                const user = auth.currentUser;
+                if (!user) {
+                    throw new Error('You must be logged in to remove applications');
+                }
+
+                const adminSnapshot = await database.ref(`users/${user.uid}/isAdmin`).once('value');
+                if (!adminSnapshot.val()) {
+                    throw new Error('Only administrators can remove applications');
+                }
+
+                if (!confirm('Are you sure you want to remove this leave application?')) {
+                    return;
+                }
+
+                // Get employee data
+                const employeeRef = database.ref(`employees/${employeeId}`);
+                const employeeSnapshot = await employeeRef.once('value');
+                const employeeData = employeeSnapshot.val();
+
+                if (!employeeData) {
+                    throw new Error('Employee data not found');
+                }
+
+                // Only return leaves if the application was approved
+                if (status === 'Approved' && 
+                    (leaveType === 'Annual Leave (Normal)' || leaveType === 'Annual Leave (黃金事假)')) {
+                    
+                    const updates = {};
+
+                    if (leaveType === 'Annual Leave (Normal)') {
+                        if (employeeData.remainingNormalLeaves !== 999) {
+                            updates.remainingNormalLeaves = employeeData.remainingNormalLeaves + leaveDays;
+                            // Ensure it doesn't exceed original allocation
+                            if (updates.remainingNormalLeaves > employeeData.normalLeaves) {
+                                updates.remainingNormalLeaves = employeeData.normalLeaves;
+                            }
+                        }
+                    } else if (leaveType === 'Annual Leave (黃金事假)') {
+                        if (employeeData.remainingGoldenLeaves !== 999) {
+                            updates.remainingGoldenLeaves = employeeData.remainingGoldenLeaves + leaveDays;
+                            // Ensure it doesn't exceed original allocation
+                            if (updates.remainingGoldenLeaves > employeeData.goldenLeaves) {
+                                updates.remainingGoldenLeaves = employeeData.goldenLeaves;
+                            }
+                        }
+                        if (employeeData.remainingNormalLeaves !== 999) {
+                            updates.remainingNormalLeaves = employeeData.remainingNormalLeaves + leaveDays;
+                            // Ensure it doesn't exceed original allocation
+                            if (updates.remainingNormalLeaves > employeeData.normalLeaves) {
+                                updates.remainingNormalLeaves = employeeData.normalLeaves;
+                            }
+                        }
+                    }
+
+                    // Update employee data if there are changes
+                    if (Object.keys(updates).length > 0) {
+                        await employeeRef.update(updates);
+                    }
+                }
+
+                // Remove the application
+                await database.ref(`applications/${applicationId}`).remove();
+
+                // Refresh the employee data
+                await loadEmployees();
+
+                showSyncStatus('Leave application removed successfully');
+            } catch (error) {
+                console.error('Error removing application:', error);
+                alert('Error removing application: ' + error.message);
             }
         }
 
@@ -3300,34 +3436,42 @@
             const employeeRef = database.ref('employees');
             employeeRef.on('value', (snapshot) => {
                 const employees = snapshot.val();
+                
+                // Update employee list table
                 const employeeList = document.getElementById('employee-list');
-                employeeList.innerHTML = '';
+                if (employeeList) employeeList.innerHTML = '';
 
-                for (let id in employees) {
-                    const emp = employees[id];
-                    const row = document.createElement('tr');
-                    row.innerHTML = `
-                        <td>${emp.name}</td>
-                        <td>${emp.code}</td>
-                        <td>${emp.role}</td>
-                        <td>${emp.mdrt}</td>
-                        <td>${emp.remainingNormalLeaves === 999 ? "∞" : emp.remainingNormalLeaves}</td>
-                        <td>${emp.remainingGoldenLeaves === 999 ? "∞" : emp.remainingGoldenLeaves}</td>
-                        <td>
-                            <button class="remove-btn" onclick="removeAgent('${id}', this.parentElement.parentElement)">Remove</button>
-                        </td>
-                    `;
-                    employeeList.appendChild(row);
-                }
-
-                // Update penalty employee select options
+                // Update both penalty and leave form employee selects
                 const penaltySelect = document.getElementById('penalty-employee');
-                penaltySelect.innerHTML = '<option value="">Select Employee</option>';
+                const leaveSelect = document.getElementById('admin-leave-employee');
+                
+                if (penaltySelect) penaltySelect.innerHTML = '<option value="">Select Employee</option>';
+                if (leaveSelect) leaveSelect.innerHTML = '<option value="">Select Agent</option>';
+
                 for (let id in employees) {
                     const emp = employees[id];
-                    penaltySelect.innerHTML += `
-                        <option value="${id}">${emp.name}</option>
-                    `;
+                    
+                    // Update employee list table
+                    if (employeeList) {
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td>${emp.name}</td>
+                            <td>${emp.code}</td>
+                            <td>${emp.role}</td>
+                            <td>${emp.mdrt}</td>
+                            <td>${emp.remainingNormalLeaves === 999 ? "∞" : emp.remainingNormalLeaves}</td>
+                            <td>${emp.remainingGoldenLeaves === 999 ? "∞" : emp.remainingGoldenLeaves}</td>
+                            <td>
+                                <button class="remove-btn" onclick="removeAgent('${id}', this.parentElement.parentElement)">Remove</button>
+                            </td>
+                        `;
+                        employeeList.appendChild(row);
+                    }
+
+                    // Update both select options
+                    const option = `<option value="${id}">${emp.name}</option>`;
+                    if (penaltySelect) penaltySelect.innerHTML += option;
+                    if (leaveSelect) leaveSelect.innerHTML += option;
                 }
             });
         }
@@ -3335,26 +3479,110 @@
         // Function to clear all leave application records
         async function clearAllLeaveRecords() {
             try {
+                // Check if user is admin
+                const user = auth.currentUser;
+                if (!user) {
+                    throw new Error('You must be logged in to clear records');
+                }
+
+                const adminSnapshot = await database.ref(`users/${user.uid}/isAdmin`).once('value');
+                if (!adminSnapshot.val()) {
+                    throw new Error('Only administrators can clear records');
+                }
+
                 if (!confirm('Are you sure you want to clear all leave application records? This action cannot be undone.')) {
                     return;
                 }
 
-                // Reference to the applications node
+                // Get all applications first
                 const applicationsRef = database.ref('applications');
-                
-                // Remove all applications
-                await applicationsRef.remove();
-                
+                const applicationsSnapshot = await applicationsRef.once('value');
+                const applications = applicationsSnapshot.val() || {};
+
+                // Get all employees
+                const employeesRef = database.ref('employees');
+                const employeesSnapshot = await employeesRef.once('value');
+                const employees = employeesSnapshot.val() || {};
+
+                // Create a map to store leave updates for each employee
+                const employeeUpdates = {};
+
+                // Calculate leaves to return for each employee
+                Object.values(applications).forEach(application => {
+                    if (application.status === 'Approved' && 
+                        (application.leaveType === 'Annual Leave (Normal)' || 
+                        application.leaveType === 'Annual Leave (黃金事假)')) {
+                        
+                        const employeeId = application.employeeId;
+                        const employee = employees[employeeId];
+                        
+                        if (employee) {
+                            if (!employeeUpdates[employeeId]) {
+                                employeeUpdates[employeeId] = {
+                                    remainingNormalLeaves: employee.remainingNormalLeaves,
+                                    remainingGoldenLeaves: employee.remainingGoldenLeaves
+                                };
+                            }
+
+                            // Calculate days between start and end dates
+                            const startDate = new Date(application.leaveStartDate);
+                            const endDate = new Date(application.leaveEndDate);
+                            const leaveDays = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
+
+                            // Return leaves based on type
+                            if (application.leaveType === 'Annual Leave (Normal)' && 
+                                employee.remainingNormalLeaves !== 999) {
+                                employeeUpdates[employeeId].remainingNormalLeaves += leaveDays;
+                            } else if (application.leaveType === 'Annual Leave (黃金事假)') {
+                                if (employee.remainingGoldenLeaves !== 999) {
+                                    employeeUpdates[employeeId].remainingGoldenLeaves += leaveDays;
+                                }
+                                if (employee.remainingNormalLeaves !== 999) {
+                                    employeeUpdates[employeeId].remainingNormalLeaves += leaveDays;
+                                }
+                            }
+
+                            // Ensure leaves don't exceed original allocation
+                            if (employeeUpdates[employeeId].remainingNormalLeaves > employee.normalLeaves && 
+                                employee.normalLeaves !== 999) {
+                                employeeUpdates[employeeId].remainingNormalLeaves = employee.normalLeaves;
+                            }
+                            if (employeeUpdates[employeeId].remainingGoldenLeaves > employee.goldenLeaves && 
+                                employee.goldenLeaves !== 999) {
+                                employeeUpdates[employeeId].remainingGoldenLeaves = employee.goldenLeaves;
+                            }
+                        }
+                    }
+                });
+
+                // Create batch updates
+                const updates = {};
+
+                // Add employee updates to batch
+                Object.entries(employeeUpdates).forEach(([employeeId, leaveUpdates]) => {
+                    updates[`employees/${employeeId}/remainingNormalLeaves`] = leaveUpdates.remainingNormalLeaves;
+                    updates[`employees/${employeeId}/remainingGoldenLeaves`] = leaveUpdates.remainingGoldenLeaves;
+                });
+
+                // Add application deletion to batch
+                updates['applications'] = null;
+
+                // Execute all updates in one batch
+                await database.ref().update(updates);
+
                 // Clear the table in the UI
                 const tableBody = document.getElementById('application-list-body');
                 if (tableBody) {
                     tableBody.innerHTML = '';
                 }
 
-                showSyncStatus('All leave application records have been cleared successfully');
+                // Refresh the employee data to update leave counts
+                await loadEmployees();
+
+                showSyncStatus('All leave application records have been cleared and leaves have been returned successfully');
             } catch (error) {
                 console.error('Error clearing leave records:', error);
-                showSyncStatus('Error clearing leave records', 'error');
+                alert('Error clearing leave records: ' + error.message);
             }
         }
 
@@ -3372,6 +3600,18 @@
             }
         });
 
+        // Add event listener for clear records button
+        document.addEventListener('DOMContentLoaded', function() {
+            const clearRecordsBtn = document.getElementById('clearRecordsBtn');
+            if (clearRecordsBtn) {
+                clearRecordsBtn.addEventListener('click', function(e) {
+                    e.preventDefault(); // Prevent form submission
+                    e.stopPropagation(); // Stop event propagation
+                    clearAllLeaveRecords();
+                });
+            }
+        });
+
         function updateDisplayedRemainingLeaves(normalLeaves, goldenLeaves) {
             const remainingNormalElement = document.getElementById('remaining-leave-normal');
             const remainingGoldenElement = document.getElementById('remaining-leave-golden');
@@ -3383,6 +3623,133 @@
                 remainingGoldenElement.textContent = goldenLeaves === 999 ? "∞" : goldenLeaves;
             }
         }
+
+        // Function to handle admin leave submission
+        async function handleAdminLeaveSubmission() {
+            try {
+                const employeeId = document.getElementById('admin-leave-employee').value;
+                const applyDate = document.getElementById('admin-apply-date').value;
+                const leaveStartDate = document.getElementById('admin-leave-start-date').value;
+                const leaveEndDate = document.getElementById('admin-leave-end-date').value;
+                const leaveType = document.getElementById('admin-leave-type').value;
+                
+                if (!employeeId || !applyDate || !leaveStartDate || !leaveEndDate || !leaveType) {
+                    throw new Error('Please fill in all required fields');
+                }
+
+                let proofDataUrl = null;
+                if (leaveType === 'Sick Leave' || leaveType === '不可抗力因素' || leaveType === '離港') {
+                    const proofFile = document.getElementById('admin-proof-file').files[0];
+                    if (proofFile) {
+                        proofDataUrl = await convertFileToBase64(proofFile);
+                    }
+                }
+
+                // Get employee data
+                const employeeSnapshot = await database.ref(`employees/${employeeId}`).once('value');
+                const employeeData = employeeSnapshot.val();
+
+                if (!employeeData) {
+                    throw new Error('Employee not found');
+                }
+
+                // Calculate leave days
+                const start = new Date(leaveStartDate);
+                const end = new Date(leaveEndDate);
+                const leaveDays = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+
+                // Create the application
+                const newApplication = {
+                    employeeId: employeeId,
+                    employeeName: employeeData.name,
+                    applyDate: applyDate,
+                    leaveStartDate: leaveStartDate,
+                    leaveEndDate: leaveEndDate,
+                    leaveType: leaveType,
+                    leaveDays: leaveDays,
+                    status: 'Approved',
+                    proof: proofDataUrl,
+                    createdAt: new Date().toISOString(),
+                    createdBy: 'admin'
+                };
+
+                // Add to Firebase
+                const applicationsRef = database.ref('applications');
+                await applicationsRef.push(newApplication);
+
+                // Update employee's remaining leaves if necessary
+                if (leaveType.includes('Annual Leave')) {
+                    const updates = {};
+                    if (leaveType === 'Annual Leave (Normal)' && employeeData.remainingNormalLeaves !== 999) {
+                        updates.remainingNormalLeaves = employeeData.remainingNormalLeaves - leaveDays;
+                    } else if (leaveType === 'Annual Leave (黃金事假)') {
+                        if (employeeData.remainingGoldenLeaves !== 999) {
+                            updates.remainingGoldenLeaves = employeeData.remainingGoldenLeaves - leaveDays;
+                        }
+                        if (employeeData.remainingNormalLeaves !== 999) {
+                            updates.remainingNormalLeaves = employeeData.remainingNormalLeaves - leaveDays;
+                        }
+                    }
+
+                    if (Object.keys(updates).length > 0) {
+                        await database.ref(`employees/${employeeId}`).update(updates);
+                    }
+                }
+
+                // Clear form
+                document.getElementById('admin-leave-form').reset();
+                
+                // Show success message
+                showSyncStatus('Leave record added successfully');
+
+            } catch (error) {
+                console.error('Error adding leave record:', error);
+                alert('Error adding leave record: ' + error.message);
+            }
+        }
+
+        // Add this after your existing event listeners
+        document.addEventListener('DOMContentLoaded', function() {
+            // Leave type change handler for admin form
+            const adminLeaveType = document.getElementById('admin-leave-type');
+            if (adminLeaveType) {
+                adminLeaveType.addEventListener('change', function() {
+                    const proofContainer = document.getElementById('admin-proof-container');
+                    const proofFileInput = document.getElementById('admin-proof-file');
+                    const forceMajeureOptions = document.getElementById('admin-force-majeure-options');
+                    const forceMajeureReasonSelect = document.getElementById('admin-force-majeure-reason');
+
+                    if (this.value === 'Sick Leave' || this.value === '不可抗力因素' || this.value === '離港') {
+                        proofContainer.style.display = 'block';
+                        proofFileInput.disabled = false;
+                        proofFileInput.required = true;
+
+                        if (this.value === '不可抗力因素') {
+                            forceMajeureOptions.style.display = 'block';
+                            forceMajeureReasonSelect.required = true;
+                        } else {
+                            forceMajeureOptions.style.display = 'none';
+                            forceMajeureReasonSelect.required = false;
+                        }
+                    } else {
+                        proofContainer.style.display = 'none';
+                        proofFileInput.disabled = true;
+                        proofFileInput.required = false;
+                        forceMajeureOptions.style.display = 'none';
+                        forceMajeureReasonSelect.required = false;
+                    }
+                });
+            }
+
+            // Admin leave form submission handler
+            const adminLeaveForm = document.getElementById('admin-leave-form');
+            if (adminLeaveForm) {
+                adminLeaveForm.addEventListener('submit', async function(e) {
+                    e.preventDefault();
+                    await handleAdminLeaveSubmission();
+                });
+            }
+        });
 
         // Function to remove an employee and their associated penalties
         async function removeAgent(employeeId, rowElement) {
