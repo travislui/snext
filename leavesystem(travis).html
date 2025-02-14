@@ -975,6 +975,53 @@
             padding: 2rem;
         }
 
+        .draggable {
+            cursor: move;
+        }
+
+        .drag-over {
+            border: 2px dashed #2196F3 !important;
+            background-color: rgba(33, 150, 243, 0.1) !important;
+        }
+
+        .dragging {
+            opacity: 0.5;
+            background-color: #f8f9fa;
+        }
+
+        /* Add this to make the first cell (name cell) act as the drag handle */
+        .drag-handle {
+            position: relative;
+            cursor: move;
+            padding-left: 35px !important; /* Increased padding to make room for the handle */
+        }
+
+        .drag-handle::before {
+            content: "⋮⋮";
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 20px;
+            color: #666;
+            opacity: 0.7;
+            line-height: 1;
+            cursor: move;
+            user-select: none;
+            pointer-events: auto;
+        }
+
+        tr:hover .drag-handle::before {
+            opacity: 1;
+            color: #333;
+        }
+
+        /* Ensure the handle is visible in all states */
+        tr.dragging .drag-handle::before {
+            opacity: 1;
+            color: #2196F3;
+        }
+
         /* Section headings */
         h2, h3 {
             color: var(--text-primary);
@@ -1211,6 +1258,7 @@
     <p><strong>Used Sick Leave Days:</strong> <span id="used-sick-leave">0</span></p>
     <p><strong>Used 不可抗力因素 Days:</strong> <span id="used-force-majeure">0</span></p>
     <p><strong>Used 離港 Days:</strong> <span id="used-overseas">0</span></p>
+    <p><strong>Applied Leaves for 區會 (Monday):</strong> <span id="used-monday-leaves">0</span></p>
     <p><strong>備註：Annual Leaves (黃金事假)包含於Annual Leaves (Normal)之內</span></p>
 
     <!-- Update the leave application form -->
@@ -1574,6 +1622,24 @@
                 console.error('Logout error:', error);
                 alert('Error logging out: ' + error.message);
             }
+        }
+
+        function isMonday(date) {
+            return new Date(date).getDay() === 1; // 0 is Sunday, 1 is Monday
+        }
+
+        function countMondaysInDateRange(startDate, endDate) {
+            let count = 0;
+            let currentDate = new Date(startDate);
+            const end = new Date(endDate);
+            
+            while (currentDate <= end) {
+                if (isMonday(currentDate)) {
+                    count++;
+                }
+                currentDate.setDate(currentDate.getDate() + 1);
+            }
+            return count;
         }
 
         // Auth state observer
@@ -2389,6 +2455,32 @@
                 return;
             }
 
+            // Check Monday leaves for Annual Leaves
+            if (leaveType.includes('Annual Leave')) {
+                const mondayCount = countMondaysInDateRange(leaveStartDate, leaveEndDate);
+                if (mondayCount > 0) {
+                    // Get current Monday leave count
+                    const employeeRef = database.ref(`employees/${currentUser.id}`);
+                    const snapshot = await employeeRef.once('value');
+                    const currentMondayLeaves = snapshot.val()?.usedMondayLeaves || 0;
+
+                    if (currentMondayLeaves >= 3) {
+                        // Already at or over limit
+                        if (!confirm(`Warning: You have already used ${currentMondayLeaves} Monday leaves. You will be charged $100 for each additional Monday (${mondayCount} Mondays = $${mondayCount * 100}). Do you want to continue?`)) {
+                            return;
+                        }
+                    } else {
+                        const newTotal = currentMondayLeaves + mondayCount;
+                        if (newTotal > 3) {
+                            const extraMondays = newTotal - 3;
+                            if (!confirm(`Warning: This will exceed your 3-Monday limit. You will be charged $100 for each additional Monday (${extraMondays} Mondays = $${extraMondays * 100}). Do you want to continue?`)) {
+                                return;
+                            }
+                        }
+                    }
+                }
+            }
+
             // Process leave application based on type
             if (leaveType === 'Sick Leave' || leaveType === '不可抗力因素' || leaveType === '離港') {
                 const proofFile = document.getElementById('proof-file').files[0];
@@ -2439,9 +2531,77 @@
                 const currentSickDays = employeeData.usedSickLeaveDays || 0;
                 const currentForceDays = employeeData.usedForceMajeureDays || 0;
                 const currentOverseasDays = employeeData.usedOverseasDays || 0;
+                const currentMondayLeaves = employeeData.usedMondayLeaves || 0;
 
                 // Create updates object for the employee
                 const updates = {};
+
+                // Check for Monday leaves if it's an Annual Leave
+                if (leaveType.includes('Annual Leave')) {
+                    const mondayCount = countMondaysInDateRange(leaveStartDate, leaveEndDate);
+                    
+                    if (mondayCount > 0) {
+                        // Check if this will exceed or has already exceeded the limit
+                        const newMondayTotal = currentMondayLeaves + mondayCount;
+                        
+                        // If current total is already 3 or more, add penalty for each new Monday
+                        if (currentMondayLeaves >= 3) {
+                            // Add penalty for each Monday
+                            for (let i = 0; i < mondayCount; i++) {
+                                const penaltyData = {
+                                    employeeId: currentUser.id,
+                                    employeeName: currentUser.name,
+                                    employeeRole: currentUser.role,
+                                    date: formatDate(new Date()),
+                                    reason: 'Additional Monday Leave After Limit',
+                                    minutes: 0,
+                                    amount: 100,
+                                    baseAmount: 100,
+                                    deadline: formatDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)),
+                                    status: 'Not Submitted',
+                                    createdAt: new Date().toISOString(),
+                                    lastModified: new Date().toISOString()
+                                };
+
+                                // Add penalty to Firebase
+                                const penaltyRef = database.ref('penalties');
+                                await penaltyRef.push(penaltyData);
+                            }
+                            
+                            // Show warning to user
+                            alert(`You have been charged $100 for each additional Monday (${mondayCount} Mondays). Total penalty: $${mondayCount * 100}`);
+                        } else if (newMondayTotal > 3) {
+                            // If this application will exceed the limit, add penalty for each Monday over 3
+                            const extraMondays = newMondayTotal - 3;
+                            for (let i = 0; i < extraMondays; i++) {
+                                const penaltyData = {
+                                    employeeId: currentUser.id,
+                                    employeeName: currentUser.name,
+                                    employeeRole: currentUser.role,
+                                    date: formatDate(new Date()),
+                                    reason: 'Exceeded Monday Leave Limit',
+                                    minutes: 0,
+                                    amount: 100,
+                                    baseAmount: 100,
+                                    deadline: formatDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)),
+                                    status: 'Not Submitted',
+                                    createdAt: new Date().toISOString(),
+                                    lastModified: new Date().toISOString()
+                                };
+
+                                // Add penalty to Firebase
+                                const penaltyRef = database.ref('penalties');
+                                await penaltyRef.push(penaltyData);
+                            }
+                            
+                            // Show warning to user
+                            alert(`You have exceeded the 3-Monday limit. You will be charged $100 for each additional Monday (${extraMondays} Mondays). Total penalty: $${extraMondays * 100}`);
+                        }
+                    }
+
+                    // Update Monday leave count
+                    updates.usedMondayLeaves = currentMondayLeaves + mondayCount;
+                }
 
                 // Update used days based on leave type
                 switch (leaveType) {
@@ -2509,6 +2669,12 @@
                         updates.usedForceMajeureDays ?? currentForceDays,
                         updates.usedOverseasDays ?? currentOverseasDays
                     );
+
+                    // Update Monday leaves display
+                    const mondayLeavesElement = document.getElementById('used-monday-leaves');
+                    if (mondayLeavesElement) {
+                        mondayLeavesElement.textContent = updates.usedMondayLeaves || 0;
+                    }
                 }
 
                 // Clear form
@@ -2562,32 +2728,122 @@
         // Helper function to update employee table
         function updateEmployeeTable() {
             const tableBody = document.getElementById('employee-list');
-            tableBody.innerHTML = ''; // Clear current table
+            if (!tableBody) return;
+            
+            tableBody.innerHTML = '';
 
-            // Sort employees by name
-            const sortedEmployees = Object.entries(employeeData)
-                .sort(([, a], [, b]) => a.name.localeCompare(b.name));
+            // Get the current order from localStorage or create default order
+            let employeeOrder;
+            try {
+                employeeOrder = JSON.parse(localStorage.getItem('employeeOrder')) || [];
+            } catch (e) {
+                employeeOrder = [];
+            }
 
-            for (const [id, employee] of sortedEmployees) {
+            // Get all employees and sort them
+            let employees = Object.entries(employeeData || {});
+            
+            // If we have a stored order, use it to sort the employees
+            if (employeeOrder.length > 0) {
+                employees.sort((a, b) => {
+                    const indexA = employeeOrder.indexOf(a[0]);
+                    const indexB = employeeOrder.indexOf(b[0]);
+                    if (indexA === -1) return 1;
+                    if (indexB === -1) return -1;
+                    return indexA - indexB;
+                });
+            } else {
+                // Default sort by name if no stored order
+                employees.sort(([, a], [, b]) => a.name.localeCompare(b.name));
+            }
+
+            employees.forEach(([id, employee]) => {
                 const row = document.createElement('tr');
+                row.draggable = true;
+                row.dataset.id = id;
+                row.className = 'draggable';
                 
                 // Format leave display - show "∞" for 999 (infinity)
                 const normalLeavesDisplay = employee.remainingNormalLeaves === 999 ? "∞" : employee.remainingNormalLeaves;
                 const goldenLeavesDisplay = employee.remainingGoldenLeaves === 999 ? "∞" : employee.remainingGoldenLeaves;
                 
                 row.innerHTML = `
-                    <td style="padding: 10px;">${employee.name}</td>
-                    <td style="padding: 10px;">${employee.code}</td>
-                    <td style="padding: 10px;">${employee.role}</td>
-                    <td style="padding: 10px;">${employee.mdrt}</td>
-                    <td style="padding: 10px;">${normalLeavesDisplay}</td>
-                    <td style="padding: 10px;">${goldenLeavesDisplay}</td>
-                    <td style="padding: 10px;">
-                        <button class="remove-btn" onclick="removeEmployee('${id}')">Remove</button>
+                    <td class="drag-handle">
+                        <div class="drag-handle-inner">${employee.name}</div>
+                    </td>
+                    <td>${employee.code}</td>
+                    <td>${employee.role}</td>
+                    <td>${employee.mdrt}</td>
+                    <td>${normalLeavesDisplay}</td>
+                    <td>${goldenLeavesDisplay}</td>
+                    <td>
+                        <button class="remove-btn" onclick="removeAgent('${id}', this.parentElement.parentElement)">Remove</button>
                     </td>
                 `;
+
+                // Add drag and drop event listeners
+                row.addEventListener('dragstart', handleDragStart);
+                row.addEventListener('dragend', handleDragEnd);
+                row.addEventListener('dragover', handleDragOver);
+                row.addEventListener('drop', handleDrop);
+                row.addEventListener('dragenter', handleDragEnter);
+                row.addEventListener('dragleave', handleDragLeave);
+
                 tableBody.appendChild(row);
+            });
+        }
+
+        // Drag and drop handler functions
+        let draggedRow = null;
+
+        function handleDragStart(e) {
+            draggedRow = this;
+            this.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', this.dataset.id);
+        }
+
+        function handleDragEnd(e) {
+            this.classList.remove('dragging');
+            const rows = document.querySelectorAll('#employee-list tr');
+            rows.forEach(row => row.classList.remove('drag-over'));
+            draggedRow = null;
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            return false;
+        }
+
+        function handleDragEnter(e) {
+            this.classList.add('drag-over');
+        }
+
+        function handleDragLeave(e) {
+            this.classList.remove('drag-over');
+        }
+
+        function handleDrop(e) {
+            e.stopPropagation();
+            e.preventDefault();
+            
+            if (draggedRow !== this) {
+                const rows = Array.from(document.querySelectorAll('#employee-list tr'));
+                const draggedIndex = rows.indexOf(draggedRow);
+                const droppedIndex = rows.indexOf(this);
+
+                if (draggedIndex !== -1 && droppedIndex !== -1) {
+                    this.parentNode.insertBefore(draggedRow, droppedIndex > draggedIndex ? this.nextSibling : this);
+                    
+                    // Save the new order
+                    const newOrder = Array.from(document.querySelectorAll('#employee-list tr')).map(row => row.dataset.id);
+                    localStorage.setItem('employeeOrder', JSON.stringify(newOrder));
+                }
             }
+            
+            this.classList.remove('drag-over');
+            return false;
         }
 
         // Initialize admin user (Run this once to set up admin)
@@ -2815,6 +3071,15 @@
                     return;
                 }
 
+                // Get the application details first
+                const applicationRef = database.ref(`applications/${applicationId}`);
+                const applicationSnapshot = await applicationRef.once('value');
+                const application = applicationSnapshot.val();
+
+                if (!application) {
+                    throw new Error('Application not found');
+                }
+
                 // Get employee data
                 const employeeRef = database.ref(`employees/${employeeId}`);
                 const employeeSnapshot = await employeeRef.once('value');
@@ -2824,12 +3089,24 @@
                     throw new Error('Employee data not found');
                 }
 
-                // Only return leaves if the application was approved
-                if (status === 'Approved' && 
-                    (leaveType === 'Annual Leave (Normal)' || leaveType === 'Annual Leave (黃金事假)')) {
-                    
-                    const updates = {};
+                const updates = {};
 
+                // Only process if the application was approved
+                if (status === 'Approved') {
+                    // Check if there are any Mondays in the leave period
+                    if (leaveType.includes('Annual Leave')) {
+                        const startDate = new Date(application.leaveStartDate);
+                        const endDate = new Date(application.leaveEndDate);
+                        const mondayCount = countMondaysInDateRange(startDate, endDate);
+                        
+                        if (mondayCount > 0) {
+                            // Subtract the Mondays from the used Monday leaves count
+                            const newMondayCount = Math.max(0, (employeeData.usedMondayLeaves || 0) - mondayCount);
+                            updates.usedMondayLeaves = newMondayCount;
+                        }
+                    }
+
+                    // Return leave days
                     if (leaveType === 'Annual Leave (Normal)') {
                         if (employeeData.remainingNormalLeaves !== 999) {
                             updates.remainingNormalLeaves = employeeData.remainingNormalLeaves + leaveDays;
@@ -2854,15 +3131,15 @@
                             }
                         }
                     }
+                }
 
-                    // Update employee data if there are changes
-                    if (Object.keys(updates).length > 0) {
-                        await employeeRef.update(updates);
-                    }
+                // Update employee data if there are changes
+                if (Object.keys(updates).length > 0) {
+                    await employeeRef.update(updates);
                 }
 
                 // Remove the application
-                await database.ref(`applications/${applicationId}`).remove();
+                await applicationRef.remove();
 
                 // Refresh the employee data
                 await loadEmployees();
@@ -3227,6 +3504,12 @@
                         employee.usedForceMajeureDays || 0,
                         employee.usedOverseasDays || 0
                     );
+
+                    // Update Monday leaves display
+                    const mondayLeavesElement = document.getElementById('used-monday-leaves');
+                    if (mondayLeavesElement) {
+                        mondayLeavesElement.textContent = employee.usedMondayLeaves || 0;
+                    }
                 } else {
                     console.error("No employee data provided");
                 }
@@ -3509,10 +3792,7 @@
 
                 // Calculate leaves to return for each employee
                 Object.values(applications).forEach(application => {
-                    if (application.status === 'Approved' && 
-                        (application.leaveType === 'Annual Leave (Normal)' || 
-                        application.leaveType === 'Annual Leave (黃金事假)')) {
-                        
+                    if (application.status === 'Approved') {
                         const employeeId = application.employeeId;
                         const employee = employees[employeeId];
                         
@@ -3520,7 +3800,8 @@
                             if (!employeeUpdates[employeeId]) {
                                 employeeUpdates[employeeId] = {
                                     remainingNormalLeaves: employee.remainingNormalLeaves,
-                                    remainingGoldenLeaves: employee.remainingGoldenLeaves
+                                    remainingGoldenLeaves: employee.remainingGoldenLeaves,
+                                    usedMondayLeaves: 0  // Reset Monday leave count
                                 };
                             }
 
@@ -3529,27 +3810,32 @@
                             const endDate = new Date(application.leaveEndDate);
                             const leaveDays = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
 
-                            // Return leaves based on type
-                            if (application.leaveType === 'Annual Leave (Normal)' && 
-                                employee.remainingNormalLeaves !== 999) {
-                                employeeUpdates[employeeId].remainingNormalLeaves += leaveDays;
-                            } else if (application.leaveType === 'Annual Leave (黃金事假)') {
-                                if (employee.remainingGoldenLeaves !== 999) {
-                                    employeeUpdates[employeeId].remainingGoldenLeaves += leaveDays;
-                                }
-                                if (employee.remainingNormalLeaves !== 999) {
+                            // Handle Annual Leaves
+                            if (application.leaveType === 'Annual Leave (Normal)' || 
+                                application.leaveType === 'Annual Leave (黃金事假)') {
+                                
+                                // Return normal leaves if not infinite
+                                if (application.leaveType === 'Annual Leave (Normal)' && 
+                                    employee.remainingNormalLeaves !== 999) {
                                     employeeUpdates[employeeId].remainingNormalLeaves += leaveDays;
+                                } else if (application.leaveType === 'Annual Leave (黃金事假)') {
+                                    if (employee.remainingGoldenLeaves !== 999) {
+                                        employeeUpdates[employeeId].remainingGoldenLeaves += leaveDays;
+                                    }
+                                    if (employee.remainingNormalLeaves !== 999) {
+                                        employeeUpdates[employeeId].remainingNormalLeaves += leaveDays;
+                                    }
                                 }
-                            }
 
-                            // Ensure leaves don't exceed original allocation
-                            if (employeeUpdates[employeeId].remainingNormalLeaves > employee.normalLeaves && 
-                                employee.normalLeaves !== 999) {
-                                employeeUpdates[employeeId].remainingNormalLeaves = employee.normalLeaves;
-                            }
-                            if (employeeUpdates[employeeId].remainingGoldenLeaves > employee.goldenLeaves && 
-                                employee.goldenLeaves !== 999) {
-                                employeeUpdates[employeeId].remainingGoldenLeaves = employee.goldenLeaves;
+                                // Ensure leaves don't exceed original allocation
+                                if (employeeUpdates[employeeId].remainingNormalLeaves > employee.normalLeaves && 
+                                    employee.normalLeaves !== 999) {
+                                    employeeUpdates[employeeId].remainingNormalLeaves = employee.normalLeaves;
+                                }
+                                if (employeeUpdates[employeeId].remainingGoldenLeaves > employee.goldenLeaves && 
+                                    employee.goldenLeaves !== 999) {
+                                    employeeUpdates[employeeId].remainingGoldenLeaves = employee.goldenLeaves;
+                                }
                             }
                         }
                     }
@@ -3562,6 +3848,7 @@
                 Object.entries(employeeUpdates).forEach(([employeeId, leaveUpdates]) => {
                     updates[`employees/${employeeId}/remainingNormalLeaves`] = leaveUpdates.remainingNormalLeaves;
                     updates[`employees/${employeeId}/remainingGoldenLeaves`] = leaveUpdates.remainingGoldenLeaves;
+                    updates[`employees/${employeeId}/usedMondayLeaves`] = 0; // Reset Monday leave count
                 });
 
                 // Add application deletion to batch
