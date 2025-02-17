@@ -1011,6 +1011,32 @@
             pointer-events: auto;
         }
 
+        .edit-select {
+            padding: 6px 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: white;
+            font-size: 14px;
+            width: 100%;
+            max-width: 150px;
+            cursor: pointer;
+            transition: border-color 0.3s ease;
+        }
+
+        .edit-select:hover {
+            border-color: #aaa;
+        }
+
+        .edit-select:focus {
+            border-color: #2196F3;
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.1);
+        }
+
+        .edit-select option {
+            padding: 8px;
+        }
+
         tr:hover .drag-handle::before {
             opacity: 1;
             color: #333;
@@ -1069,7 +1095,7 @@
             <input type="text" id="username" placeholder="Username" required>
             <input type="password" id="password" placeholder="Password" required>
             <p><strong>Username 請輸入自己名字 e.g. Sam Hui</span></p>
-            <p><strong>Password 請輸入 next(your agent code) e.g. next12345</span></p>
+            <p><strong>Password 請輸入 next(your agent code) e.g. nextA12345 </span></p>
             <button type="submit">Login</button>
         </form>
     </div>
@@ -3720,43 +3746,138 @@
             employeeRef.on('value', (snapshot) => {
                 const employees = snapshot.val();
                 
-                // Update employee list table
                 const employeeList = document.getElementById('employee-list');
                 if (employeeList) employeeList.innerHTML = '';
 
-                // Update both penalty and leave form employee selects
                 const penaltySelect = document.getElementById('penalty-employee');
                 const leaveSelect = document.getElementById('admin-leave-employee');
                 
                 if (penaltySelect) penaltySelect.innerHTML = '<option value="">Select Employee</option>';
                 if (leaveSelect) leaveSelect.innerHTML = '<option value="">Select Agent</option>';
 
-                for (let id in employees) {
-                    const emp = employees[id];
-                    
-                    // Update employee list table
+                let employeeOrder;
+                try {
+                    employeeOrder = JSON.parse(localStorage.getItem('employeeOrder')) || [];
+                } catch (e) {
+                    employeeOrder = [];
+                }
+
+                let employeesArray = Object.entries(employees || {});
+                if (employeeOrder.length > 0) {
+                    employeesArray.sort((a, b) => {
+                        const indexA = employeeOrder.indexOf(a[0]);
+                        const indexB = employeeOrder.indexOf(b[0]);
+                        if (indexA === -1) return 1;
+                        if (indexB === -1) return -1;
+                        return indexA - indexB;
+                    });
+                } else {
+                    employeesArray.sort(([, a], [, b]) => a.name.localeCompare(b.name));
+                }
+
+                for (const [id, emp] of employeesArray) {
                     if (employeeList) {
                         const row = document.createElement('tr');
+                        row.draggable = true;
+                        row.dataset.id = id;
+                        row.className = 'draggable';
+                        
+                        const normalLeavesDisplay = emp.remainingNormalLeaves === 999 ? "∞" : emp.remainingNormalLeaves;
+                        const goldenLeavesDisplay = emp.remainingGoldenLeaves === 999 ? "∞" : emp.remainingGoldenLeaves;
+                        
+                        // Create role select element
+                        const roleSelect = `
+                            <select onchange="updateEmployeeField('${id}', 'role', this.value)" class="edit-select">
+                                ${['Agent', 'AUM/UM', 'SUM', 'BM', 'DM', 'DD']
+                                    .map(role => `<option value="${role}" ${emp.role === role ? 'selected' : ''}>${role}</option>`)
+                                    .join('')}
+                            </select>
+                        `;
+
+                        // Create MDRT select element
+                        const mdrtSelect = `
+                            <select onchange="updateEmployeeField('${id}', 'mdrt', this.value)" class="edit-select">
+                                ${['NO', 'MDRT', 'COT or above']
+                                    .map(status => `<option value="${status}" ${emp.mdrt === status ? 'selected' : ''}>${status}</option>`)
+                                    .join('')}
+                            </select>
+                        `;
+                        
                         row.innerHTML = `
-                            <td>${emp.name}</td>
+                            <td class="drag-handle">
+                                <div class="drag-handle-inner">${emp.name}</div>
+                            </td>
                             <td>${emp.code}</td>
-                            <td>${emp.role}</td>
-                            <td>${emp.mdrt}</td>
-                            <td>${emp.remainingNormalLeaves === 999 ? "∞" : emp.remainingNormalLeaves}</td>
-                            <td>${emp.remainingGoldenLeaves === 999 ? "∞" : emp.remainingGoldenLeaves}</td>
+                            <td>${roleSelect}</td>
+                            <td>${mdrtSelect}</td>
+                            <td>${normalLeavesDisplay}</td>
+                            <td>${goldenLeavesDisplay}</td>
                             <td>
                                 <button class="remove-btn" onclick="removeAgent('${id}', this.parentElement.parentElement)">Remove</button>
                             </td>
                         `;
+
+                        row.addEventListener('dragstart', handleDragStart);
+                        row.addEventListener('dragend', handleDragEnd);
+                        row.addEventListener('dragover', handleDragOver);
+                        row.addEventListener('drop', handleDrop);
+                        row.addEventListener('dragenter', handleDragEnter);
+                        row.addEventListener('dragleave', handleDragLeave);
+
                         employeeList.appendChild(row);
                     }
 
-                    // Update both select options
                     const option = `<option value="${id}">${emp.name}</option>`;
                     if (penaltySelect) penaltySelect.innerHTML += option;
                     if (leaveSelect) leaveSelect.innerHTML += option;
                 }
             });
+        }
+
+        // Add this new function to handle updates
+        async function updateEmployeeField(employeeId, field, value) {
+            try {
+                const employeeRef = database.ref(`employees/${employeeId}`);
+                const updates = { [field]: value };
+
+                // Special handling for COT or above status
+                if (field === 'mdrt' && value === 'COT or above') {
+                    updates.normalLeaves = 999;
+                    updates.goldenLeaves = 999;
+                    updates.remainingNormalLeaves = 999;
+                    updates.remainingGoldenLeaves = 999;
+                } else if (field === 'mdrt' && value === 'MDRT') {
+                    updates.normalLeaves = 13;
+                    updates.goldenLeaves = 3;
+                    // Only update remaining leaves if they were previously infinite
+                    const snapshot = await employeeRef.once('value');
+                    const currentData = snapshot.val();
+                    if (currentData.remainingNormalLeaves === 999) {
+                        updates.remainingNormalLeaves = 13;
+                    }
+                    if (currentData.remainingGoldenLeaves === 999) {
+                        updates.remainingGoldenLeaves = 3;
+                    }
+                } else if (field === 'mdrt' && value === 'NO') {
+                    updates.normalLeaves = 10;
+                    updates.goldenLeaves = 3;
+                    // Only update remaining leaves if they were previously infinite
+                    const snapshot = await employeeRef.once('value');
+                    const currentData = snapshot.val();
+                    if (currentData.remainingNormalLeaves === 999) {
+                        updates.remainingNormalLeaves = 10;
+                    }
+                    if (currentData.remainingGoldenLeaves === 999) {
+                        updates.remainingGoldenLeaves = 3;
+                    }
+                }
+
+                await employeeRef.update(updates);
+                showSyncStatus('Employee updated successfully');
+            } catch (error) {
+                console.error('Error updating employee:', error);
+                showSyncStatus('Error updating employee', 'error');
+            }
         }
 
         // Function to clear all leave application records
