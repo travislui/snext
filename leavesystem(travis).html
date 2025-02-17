@@ -1037,6 +1037,51 @@
             padding: 8px;
         }
 
+        .collapse-btn {
+            background-color: #2c3e50;
+            border: 1px solid #dee2e6;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .collapse-btn:hover {
+            background-color: #e9ecef;
+        }
+
+        .collapse-icon {
+            display: inline-block;
+            transition: transform 0.3s ease;
+        }
+
+        .collapse-btn.collapsed .collapse-icon {
+            transform: rotate(-90deg);
+        }
+
+        /* Animation for the table container */
+        #agentListContainer {
+            transition: all 0.3s ease;
+            overflow: hidden;
+        }
+
+        #agentListContainer.collapsed {
+            max-height: 0;
+            opacity: 0;
+            margin: 0;
+            padding: 0;
+        }
+
+        #agentListContainer.expanded {
+            max-height: 2000px; /* Adjust this value based on your needs */
+            opacity: 1;
+            margin-bottom: 20px;
+        }
+
         tr:hover .drag-handle::before {
             opacity: 1;
             color: #333;
@@ -1183,17 +1228,22 @@
     </form>
 
     <h3>Agent List</h3>
-    <div class="table-container">
+    <div style="margin-bottom: 10px;">
+        <button id="toggleAgentList" class="collapse-btn">
+            <span class="collapse-icon">▼</span> Collapse Agent List
+        </button>
+    </div>
+    <div id="agentListContainer" class="table-container">
         <table id="employee-table">
             <thead>
                 <tr>
-                    <th style="width: 150px;">Name</th>
-                    <th style="width: 70px;">Code</th>
-                    <th style="width: 280px;">Role</th> <!-- Increased width for Role -->
-                    <th style="width: 220px;">Clubs & Awards</th>
-                    <th style="width: 150px;">Remaining Annual Leaves (Normal)</th>
-                    <th style="width: 150px;">Remaining Annual Leaves (黃金事假)</th>
-                    <th style="width: 100px;">Action</th>
+                    <th style="padding: 10px;">Name</th>
+                    <th style="padding: 10px;">Code</th>
+                    <th style="padding: 10px;">Role</th>
+                    <th style="padding: 10px;">Clubs & Awards</th>
+                    <th style="padding: 10px;">Remaining Annual Leaves (Normal)</th>
+                    <th style="padding: 10px;">Remaining Annual Leaves (黃金事假)</th>
+                    <th style="padding: 10px;">Action</th>
                 </tr>
             </thead>
             <tbody id="employee-list">
@@ -2986,6 +3036,30 @@
                     throw new Error('Application not found');
                 }
 
+                // Get employee data
+                const employeeRef = database.ref(`employees/${employeeId}`);
+                const employeeSnapshot = await employeeRef.once('value');
+                const employeeData = employeeSnapshot.val();
+
+                if (!employeeData) {
+                    throw new Error('Employee not found');
+                }
+
+                const updates = {};
+
+                // Check for Mondays if it's an Annual Leave
+                if (leaveType.includes('Annual Leave')) {
+                    const startDate = new Date(application.leaveStartDate);
+                    const endDate = new Date(application.leaveEndDate);
+                    const mondayCount = countMondaysInDateRange(startDate, endDate);
+                    
+                    if (mondayCount > 0) {
+                        // Subtract the Mondays from the used Monday leaves count
+                        const newMondayCount = Math.max(0, (employeeData.usedMondayLeaves || 0) - mondayCount);
+                        updates.usedMondayLeaves = newMondayCount;
+                    }
+                }
+
                 // Update application status
                 await database.ref(`applications/${applicationId}`).update({
                     status: 'Rejected',
@@ -2999,27 +3073,21 @@
                     const endDate = new Date(application.leaveEndDate);
                     const leaveDays = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
 
-                    const employeeRef = database.ref(`employees/${employeeId}`);
-                    const employeeSnapshot = await employeeRef.once('value');
-                    const employeeData = employeeSnapshot.val();
-
-                    if (employeeData) {
-                        const updates = {};
-                        if (leaveType === 'Annual Leave (Normal)' && employeeData.remainingNormalLeaves !== 999) {
-                            updates.remainingNormalLeaves = employeeData.remainingNormalLeaves + leaveDays;
-                        } else if (leaveType === 'Annual Leave (黃金事假)') {
-                            if (employeeData.remainingGoldenLeaves !== 999) {
-                                updates.remainingGoldenLeaves = employeeData.remainingGoldenLeaves + leaveDays;
-                            }
-                            if (employeeData.remainingNormalLeaves !== 999) {
-                                updates.remainingNormalLeaves = employeeData.remainingNormalLeaves + leaveDays;
-                            }
+                    if (leaveType === 'Annual Leave (Normal)' && employeeData.remainingNormalLeaves !== 999) {
+                        updates.remainingNormalLeaves = employeeData.remainingNormalLeaves + leaveDays;
+                    } else if (leaveType === 'Annual Leave (黃金事假)') {
+                        if (employeeData.remainingGoldenLeaves !== 999) {
+                            updates.remainingGoldenLeaves = employeeData.remainingGoldenLeaves + leaveDays;
                         }
-
-                        if (Object.keys(updates).length > 0) {
-                            await employeeRef.update(updates);
+                        if (employeeData.remainingNormalLeaves !== 999) {
+                            updates.remainingNormalLeaves = employeeData.remainingNormalLeaves + leaveDays;
                         }
                     }
+                }
+
+                // Update employee data if there are any updates
+                if (Object.keys(updates).length > 0) {
+                    await employeeRef.update(updates);
                 }
 
                 // Recalculate used days
@@ -3162,13 +3230,22 @@
                 // Update employee data if there are changes
                 if (Object.keys(updates).length > 0) {
                     await employeeRef.update(updates);
+
+                    // If Monday count was updated, update the display
+                    if (updates.usedMondayLeaves !== undefined) {
+                        const mondayLeavesElement = document.getElementById('used-monday-leaves');
+                        if (mondayLeavesElement) {
+                            mondayLeavesElement.textContent = updates.usedMondayLeaves;
+                        }
+                    }
                 }
 
                 // Remove the application
                 await applicationRef.remove();
 
-                // Refresh the employee data
+                // Refresh the data displays
                 await loadEmployees();
+                await loadAllApplications();
 
                 showSyncStatus('Leave application removed successfully');
             } catch (error) {
@@ -3262,6 +3339,25 @@
             document.getElementById('logout-btn').addEventListener('click', logout);
             document.getElementById('export-applications-btn').addEventListener('click', exportApplicationsToExcel);
             document.getElementById('export-penalties-btn').addEventListener('click', exportPenaltiesToExcel);
+
+            // Initialize the collapse state
+            const container = document.getElementById('agentListContainer');
+            const toggleButton = document.getElementById('toggleAgentList');
+            const isCollapsed = localStorage.getItem('agentListCollapsed') === 'true';
+            
+            if (container && toggleButton) {
+                if (isCollapsed) {
+                    container.classList.remove('expanded');
+                    container.classList.add('collapsed');
+                    toggleButton.classList.add('collapsed');
+                    toggleButton.innerHTML = '<span class="collapse-icon">▼</span> Expand Agent List';
+                } else {
+                    container.classList.add('expanded');
+                    container.classList.remove('collapsed');
+                    toggleButton.classList.remove('collapsed');
+                    toggleButton.innerHTML = '<span class="collapse-icon">▼</span> Collapse Agent List';
+                }
+            }
         }
 
         // Function to show proof for leave applications
@@ -4157,6 +4253,45 @@
                     await handleAdminLeaveSubmission();
                 });
             }
+        });
+
+        // Add this to your existing JavaScript
+        document.addEventListener('DOMContentLoaded', function() {
+            const toggleButton = document.getElementById('toggleAgentList');
+            const container = document.getElementById('agentListContainer');
+            const icon = toggleButton.querySelector('.collapse-icon');
+            
+            // Set initial state
+            container.classList.add('expanded');
+            
+            // Load the saved state from localStorage if it exists
+            const isCollapsed = localStorage.getItem('agentListCollapsed') === 'true';
+            if (isCollapsed) {
+                container.classList.remove('expanded');
+                container.classList.add('collapsed');
+                toggleButton.classList.add('collapsed');
+                toggleButton.innerHTML = '<span class="collapse-icon">▼</span> Expand Agent List';
+            }
+
+            toggleButton.addEventListener('click', function() {
+                const isCurrentlyCollapsed = container.classList.contains('collapsed');
+                
+                if (isCurrentlyCollapsed) {
+                    // Expand
+                    container.classList.remove('collapsed');
+                    container.classList.add('expanded');
+                    toggleButton.classList.remove('collapsed');
+                    toggleButton.innerHTML = '<span class="collapse-icon">▼</span> Collapse Agent List';
+                    localStorage.setItem('agentListCollapsed', 'false');
+                } else {
+                    // Collapse
+                    container.classList.remove('expanded');
+                    container.classList.add('collapsed');
+                    toggleButton.classList.add('collapsed');
+                    toggleButton.innerHTML = '<span class="collapse-icon">▼</span> Expand Agent List';
+                    localStorage.setItem('agentListCollapsed', 'true');
+                }
+            });
         });
 
         // Function to remove an employee and their associated penalties
