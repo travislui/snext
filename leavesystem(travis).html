@@ -1095,7 +1095,7 @@
             <input type="text" id="username" placeholder="Username" required>
             <input type="password" id="password" placeholder="Password" required>
             <p><strong>Username 請輸入自己名字 e.g. Sam Hui</span></p>
-            <p><strong>Password 請輸入 next(your agent code) e.g. nextA12345 </span></p>
+            <p><strong>Password 請輸入 next(your agent code) e.g. nextA12345 **Agent Code有英文字母要大楷**</span></p>
             <button type="submit">Login</button>
         </form>
     </div>
@@ -1185,20 +1185,20 @@
     <h3>Agent List</h3>
     <div class="table-container">
         <table id="employee-table">
-        <thead>
-            <tr>
-                <th style="padding: 10px;">Name</th>
-                <th style="padding: 10px;">Code</th>
-                <th style="padding: 10px;">Role</th>
-                <th style="padding: 10px;">Clubs & Awards</th>
-                <th style="padding: 10px;">Remaining Annual Leaves (Normal)</th>
-                <th style="padding: 10px;">Remaining Annual Leaves (黃金事假)</th>
-                <th style="padding: 10px;">Action</th>
-            </tr>
-        </thead>
-        <tbody id="employee-list">
-        </tbody>
-    </table>
+            <thead>
+                <tr>
+                    <th style="width: 150px;">Name</th>
+                    <th style="width: 70px;">Code</th>
+                    <th style="width: 280px;">Role</th> <!-- Increased width for Role -->
+                    <th style="width: 220px;">Clubs & Awards</th>
+                    <th style="width: 150px;">Remaining Annual Leaves (Normal)</th>
+                    <th style="width: 150px;">Remaining Annual Leaves (黃金事假)</th>
+                    <th style="width: 100px;">Action</th>
+                </tr>
+            </thead>
+            <tbody id="employee-list">
+            </tbody>
+        </table>
     </div>
 
     <!-- Update the employee application table -->
@@ -1345,7 +1345,7 @@
         </div>
     </div>
 
-    <h3>賀金 Info</h3>
+    <h3>賀金 Info *由3月起統計*</h3>
     <div class="table-container">
         <table id="employee-penalty-table">
             <thead>
