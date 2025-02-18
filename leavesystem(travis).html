@@ -4118,42 +4118,68 @@
 
         // Add this new function to handle updates
         async function updateEmployeeField(employeeId, field, value) {
-            const updates = {};
-            updates[`employees/${employeeId}/${field}`] = value;
-            
             try {
+                // Get current employee data first
+                const employeeSnapshot = await database.ref(`employees/${employeeId}`).once('value');
+                const employeeData = employeeSnapshot.val();
+                
+                if (!employeeData) {
+                    throw new Error('Employee not found');
+                }
+
+                const updates = {};
+                updates[`employees/${employeeId}/${field}`] = value;
+                
+                // If updating code, handle authentication updates
+                if (field === 'code') {
+                    try {
+                        // Create new auth credentials with updated code
+                        const newEmail = `${employeeData.name.replace(/\s+/g, '')}@snext.com`.toLowerCase();
+                        const newPassword = value; // New code becomes the new password
+
+                        // Create new user account with updated credentials
+                        const userCredential = await auth.createUserWithEmailAndPassword(newEmail, newPassword);
+                        
+                        // Delete old user account if it exists
+                        if (employeeData.uid) {
+                            try {
+                                // Get reference to old user
+                                const oldUser = await auth.signInWithEmailAndPassword(
+                                    `${employeeData.name.replace(/\s+/g, '')}@snext.com`.toLowerCase(),
+                                    employeeData.code
+                                );
+                                // Delete old user account
+                                await oldUser.user.delete();
+                            } catch (error) {
+                                console.log('Old user account not found or already deleted');
+                            }
+                        }
+
+                        // Update employee record with new UID
+                        updates[`employees/${employeeId}/uid`] = userCredential.user.uid;
+                        updates[`employees/${employeeId}/previousCode`] = employeeData.code;
+
+                        // Sign back in as admin
+                        await auth.signInWithEmailAndPassword('admin@snext.com', 'admin123');
+
+                    } catch (authError) {
+                        console.error('Error updating authentication:', authError);
+                        throw new Error('Failed to update login credentials. Please try again.');
+                    }
+                }
+
                 // Update the employee data
                 await database.ref().update(updates);
                 
-                // If the code field was changed, update the login credentials
+                showSyncStatus(`Employee ${field} updated successfully`);
+                
                 if (field === 'code') {
-                    const employeeSnapshot = await database.ref(`employees/${employeeId}`).once('value');
-                    const employeeData = employeeSnapshot.val();
-                    
-                    // Update login credentials
-                    const loginUpdates = {};
-                    loginUpdates[`logins/${value}`] = {
-                        password: value, // Using code as default password
-                        role: 'employee',
-                        employeeId: employeeId
-                    };
-                    
-                    // Remove old login if it exists
-                    if (employeeData.previousCode) {
-                        await database.ref(`logins/${employeeData.previousCode}`).remove();
-                    }
-                    
-                    // Update the login credentials
-                    await database.ref().update(loginUpdates);
-                    
-                    // Store the previous code for future reference
-                    await database.ref(`employees/${employeeId}/previousCode`).set(employeeData.code);
-                    
-                    alert('Employee code and login credentials updated successfully');
+                    alert(`Employee code updated successfully. New login credentials:\nUsername: ${employeeData.name}\nPassword: ${value}`);
                 }
+
             } catch (error) {
                 console.error('Error updating employee:', error);
-                alert('Error updating employee information');
+                alert('Error updating employee information: ' + error.message);
             }
         }
 
