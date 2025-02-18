@@ -1063,6 +1063,91 @@
             transform: rotate(-90deg);
         }
 
+        .button-group {
+            display: flex;
+            gap: 5px;
+        }
+
+        .adjust-btn {
+            padding: 6px 12px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .adjust-btn:hover {
+            background-color: #45a049;
+        }
+
+        .adjust-btn.save-btn {
+            background-color: #2196F3;
+        }
+
+        .adjust-btn.save-btn:hover {
+            background-color: #1976D2;
+        }
+
+        .editable-cell {
+            position: relative;
+        }
+
+        .display-text {
+            padding: 6px 8px;
+            display: block;
+        }
+
+        .edit-select {
+            display: none;
+            width: 100%;
+            padding: 6px 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: white;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .edit-select:focus {
+            border-color: #2196F3;
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.1);
+        }
+
+        /* Make sure the edit select boxes are properly sized */
+        .editable-cell .edit-select {
+            min-width: 120px;
+            max-width: 200px;
+        }
+
+        /* Style for the cell when in edit mode */
+        .editable-cell.editing {
+            background-color: #f8f9fa;
+        }
+
+        .edit-input {
+            width: 100%;
+            padding: 6px 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            margin: 0;
+        }
+
+        .edit-input:focus {
+            border-color: #2196F3;
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.1);
+        }
+
+        /* Ensure proper spacing in table cells */
+        .editable-cell {
+            padding: 8px !important;
+            min-width: 120px;
+        }
+
         /* Animation for the table container */
         #agentListContainer {
             transition: all 0.3s ease;
@@ -1237,13 +1322,13 @@
         <table id="employee-table">
             <thead>
                 <tr>
-                    <th style="padding: 10px;">Name</th>
-                    <th style="padding: 10px;">Code</th>
-                    <th style="padding: 10px;">Role</th>
-                    <th style="padding: 10px;">Clubs & Awards</th>
-                    <th style="padding: 10px;">Remaining Annual Leaves (Normal)</th>
-                    <th style="padding: 10px;">Remaining Annual Leaves (黃金事假)</th>
-                    <th style="padding: 10px;">Action</th>
+                    <th style="width: 150px;">Name</th>
+                    <th style="width: 120px;">Code</th>
+                    <th style="width: 100px;">Role</th> <!-- Increased width for Role -->
+                    <th style="width: 100px;">Clubs & Awards</th>
+                    <th style="width: 200px;">Remaining Annual Leaves (Normal)</th>
+                    <th style="width: 200px;">Remaining Annual Leaves (黃金事假)</th>
+                    <th style="width: 240px;">Action</th>
                 </tr>
             </thead>
             <tbody id="employee-list">
@@ -3841,7 +3926,6 @@
             const employeeRef = database.ref('employees');
             employeeRef.on('value', (snapshot) => {
                 const employees = snapshot.val();
-                
                 const employeeList = document.getElementById('employee-list');
                 if (employeeList) employeeList.innerHTML = '';
 
@@ -3881,35 +3965,49 @@
                         const normalLeavesDisplay = emp.remainingNormalLeaves === 999 ? "∞" : emp.remainingNormalLeaves;
                         const goldenLeavesDisplay = emp.remainingGoldenLeaves === 999 ? "∞" : emp.remainingGoldenLeaves;
                         
-                        // Create role select element
+                        // Add code field as editable
+                        const codeInput = `
+                            <input type="text" class="edit-input" 
+                                value="${emp.code}" 
+                                style="display: none;"
+                                onchange="updateEmployeeField('${id}', 'code', this.value)">
+                            <span class="display-text">${emp.code}</span>
+                        `;
+
                         const roleSelect = `
-                            <select onchange="updateEmployeeField('${id}', 'role', this.value)" class="edit-select">
+                            <select class="edit-select" style="display: none;" 
+                                    onchange="updateEmployeeField('${id}', 'role', this.value)">
                                 ${['Agent', 'AUM/UM', 'SUM', 'BM', 'DM', 'DD']
                                     .map(role => `<option value="${role}" ${emp.role === role ? 'selected' : ''}>${role}</option>`)
                                     .join('')}
                             </select>
+                            <span class="display-text">${emp.role}</span>
                         `;
 
-                        // Create MDRT select element
                         const mdrtSelect = `
-                            <select onchange="updateEmployeeField('${id}', 'mdrt', this.value)" class="edit-select">
+                            <select class="edit-select" style="display: none;" 
+                                    onchange="updateEmployeeField('${id}', 'mdrt', this.value)">
                                 ${['NO', 'MDRT', 'COT or above']
                                     .map(status => `<option value="${status}" ${emp.mdrt === status ? 'selected' : ''}>${status}</option>`)
                                     .join('')}
                             </select>
+                            <span class="display-text">${emp.mdrt}</span>
                         `;
                         
                         row.innerHTML = `
                             <td class="drag-handle">
                                 <div class="drag-handle-inner">${emp.name}</div>
                             </td>
-                            <td>${emp.code}</td>
-                            <td>${roleSelect}</td>
-                            <td>${mdrtSelect}</td>
+                            <td class="editable-cell">${codeInput}</td>
+                            <td class="editable-cell">${roleSelect}</td>
+                            <td class="editable-cell">${mdrtSelect}</td>
                             <td>${normalLeavesDisplay}</td>
                             <td>${goldenLeavesDisplay}</td>
-                            <td>
-                                <button class="remove-btn" onclick="removeAgent('${id}', this.parentElement.parentElement)">Remove</button>
+                            <td class="action-column">
+                                <div class="button-stack">
+                                    <button class="adjust-btn action-btn" onclick="toggleAdjustMode(this)">Adjust</button>
+                                    <button class="remove-btn action-btn" onclick="removeAgent('${id}', this.parentElement.parentElement.parentElement)">Remove</button>
+                                </div>
                             </td>
                         `;
 
@@ -3930,49 +4028,76 @@
             });
         }
 
+        // Add this new function to handle adjust mode
+        function toggleAdjustMode(button) {
+            const row = button.closest('tr');
+            const editableFields = row.querySelectorAll('.editable-cell');
+            const isAdjusting = button.classList.toggle('adjusting');
+            
+            editableFields.forEach(cell => {
+                const input = cell.querySelector('.edit-input');
+                const select = cell.querySelector('.edit-select');
+                const displayText = cell.querySelector('.display-text');
+                
+                if (isAdjusting) {
+                    if (input) input.style.display = 'block';
+                    if (select) select.style.display = 'block';
+                    if (displayText) displayText.style.display = 'none';
+                    button.textContent = 'Save';
+                    button.classList.add('save-btn');
+                } else {
+                    if (input) {
+                        input.style.display = 'none';
+                        displayText.textContent = input.value;
+                    }
+                    if (select) {
+                        select.style.display = 'none';
+                        displayText.textContent = select.value;
+                    }
+                    button.textContent = 'Adjust';
+                    button.classList.remove('save-btn');
+                }
+            });
+        }
+
         // Add this new function to handle updates
         async function updateEmployeeField(employeeId, field, value) {
+            const updates = {};
+            updates[`employees/${employeeId}/${field}`] = value;
+            
             try {
-                const employeeRef = database.ref(`employees/${employeeId}`);
-                const updates = { [field]: value };
-
-                // Special handling for COT or above status
-                if (field === 'mdrt' && value === 'COT or above') {
-                    updates.normalLeaves = 999;
-                    updates.goldenLeaves = 999;
-                    updates.remainingNormalLeaves = 999;
-                    updates.remainingGoldenLeaves = 999;
-                } else if (field === 'mdrt' && value === 'MDRT') {
-                    updates.normalLeaves = 13;
-                    updates.goldenLeaves = 3;
-                    // Only update remaining leaves if they were previously infinite
-                    const snapshot = await employeeRef.once('value');
-                    const currentData = snapshot.val();
-                    if (currentData.remainingNormalLeaves === 999) {
-                        updates.remainingNormalLeaves = 13;
+                // Update the employee data
+                await database.ref().update(updates);
+                
+                // If the code field was changed, update the login credentials
+                if (field === 'code') {
+                    const employeeSnapshot = await database.ref(`employees/${employeeId}`).once('value');
+                    const employeeData = employeeSnapshot.val();
+                    
+                    // Update login credentials
+                    const loginUpdates = {};
+                    loginUpdates[`logins/${value}`] = {
+                        password: value, // Using code as default password
+                        role: 'employee',
+                        employeeId: employeeId
+                    };
+                    
+                    // Remove old login if it exists
+                    if (employeeData.previousCode) {
+                        await database.ref(`logins/${employeeData.previousCode}`).remove();
                     }
-                    if (currentData.remainingGoldenLeaves === 999) {
-                        updates.remainingGoldenLeaves = 3;
-                    }
-                } else if (field === 'mdrt' && value === 'NO') {
-                    updates.normalLeaves = 10;
-                    updates.goldenLeaves = 3;
-                    // Only update remaining leaves if they were previously infinite
-                    const snapshot = await employeeRef.once('value');
-                    const currentData = snapshot.val();
-                    if (currentData.remainingNormalLeaves === 999) {
-                        updates.remainingNormalLeaves = 10;
-                    }
-                    if (currentData.remainingGoldenLeaves === 999) {
-                        updates.remainingGoldenLeaves = 3;
-                    }
+                    
+                    // Update the login credentials
+                    await database.ref().update(loginUpdates);
+                    
+                    // Store the previous code for future reference
+                    await database.ref(`employees/${employeeId}/previousCode`).set(employeeData.code);
+                    
+                    alert('Employee code and login credentials updated successfully');
                 }
-
-                await employeeRef.update(updates);
-                showSyncStatus('Employee updated successfully');
             } catch (error) {
                 console.error('Error updating employee:', error);
-                showSyncStatus('Error updating employee', 'error');
+                alert('Error updating employee information');
             }
         }
 
