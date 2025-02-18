@@ -4132,50 +4132,55 @@
                 
                 // If updating code, handle authentication updates
                 if (field === 'code') {
-                    try {
-                        // Create new auth credentials with updated code
-                        const newEmail = `${employeeData.name.replace(/\s+/g, '')}@snext.com`.toLowerCase();
-                        const newPassword = value; // New code becomes the new password
+                    // Store the current admin credentials
+                    const adminEmail = 'admin@snext.com';
+                    const adminPassword = auth.currentUser?.email === adminEmail ? 
+                        document.getElementById('current-password')?.value || 'admin123' : 'admin123';
 
-                        // Create new user account with updated credentials
-                        const userCredential = await auth.createUserWithEmailAndPassword(newEmail, newPassword);
+                    try {
+                        // Format the employee email
+                        const employeeEmail = `${employeeData.name.replace(/[^a-zA-Z0-9]/g, '')}@snext.com`.toLowerCase();
                         
-                        // Delete old user account if it exists
-                        if (employeeData.uid) {
-                            try {
-                                // Get reference to old user
-                                const oldUser = await auth.signInWithEmailAndPassword(
-                                    `${employeeData.name.replace(/\s+/g, '')}@snext.com`.toLowerCase(),
-                                    employeeData.code
-                                );
-                                // Delete old user account
-                                await oldUser.user.delete();
-                            } catch (error) {
-                                console.log('Old user account not found or already deleted');
+                        // Create temporary password based on new code
+                        const newPassword = `next${value}`; // Adding 'next' prefix to code for password
+
+                        // First, update the employee record
+                        updates[`employees/${employeeId}/code`] = value;
+                        updates[`employees/${employeeId}/previousCode`] = employeeData.code;
+
+                        // Try to find existing user account
+                        try {
+                            const userCredential = await auth.signInWithEmailAndPassword(employeeEmail, `next${employeeData.code}`);
+                            if (userCredential.user) {
+                                // Update password for existing account
+                                await userCredential.user.updatePassword(newPassword);
+                            }
+                        } catch (signInError) {
+                            // If user doesn't exist, create new account
+                            if (signInError.code === 'auth/user-not-found') {
+                                await auth.createUserWithEmailAndPassword(employeeEmail, newPassword);
+                            } else {
+                                console.error('Error updating user:', signInError);
                             }
                         }
 
-                        // Update employee record with new UID
-                        updates[`employees/${employeeId}/uid`] = userCredential.user.uid;
-                        updates[`employees/${employeeId}/previousCode`] = employeeData.code;
-
                         // Sign back in as admin
-                        await auth.signInWithEmailAndPassword('admin@snext.com', 'admin123');
+                        await auth.signInWithEmailAndPassword(adminEmail, adminPassword);
+
+                        alert(`Employee code updated successfully.\nNew login credentials:\nUsername: ${employeeData.name}\nPassword: next${value}`);
 
                     } catch (authError) {
-                        console.error('Error updating authentication:', authError);
-                        throw new Error('Failed to update login credentials. Please try again.');
+                        console.error('Auth error:', authError);
+                        // Still update the employee record even if auth update fails
+                        await database.ref().update(updates);
+                        alert(`Employee code updated, but there was an issue updating login credentials. \nNew login credentials:\nUsername: ${employeeData.name}\nPassword: next${value}`);
+                        return;
                     }
                 }
 
                 // Update the employee data
                 await database.ref().update(updates);
-                
                 showSyncStatus(`Employee ${field} updated successfully`);
-                
-                if (field === 'code') {
-                    alert(`Employee code updated successfully. New login credentials:\nUsername: ${employeeData.name}\nPassword: ${value}`);
-                }
 
             } catch (error) {
                 console.error('Error updating employee:', error);
