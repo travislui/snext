@@ -148,8 +148,8 @@
         .table-container {
             width: 100%;
             overflow-x: auto;
-            -webkit-overflow-scrolling: touch;
-            margin-bottom: 15px;
+            margin: 20px 0;
+            padding-bottom: 10px; /* For scroll bar space */
         }
 
         /* Add visual indication of scrollable tables */
@@ -1150,8 +1150,64 @@
 
         /* Animation for the table container */
         #agentListContainer {
-            transition: all 0.3s ease;
-            overflow: hidden;
+            max-height: 400px; /* You can adjust this value to your preferred height */
+            overflow-y: auto;
+            overflow-x: auto;
+            margin: 20px 0;
+            padding-bottom: 10px;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+        }
+
+        #employee-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+
+        #employee-table thead th {
+            position: sticky;
+            top: 0;
+            background: linear-gradient(120deg, var(--primary-color), var(--secondary-color));
+            z-index: 1;
+            padding: 15px;
+        }
+
+        /* Add some spacing between rows */
+        #employee-table tbody tr {
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        #employee-table tbody tr:last-child {
+            border-bottom: none;
+        }
+
+        #employee-table td {
+            padding: 12px;
+            vertical-align: middle;
+        }
+
+        #employee-table tbody tr:hover {
+            background-color: rgba(52, 152, 219, 0.05);
+        }
+
+        #agentListContainer::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        #agentListContainer::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+
+        #agentListContainer::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+
+        #agentListContainer::-webkit-scrollbar-thumb:hover {
+            background: #555;
         }
 
         #agentListContainer.collapsed {
@@ -1322,13 +1378,13 @@
         <table id="employee-table">
             <thead>
                 <tr>
-                    <th style="width: 150px;">Name</th>
-                    <th style="width: 120px;">Code</th>
-                    <th style="width: 100px;">Role</th> <!-- Increased width for Role -->
-                    <th style="width: 100px;">Clubs & Awards</th>
-                    <th style="width: 200px;">Remaining Annual Leaves (Normal)</th>
-                    <th style="width: 200px;">Remaining Annual Leaves (黃金事假)</th>
-                    <th style="width: 240px;">Action</th>
+                    <th>Name</th>
+                    <th>Code</th>
+                    <th>Role</th>
+                    <th>Clubs & Awards</th>
+                    <th>Remaining Annual Leaves (Normal)</th>
+                    <th>Remaining Annual Leaves (黃金事假)</th>
+                    <th>Action</th>
                 </tr>
             </thead>
             <tbody id="employee-list">
