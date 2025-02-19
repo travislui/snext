@@ -2647,7 +2647,7 @@
             if (leaveType === 'Annual Leave (Normal)') {
                 // Calculate the minimum allowed Leave Start Date (2 days after Apply Date)
                 const minLeaveStartDate = new Date(applyDate);
-                minLeaveStartDate.setDate(minLeaveStartDate.getDate() + 1);
+                minLeaveStartDate.setDate(minLeaveStartDate.getDate() + 2);
 
                 if (leaveStartDate < minLeaveStartDate) {
                     alert("Leave Start Date must be at least 3 days after Apply Date for Annual Leave (Normal). (Include Apply Date)");
