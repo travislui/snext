@@ -4129,62 +4129,67 @@
 
                 const updates = {};
                 updates[`employees/${employeeId}/${field}`] = value;
-                
+
                 // If updating code, handle authentication updates
                 if (field === 'code') {
-                    // Store the current admin credentials
-                    const adminEmail = 'admin@snext.com';
-                    const adminPassword = auth.currentUser?.email === adminEmail ? 
-                        document.getElementById('current-password')?.value || 'admin123' : 'admin123';
-
                     try {
-                        // Format the employee email
+                        // Store admin credentials
+                        const adminUser = auth.currentUser;
+                        const adminEmail = 'admin@snext.com';
+
+                        // Format the employee email (remove spaces and special characters)
                         const employeeEmail = `${employeeData.name.replace(/[^a-zA-Z0-9]/g, '')}@snext.com`.toLowerCase();
-                        
-                        // Create temporary password based on new code
-                        const newPassword = `next${value}`; // Adding 'next' prefix to code for password
+                        console.log('Employee email:', employeeEmail);
 
-                        // First, update the employee record
-                        updates[`employees/${employeeId}/code`] = value;
-                        updates[`employees/${employeeId}/previousCode`] = employeeData.code;
-
-                        // Try to find existing user account
+                        // Delete existing user if exists
                         try {
-                            const userCredential = await auth.signInWithEmailAndPassword(employeeEmail, `next${employeeData.code}`);
-                            if (userCredential.user) {
-                                // Update password for existing account
-                                await userCredential.user.updatePassword(newPassword);
+                            const existingUser = await auth.signInWithEmailAndPassword(employeeEmail, employeeData.code);
+                            if (existingUser.user) {
+                                await existingUser.user.delete();
                             }
-                        } catch (signInError) {
-                            // If user doesn't exist, create new account
-                            if (signInError.code === 'auth/user-not-found') {
-                                await auth.createUserWithEmailAndPassword(employeeEmail, newPassword);
-                            } else {
-                                console.error('Error updating user:', signInError);
-                            }
+                        } catch (error) {
+                            console.log('No existing user found or already deleted');
                         }
 
+                        // Create new user account
+                        const newUserCredential = await auth.createUserWithEmailAndPassword(employeeEmail, value);
+                        
+                        // Update employee record with new UID
+                        updates[`employees/${employeeId}/uid`] = newUserCredential.user.uid;
+                        updates[`employees/${employeeId}/code`] = value;
+                        
                         // Sign back in as admin
-                        await auth.signInWithEmailAndPassword(adminEmail, adminPassword);
+                        if (adminUser) {
+                            await auth.signInWithEmailAndPassword(adminEmail, 'admin123');
+                        }
 
-                        alert(`Employee code updated successfully.\nNew login credentials:\nUsername: ${employeeData.name}\nPassword: next${value}`);
+                        // Update Firebase database
+                        await database.ref().update(updates);
+
+                        showSyncStatus('Employee code and login credentials updated successfully');
+                        alert(`Employee code updated successfully.\nNew login credentials:\nUsername: ${employeeData.name}\nPassword: ${value}`);
 
                     } catch (authError) {
-                        console.error('Auth error:', authError);
-                        // Still update the employee record even if auth update fails
-                        await database.ref().update(updates);
-                        alert(`Employee code updated, but there was an issue updating login credentials. \nNew login credentials:\nUsername: ${employeeData.name}\nPassword: next${value}`);
-                        return;
+                        console.error('Authentication error:', authError);
+                        throw new Error('Failed to update login credentials: ' + authError.message);
                     }
+                } else {
+                    // For non-code field updates
+                    await database.ref().update(updates);
+                    showSyncStatus(`Employee ${field} updated successfully`);
                 }
-
-                // Update the employee data
-                await database.ref().update(updates);
-                showSyncStatus(`Employee ${field} updated successfully`);
 
             } catch (error) {
                 console.error('Error updating employee:', error);
                 alert('Error updating employee information: ' + error.message);
+                // Attempt to restore admin session if needed
+                if (auth.currentUser?.email !== 'admin@snext.com') {
+                    try {
+                        await auth.signInWithEmailAndPassword('admin@snext.com', 'admin123');
+                    } catch (e) {
+                        console.error('Failed to restore admin session:', e);
+                    }
+                }
             }
         }
 
@@ -4374,7 +4379,79 @@
                 const end = new Date(leaveEndDate);
                 const leaveDays = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
 
-                // Create the application
+                // Check for Mondays in leave period for Annual Leaves
+                if (leaveType.includes('Annual Leave')) {
+                    const mondayCount = countMondaysInDateRange(new Date(leaveStartDate), new Date(leaveEndDate));
+                    
+                    if (mondayCount > 0) {
+                        // Get current Monday leave count
+                        const currentMondayLeaves = employeeData.usedMondayLeaves || 0;
+                        const newTotalMondays = currentMondayLeaves + mondayCount;
+
+                        if (newTotalMondays > 3) {
+                            // Calculate penalties for excess Mondays
+                            const excessMondays = newTotalMondays - Math.max(3, currentMondayLeaves);
+                            
+                            // Add penalties for each excess Monday
+                            for (let i = 0; i < excessMondays; i++) {
+                                const penaltyData = {
+                                    employeeId: employeeId,
+                                    employeeName: employeeData.name,
+                                    employeeRole: employeeData.role,
+                                    date: formatDate(new Date()),
+                                    reason: 'Additional Monday Leave After Limit',
+                                    minutes: 0,
+                                    amount: 100,
+                                    baseAmount: 100,
+                                    deadline: formatDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)),
+                                    status: 'Not Submitted',
+                                    createdAt: new Date().toISOString(),
+                                    lastModified: new Date().toISOString(),
+                                    createdBy: 'admin'
+                                };
+
+                                // Add penalty to Firebase
+                                const penaltyRef = database.ref('penalties');
+                                await penaltyRef.push(penaltyData);
+                            }
+
+                            // Show warning about penalties
+                            alert(`This leave application includes ${mondayCount} Monday(s). The employee has already used ${currentMondayLeaves} Monday leaves. A penalty of $100 will be added for each excess Monday (${excessMondays} penalties added).`);
+                        } else if (currentMondayLeaves >= 3) {
+                            // All new Mondays will be penalized
+                            for (let i = 0; i < mondayCount; i++) {
+                                const penaltyData = {
+                                    employeeId: employeeId,
+                                    employeeName: employeeData.name,
+                                    employeeRole: employeeData.role,
+                                    date: formatDate(new Date()),
+                                    reason: 'Additional Monday Leave After Limit',
+                                    minutes: 0,
+                                    amount: 100,
+                                    baseAmount: 100,
+                                    deadline: formatDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)),
+                                    status: 'Not Submitted',
+                                    createdAt: new Date().toISOString(),
+                                    lastModified: new Date().toISOString(),
+                                    createdBy: 'admin'
+                                };
+
+                                // Add penalty to Firebase
+                                const penaltyRef = database.ref('penalties');
+                                await penaltyRef.push(penaltyData);
+                            }
+
+                            alert(`This leave application includes ${mondayCount} Monday(s). The employee has already used their 3 Monday leaves. A penalty of $100 will be added for each Monday (${mondayCount} penalties added).`);
+                        }
+
+                        // Update the Monday leave count for the employee
+                        await database.ref(`employees/${employeeId}`).update({
+                            usedMondayLeaves: newTotalMondays
+                        });
+                    }
+                }
+
+                // Create the application object
                 const newApplication = {
                     employeeId: employeeId,
                     employeeName: employeeData.name,
