@@ -2722,6 +2722,23 @@
                     throw new Error('Employee data not found');
                 }
 
+                // Check leave quota before processing
+                if (leaveType === 'Annual Leave (Normal)') {
+                    if (employeeData.remainingNormalLeaves !== 999 && // Skip check for infinite leaves
+                        leaveDays > employeeData.remainingNormalLeaves) {
+                        throw new Error(`You only have ${employeeData.remainingNormalLeaves} normal annual leaves remaining`);
+                    }
+                } else if (leaveType === 'Annual Leave (黃金事假)') {
+                    if (employeeData.remainingGoldenLeaves !== 999 && // Skip check for infinite leaves
+                        leaveDays > employeeData.remainingGoldenLeaves) {
+                        throw new Error(`You only have ${employeeData.remainingGoldenLeaves} golden annual leaves remaining`);
+                    }
+                    if (employeeData.remainingNormalLeaves !== 999 && // Skip check for infinite leaves
+                        leaveDays > employeeData.remainingNormalLeaves) {
+                        throw new Error(`You only have ${employeeData.remainingNormalLeaves} normal annual leaves remaining`);
+                    }
+                }
+
                 // Initialize used days if they don't exist
                 const currentSickDays = employeeData.usedSickLeaveDays || 0;
                 const currentForceDays = employeeData.usedForceMajeureDays || 0;
