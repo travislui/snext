@@ -1710,81 +1710,61 @@
                     try {
                         console.log("Attempting employee login for:", username);
                         
-                        // Sanitize the email format
-                        const employeeEmail = `${username.replace(/[^a-zA-Z0-9]/g, '')}@snext.com`.toLowerCase();
-                        console.log("Using sanitized email:", employeeEmail);
-
-                        let userCredential;
-                        try {
-                            // Try to sign in
-                            userCredential = await auth.signInWithEmailAndPassword(employeeEmail, password);
-                            console.log("Authentication successful");
-                        } catch (error) {
-                            console.log("Sign-in error:", error.code);
-                            if (error.code === 'auth/user-not-found') {
-                                // Create new user if doesn't exist
-                                console.log("Creating new user account");
-                                try {
-                                    userCredential = await auth.createUserWithEmailAndPassword(employeeEmail, password);
-                                    console.log("New user account created successfully");
-                                } catch (createError) {
-                                    console.error("Error creating user:", createError);
-                                    throw createError;
-                                }
-                            } else {
-                                console.error("Authentication error:", error);
-                                throw error;
-                            }
-                        }
-
-                        // Wait for a moment to ensure auth state is updated
-                        await new Promise(resolve => setTimeout(resolve, 1000));
-
-                        console.log("Fetching employee data");
+                        // First, find the employee in the database by name
                         const employeeRef = database.ref('employees');
                         const snapshot = await employeeRef.once('value');
+                        const employees = snapshot.val() || {};
                         
-                        if (!snapshot.exists()) {
-                            console.log("No employees found");
-                            throw new Error('No employee records found');
-                        }
-
-                        const employees = snapshot.val();
                         let employeeData = null;
                         let employeeId = null;
 
+                        // Find the employee by name
                         Object.entries(employees).forEach(([id, data]) => {
-                            if (data.name === username && data.code === password) {
+                            if (data.name === username) {
                                 employeeData = data;
                                 employeeId = id;
                             }
                         });
 
                         if (!employeeData) {
-                            console.log("No matching employee found");
-                            throw new Error('Invalid credentials');
+                            throw new Error('Employee not found');
                         }
 
-                        console.log("Employee found:", employeeId);
-                        currentUser = {
-                            ...employeeData,
-                            id: employeeId,
-                            uid: userCredential.user.uid
-                        };
+                        // Verify the password matches the current code
+                        if (password !== employeeData.code) {
+                            throw new Error('Invalid password');
+                        }
 
-                        console.log("Current user set:", currentUser);
+                        // Format email
+                        const employeeEmail = `${username.replace(/[^a-zA-Z0-9]/g, '')}@snext.com`.toLowerCase();
 
-                        // Clean up existing listeners
-                        database.ref('penalties').off();
+                        try {
+                            // Attempt to sign in
+                            const userCredential = await auth.signInWithEmailAndPassword(employeeEmail, password);
+                            currentUser = {
+                                ...employeeData,
+                                id: employeeId,
+                                uid: userCredential.user.uid
+                            };
+                        } catch (authError) {
+                            // If authentication fails, create new account
+                            console.log('Auth error, creating new account:', authError);
+                            const newUserCredential = await auth.createUserWithEmailAndPassword(employeeEmail, password);
+                            currentUser = {
+                                ...employeeData,
+                                id: employeeId,
+                                uid: newUserCredential.user.uid
+                            };
+                        }
 
                         // Update employee record with UID if needed
-                        if (!employeeData.uid) {
+                        if (currentUser.uid && (!employeeData.uid || employeeData.uid !== currentUser.uid)) {
                             await employeeRef.child(employeeId).update({
-                                uid: userCredential.user.uid
+                                uid: currentUser.uid
                             });
                         }
 
-                        console.log("Showing employee interface");
+                        console.log("Login successful, showing employee interface");
                         showEmployeeInterface();
                         loadEmployeeData(currentUser);
                         loadEmployeeApplications(employeeId);
@@ -1804,8 +1784,6 @@
             } catch (error) {
                 console.error('Login error:', error);
                 alert(error.message);
-                
-                // Clear password field on error
                 document.getElementById('password').value = '';
             }
         }
@@ -4137,41 +4115,45 @@
                         const adminUser = auth.currentUser;
                         const adminEmail = 'admin@snext.com';
 
-                        // Format the employee email (remove spaces and special characters)
+                        // Format the employee email
                         const employeeEmail = `${employeeData.name.replace(/[^a-zA-Z0-9]/g, '')}@snext.com`.toLowerCase();
-                        console.log('Employee email:', employeeEmail);
+                        console.log('Updating code for:', employeeEmail);
 
-                        // Delete existing user if exists
-                        try {
-                            const existingUser = await auth.signInWithEmailAndPassword(employeeEmail, employeeData.code);
-                            if (existingUser.user) {
-                                await existingUser.user.delete();
-                            }
-                        } catch (error) {
-                            console.log('No existing user found or already deleted');
-                        }
-
-                        // Create new user account
-                        const newUserCredential = await auth.createUserWithEmailAndPassword(employeeEmail, value);
-                        
-                        // Update employee record with new UID
-                        updates[`employees/${employeeId}/uid`] = newUserCredential.user.uid;
-                        updates[`employees/${employeeId}/code`] = value;
-                        
-                        // Sign back in as admin
-                        if (adminUser) {
-                            await auth.signInWithEmailAndPassword(adminEmail, 'admin123');
-                        }
-
-                        // Update Firebase database
+                        // First update the database
                         await database.ref().update(updates);
 
-                        showSyncStatus('Employee code and login credentials updated successfully');
+                        // Now handle authentication update
+                        try {
+                            // Sign out any current user
+                            await auth.signOut();
+
+                            // Try to sign in with existing credentials
+                            await auth.signInWithEmailAndPassword(employeeEmail, employeeData.code);
+                            const user = auth.currentUser;
+                            
+                            // Update the password
+                            await user.updatePassword(value);
+                            console.log('Password updated successfully');
+
+                        } catch (authError) {
+                            console.log('Auth update error:', authError);
+                            // If sign-in fails, try to create new account
+                            if (authError.code === 'auth/user-not-found') {
+                                await auth.createUserWithEmailAndPassword(employeeEmail, value);
+                                console.log('New user account created');
+                            }
+                        }
+
+                        // Sign back in as admin
+                        await auth.signInWithEmailAndPassword(adminEmail, 'admin123');
+
+                        showSyncStatus('Employee code updated successfully');
                         alert(`Employee code updated successfully.\nNew login credentials:\nUsername: ${employeeData.name}\nPassword: ${value}`);
 
-                    } catch (authError) {
-                        console.error('Authentication error:', authError);
-                        throw new Error('Failed to update login credentials: ' + authError.message);
+                    } catch (error) {
+                        console.error('Error in authentication update:', error);
+                        // Database was already updated, so just show a message
+                        alert(`Code updated in database. New password is: ${value}`);
                     }
                 } else {
                     // For non-code field updates
@@ -4182,14 +4164,6 @@
             } catch (error) {
                 console.error('Error updating employee:', error);
                 alert('Error updating employee information: ' + error.message);
-                // Attempt to restore admin session if needed
-                if (auth.currentUser?.email !== 'admin@snext.com') {
-                    try {
-                        await auth.signInWithEmailAndPassword('admin@snext.com', 'admin123');
-                    } catch (e) {
-                        console.error('Failed to restore admin session:', e);
-                    }
-                }
             }
         }
 
