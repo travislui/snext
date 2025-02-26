@@ -3,6 +3,10 @@
 
 <head>
     <title>S-Next 請假及賀金系統</title>
+    <link href='https://cdn.jsdelivr.net/npm/@fullcalendar/core@6.1.10/main.min.css' rel='stylesheet' />
+    <link href='https://cdn.jsdelivr.net/npm/@fullcalendar/daygrid@6.1.10/main.min.css' rel='stylesheet' />
+    <script src='https://cdn.jsdelivr.net/npm/@fullcalendar/core@6.1.10/main.min.js'></script>
+    <script src='https://cdn.jsdelivr.net/npm/@fullcalendar/daygrid@6.1.10/main.min.js'></script>
     <style>
         /* Responsive styles */
         @media screen and (max-width: 768px) {
@@ -1216,6 +1220,161 @@
             min-width: 120px;
         }
 
+        .calendar-container {
+            margin: 20px 0;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            transition: all 0.3s ease;
+            max-height: 800px;
+            overflow: hidden;
+        }
+
+        .calendar-container.collapsed {
+            max-height: 0;
+            padding: 0;
+            margin: 0;
+            opacity: 0;
+        }
+
+        .fc { /* the calendar root */
+            max-width: 100%;
+            height: auto !important;
+            background: white;
+            padding: 10px;
+            border-radius: 8px;
+        }
+
+        .fc-event {
+            cursor: pointer;
+            margin: 2px 0;
+            padding: 2px 4px;
+        }
+
+        .fc-event-title {
+            font-size: 0.85em;
+            white-space: normal !important; /* Allow text to wrap */
+            overflow: hidden;
+            text-overflow: ellipsis;
+            padding: 2px;
+        }
+
+        .fc-day-today {
+            background-color: rgba(52, 152, 219, 0.1) !important;
+        }
+
+        .fc-header-toolbar {
+            margin-bottom: 1.5em !important;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .fc-toolbar-chunk {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .fc-button {
+            background-color: var(--primary-color) !important;
+            border: none !important;
+            border-radius: 4px !important;
+            padding: 0.5rem 1rem !important;
+            font-size: 0.875rem !important;
+        }
+
+        .fc-button:hover {
+            background-color: var(--accent-color) !important;
+        }
+
+        .fc-button-active {
+            background-color: var(--accent-color) !important;
+        }
+
+        /* Custom leave type colors */
+        .leave-annual-normal {
+            background-color: #4CAF50 !important;
+            border-color: #4CAF50 !important;
+            color: white !important;
+        }
+
+        .leave-annual-golden {
+            background-color: #FFC107 !important;
+            border-color: #FFC107 !important;
+            color: black !important;
+        }
+
+        .leave-sick {
+            background-color: #F44336 !important;
+            border-color: #F44336 !important;
+            color: white !important;
+        }
+
+        .leave-force-majeure {
+            background-color: #9C27B0 !important;
+            border-color: #9C27B0 !important;
+            color: white !important;
+        }
+
+        .leave-overseas {
+            background-color: #2196F3 !important;
+            border-color: #2196F3 !important;
+            color: white !important;
+        }
+
+        #calendar-legend {
+            margin-bottom: 1rem;
+            padding: 0.5rem;
+            border-radius: 4px;
+            background-color: #f8f9fa;
+        }
+
+        #calendar-legend .flex {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        #calendar-legend .flex > div {
+            display: flex;
+            align-items: center;
+            margin-right: 1rem;
+        }
+
+        #calendar-legend .w-4 {
+            width: 1rem;
+            height: 1rem;
+            margin-right: 0.5rem;
+            border-radius: 0.25rem;
+        }
+
+        /* Custom leave type colors */
+        .leave-annual-normal {
+            background-color: #4CAF50 !important;
+            border-color: #4CAF50 !important;
+        }
+
+        .leave-annual-golden {
+            background-color: #FFC107 !important;
+            border-color: #FFC107 !important;
+        }
+
+        .leave-sick {
+            background-color: #F44336 !important;
+            border-color: #F44336 !important;
+        }
+
+        .leave-force-majeure {
+            background-color: #9C27B0 !important;
+            border-color: #9C27B0 !important;
+        }
+
+        .leave-overseas {
+            background-color: #2196F3 !important;
+            border-color: #2196F3 !important;
+        }
+
         /* Animation for the table container */
         #agentListContainer {
             max-height: 400px; /* You can adjust this value to your preferred height */
@@ -1462,6 +1621,40 @@
 
     <!-- Update the employee application table -->
     <h3>Agent Leave Application Record</h3>
+    <div style="margin-bottom: 10px;">
+        <button id="toggleCalendarView" class="collapse-btn">
+            <span class="collapse-icon">▼</span> Toggle Calendar View
+        </button>
+    </div>
+    <div id="calendar-container" class="calendar-container expanded">
+        <h3>Leave Calendar</h3>
+        <div id="calendar-legend" class="mb-4">
+            <div class="flex flex-wrap gap-4 mb-2">
+                <div class="flex items-center">
+                    <div class="w-4 h-4 mr-2 bg-[#4CAF50] rounded"></div>
+                    <span>Annual Leave (Normal)</span>
+                </div>
+                <div class="flex items-center">
+                    <div class="w-4 h-4 mr-2 bg-[#FFC107] rounded"></div>
+                    <span>Annual Leave (黃金事假)</span>
+                </div>
+                <div class="flex items-center">
+                    <div class="w-4 h-4 mr-2 bg-[#F44336] rounded"></div>
+                    <span>Sick Leave</span>
+                </div>
+                <div class="flex items-center">
+                    <div class="w-4 h-4 mr-2 bg-[#9C27B0] rounded"></div>
+                    <span>不可抗力因素</span>
+                </div>
+                <div class="flex items-center">
+                    <div class="w-4 h-4 mr-2 bg-[#2196F3] rounded"></div>
+                    <span>離港</span>
+                </div>
+            </div>
+        </div>
+        <div id="leave-calendar" style="margin-top: 20px;"></div>
+    </div>
+
     <div style="margin-bottom: 10px;">
         <button id="toggleApplicationList" class="collapse-btn">
             <span class="collapse-icon">▼</span> Collapse Application List
@@ -3170,6 +3363,9 @@
                 const applicationsRef = database.ref('applications');
                 applicationsRef.on('value', (snapshot) => {
                     const applications = snapshot.val() || {};
+
+                    updateCalendarEvents(applications);
+
                     const tableBody = document.getElementById('application-list-body');
                     if (!tableBody) return;
 
@@ -4735,6 +4931,128 @@
             }
         });
 
+        // Initialize calendar when DOM is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            const calendarEl = document.getElementById('leave-calendar');
+            if (calendarEl) {
+                const calendar = new FullCalendar.Calendar(calendarEl, {
+                    initialView: 'dayGridMonth',
+                    headerToolbar: {
+                        left: 'prev,next today',
+                        center: 'title',
+                        right: 'dayGridMonth,dayGridWeek,dayGridDay'
+                    },
+                    height: 600, // Set a fixed height for better visibility
+                    events: [],
+                    eventDidMount: function(info) {
+                        info.el.title = `${info.event.extendedProps.employeeName}\n${info.event.title}`;
+                    },
+                    displayEventTime: false,
+                    eventDisplay: 'block',
+                    eventOverlap: true,
+                    dayMaxEvents: 3, // Limit visible events per day, with "+more" link
+                    eventClick: function(info) {
+                        alert(`
+                            Employee: ${info.event.extendedProps.employeeName}
+                            Leave Type: ${info.event.extendedProps.leaveType}
+                            From: ${info.event.start.toLocaleDateString()}
+                            To: ${new Date(info.event.end - 86400000).toLocaleDateString()}
+                        `);
+                    },
+                    datesSet: function() {
+                        // Ensure calendar refreshes when view changes
+                        calendar.render();
+                    }
+                });
+                
+                calendar.render();
+                window.leaveCalendar = calendar;
+
+                // Toggle functionality
+                const toggleBtn = document.getElementById('toggleCalendarView');
+                const container = document.getElementById('calendar-container');
+                if (toggleBtn && container) {
+                    // Load saved state
+                    const isCollapsed = localStorage.getItem('calendarViewCollapsed') === 'true';
+                    if (isCollapsed) {
+                        container.classList.add('collapsed');
+                        container.classList.remove('expanded');
+                        toggleBtn.innerHTML = '<span class="collapse-icon">▼</span> Show Calendar View';
+                    } else {
+                        container.classList.add('expanded');
+                        container.classList.remove('collapsed');
+                        toggleBtn.innerHTML = '<span class="collapse-icon">▼</span> Hide Calendar View';
+                    }
+
+                    toggleBtn.addEventListener('click', function() {
+                        const isCurrentlyCollapsed = container.classList.contains('collapsed');
+                        if (isCurrentlyCollapsed) {
+                            container.classList.remove('collapsed');
+                            container.classList.add('expanded');
+                            toggleBtn.innerHTML = '<span class="collapse-icon">▼</span> Hide Calendar View';
+                            calendar.render();
+                        } else {
+                            container.classList.add('collapsed');
+                            container.classList.remove('expanded');
+                            toggleBtn.innerHTML = '<span class="collapse-icon">▼</span> Show Calendar View';
+                        }
+                        localStorage.setItem('calendarViewCollapsed', isCurrentlyCollapsed ? 'false' : 'true');
+                    });
+                }
+            }
+        });
+
+        // Update the existing updateCalendarEvents function
+        function updateCalendarEvents(applications) {
+            if (!window.leaveCalendar) return;
+
+            window.leaveCalendar.removeAllEvents();
+
+            if (!applications) return;
+
+            const events = Object.entries(applications)
+                .filter(([_, app]) => app.status === 'Approved')
+                .map(([id, application]) => {
+                    let className = '';
+                    switch (application.leaveType) {
+                        case 'Annual Leave (Normal)':
+                            className = 'leave-annual-normal';
+                            break;
+                        case 'Annual Leave (黃金事假)':
+                            className = 'leave-annual-golden';
+                            break;
+                        case 'Sick Leave':
+                            className = 'leave-sick';
+                            break;
+                        case '不可抗力因素':
+                            className = 'leave-force-majeure';
+                            break;
+                        case '離港':
+                            className = 'leave-overseas';
+                            break;
+                    }
+
+                    const endDate = new Date(application.leaveEndDate);
+                    endDate.setDate(endDate.getDate() + 1); // Make end date inclusive
+
+                    return {
+                        id: id,
+                        title: `${application.employeeName} - ${application.leaveType}`,
+                        start: application.leaveStartDate,
+                        end: endDate.toISOString().split('T')[0],
+                        className: className,
+                        extendedProps: {
+                            employeeName: application.employeeName,
+                            leaveType: application.leaveType,
+                            status: application.status
+                        }
+                    };
+                });
+
+            window.leaveCalendar.addEventSource(events);
+            window.leaveCalendar.render();
+        }
+        
         function checkScrollPosition() {
             const scrollButton = document.getElementById('scroll-to-bottom-btn');
             if (!scrollButton) return;
