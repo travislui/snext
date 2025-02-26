@@ -812,6 +812,30 @@
             display: flex;
         }
 
+        #applicationListContainer {
+            max-height: 2000px; /* Adjust this value based on your needs */
+            overflow-y: auto;
+            overflow-x: auto;
+            margin: 20px 0;
+            padding-bottom: 10px;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        #applicationListContainer.collapsed {
+            max-height: 0;
+            opacity: 0;
+            margin: 0;
+            padding: 0;
+            border: none;
+        }
+
+        #applicationListContainer.expanded {
+            opacity: 1;
+            margin-bottom: 20px;
+        }
+
         .clear-records-btn {
             background-color: #dc3545;
             color: white;
@@ -1438,11 +1462,18 @@
 
     <!-- Update the employee application table -->
     <h3>Agent Leave Application Record</h3>
+    <div style="margin-bottom: 10px;">
+        <button id="toggleApplicationList" class="collapse-btn">
+            <span class="collapse-icon">▼</span> Collapse Application List
+        </button>
+    </div>
+
     <div class="export-buttons" style="margin-top: 20px;">
         <button id="export-applications-btn" class="export-btn">Export Applications to Excel</button>
         <button id="clearRecordsBtn" class="clear-records-btn">Clear All Leave Records</button>
     </div>
-    <div class="table-container">
+
+    <div class="table-container applications-container" id="applicationListContainer">
         <table id="application-list-table">
             <thead>
                 <tr>
@@ -4655,6 +4686,50 @@
                             checkScrollPosition();
                             scrollTimeout = null;
                         }, 100);
+                    }
+                });
+            }
+        });
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const toggleApplicationButton = document.getElementById('toggleApplicationList');
+            const applicationContainer = document.getElementById('applicationListContainer');
+            
+            if (toggleApplicationButton && applicationContainer) {
+                // Load saved state
+                const isCollapsed = localStorage.getItem('applicationListCollapsed') === 'true';
+                
+                // Set initial state
+                if (isCollapsed) {
+                    applicationContainer.classList.add('collapsed');
+                    applicationContainer.classList.remove('expanded');
+                    toggleApplicationButton.classList.add('collapsed');
+                    toggleApplicationButton.innerHTML = '<span class="collapse-icon">▼</span> Expand Application List';
+                } else {
+                    applicationContainer.classList.add('expanded');
+                    applicationContainer.classList.remove('collapsed');
+                    toggleApplicationButton.classList.remove('collapsed');
+                    toggleApplicationButton.innerHTML = '<span class="collapse-icon">▼</span> Collapse Application List';
+                }
+
+                // Add click handler
+                toggleApplicationButton.addEventListener('click', function() {
+                    const isCurrentlyCollapsed = applicationContainer.classList.contains('collapsed');
+                    
+                    if (isCurrentlyCollapsed) {
+                        // Expand
+                        applicationContainer.classList.remove('collapsed');
+                        applicationContainer.classList.add('expanded');
+                        toggleApplicationButton.classList.remove('collapsed');
+                        toggleApplicationButton.innerHTML = '<span class="collapse-icon">▼</span> Collapse Application List';
+                        localStorage.setItem('applicationListCollapsed', 'false');
+                    } else {
+                        // Collapse
+                        applicationContainer.classList.remove('expanded');
+                        applicationContainer.classList.add('collapsed');
+                        toggleApplicationButton.classList.add('collapsed');
+                        toggleApplicationButton.innerHTML = '<span class="collapse-icon">▼</span> Expand Application List';
+                        localStorage.setItem('applicationListCollapsed', 'true');
                     }
                 });
             }
