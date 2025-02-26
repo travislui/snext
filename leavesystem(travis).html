@@ -416,6 +416,50 @@
             background-color: #7f8c8d;
         }
 
+        #scroll-to-bottom-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+            width: 50px;
+            height: 50px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, background-color 0.3s ease;
+            pointer-events: none;
+        }
+
+        #scroll-to-bottom-btn.visible {
+            opacity: 0.8;
+            visibility: visible;
+            pointer-events: auto;
+        }
+
+        #scroll-to-bottom-btn:hover {
+            background-color: var(--accent-color);
+            opacity: 1;
+        }
+
+        @media screen and (max-width: 768px) {
+            #scroll-to-bottom-btn {
+                bottom: 10px;
+                right: 10px;
+                width: 40px;
+                height: 40px;
+                font-size: 20px;
+            }
+        }
+
         /* Modal styles update */
         .proof-modal-content {
             background-color: white;
@@ -1457,6 +1501,10 @@
             </div>
         </div>
     </div>
+
+    <button id="scroll-to-bottom-btn" style="position: fixed; bottom: 20px; right: 20px; z-index: 1000; padding: 10px; border-radius: 50%; width: 50px; height: 50px; background-color: var(--primary-color); color: white; border: none; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.2); display: flex; justify-content: center; align-items: center;">
+        ↓
+    </button>
 
     <!-- Add the logout button here -->
     <button id="logout-btn">Logout</button>
@@ -4573,6 +4621,59 @@
                 }
             });
         });
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const scrollButton = document.getElementById('scroll-to-bottom-btn');
+            let scrollTimeout = null;
+            
+            if (scrollButton) {
+                // Initial check
+                checkScrollPosition();
+                
+                // Click handler
+                scrollButton.addEventListener('click', function() {
+                    window.scrollTo({
+                        top: document.documentElement.scrollHeight,
+                        behavior: 'smooth'
+                    });
+                });
+
+                // Throttled scroll handler
+                window.addEventListener('scroll', function() {
+                    if (!scrollTimeout) {
+                        scrollTimeout = setTimeout(function() {
+                            checkScrollPosition();
+                            scrollTimeout = null;
+                        }, 100);
+                    }
+                });
+
+                // Update on window resize
+                window.addEventListener('resize', function() {
+                    if (!scrollTimeout) {
+                        scrollTimeout = setTimeout(function() {
+                            checkScrollPosition();
+                            scrollTimeout = null;
+                        }, 100);
+                    }
+                });
+            }
+        });
+
+        function checkScrollPosition() {
+            const scrollButton = document.getElementById('scroll-to-bottom-btn');
+            if (!scrollButton) return;
+
+            const scrollPosition = window.scrollY + window.innerHeight;
+            const documentHeight = document.documentElement.scrollHeight;
+            const buffer = 1500; // Increased buffer
+            
+            if (documentHeight > window.innerHeight && scrollPosition < documentHeight - buffer) {
+                scrollButton.classList.add('visible');
+            } else {
+                scrollButton.classList.remove('visible');
+            }
+        }
 
         // Function to remove an employee and their associated penalties
         async function removeAgent(employeeId, rowElement) {
