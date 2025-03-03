@@ -439,18 +439,17 @@
             font-size: 24px;
             opacity: 0;
             visibility: hidden;
-            transition: opacity 0.3s ease, background-color 0.3s ease;
+            transition: opacity 0.3s ease;
             pointer-events: none;
         }
 
         #scroll-to-bottom-btn.visible {
-            opacity: 0.8;
+            opacity: 1.0;
             visibility: visible;
             pointer-events: auto;
         }
 
         #scroll-to-bottom-btn:hover {
-            background-color: var(--accent-color);
             opacity: 1;
         }
 
@@ -1220,6 +1219,11 @@
             min-width: 120px;
         }
 
+        #leave-calendar {
+            max-width: 100%;
+            height: 600px; /* Ensure height is set */
+        }
+
         .calendar-container {
             margin: 20px 0;
             padding: 20px;
@@ -1514,225 +1518,238 @@
     </div>
 
     <div class="container" id="admin-page" style="display: none;">
-    <h2>Admin Interface</h2>
-    <h3>Add Agents</h3>
-    <form id="add-employee-form">
-        <input type="text" id="emp-name" placeholder="Agent Name" required>
-        <input type="text" id="emp-code" placeholder="Agent Code" required>
-        <label for="emp-role">Role position:</label>
-        <select id="emp-role" required>
-            <option value="Agent">Agent</option>
-            <option value="AUM/UM">AUM/UM</option>
-            <option value="SUM">SUM</option>
-            <option value="BM">BM</option>
-            <option value="DM">DM</option>
-            <option value="DD">DD</option>
-        </select>
-        <label for="emp-mdrt">Clubs & Awards</label>
-        <select id="emp-mdrt" required>
-            <option value="no">NO</option>
-            <option value="mdrt">MDRT</option>
-            <option value="cot or above">COT or above</option>
-        </select>
-        <button type="button" id="add-employee-btn" class="add-btn">Add Agent</button>
-    </form>
-
-    <h3>Add Leave Record</h3>
-    <form id="admin-leave-form">
-        <select id="admin-leave-employee" required>
-            <option value="">Select Agent</option>
-        </select>
-        <label for="admin-apply-date">Apply Date:</label>
-        <input type="date" id="admin-apply-date" required>
-        <label for="admin-leave-start-date">Leave Start Date:</label>
-        <input type="date" id="admin-leave-start-date" required>
-        <label for="admin-leave-end-date">Leave End Date:</label>
-        <input type="date" id="admin-leave-end-date" required>
-        <label for="admin-leave-type">Leave Type:</label>
-        <select id="admin-leave-type" required>
-            <option value="Annual Leave (Normal)">Annual Leave (Normal)</option>
-            <option value="Annual Leave (黃金事假)">Annual Leave (黃金事假)</option>
-            <option value="Sick Leave">Sick Leave</option>
-            <option value="不可抗力因素">不可抗力因素</option>
-            <option value="離港">離港</option>
-        </select>
-        <div id="admin-force-majeure-options" style="display: none;">
-            <label for="admin-force-majeure-reason">Reason:</label>
-            <select id="admin-force-majeure-reason">
-                <option value="">Select a reason</option>
-                <option value="大學生考試">大學生考試</option>
-                <option value="IIQE PAPER 1 & 3 考試">IIQE PAPER 1 & 3 考試</option>
-                <option value="擔任公司/其他區域的分享嘉賓及伴同出席分享的同事">擔任公司/其他區域的分享嘉賓及伴同出席分享的同事</option>
-                <option value="參加公司活動(只有一個時間)">參加公司活動(只有一個時間)</option>
-                <option value="參加頒獎典禮及領獎">參加頒獎典禮及領獎</option>
-                <option value="CIAM課程">CIAM課程</option>
-                <option value="PA/EDP/PA & EDP Elite/FP/新UM課程">PA/EDP/PA & EDP Elite/FP/新UM課程</option>
-                <option value="正日莊務">正日莊務</option>
-                <option value="考車正日">考車正日</option>
-                <option value="直系親屬紅白二事(包括自己結婚)">直系親屬紅白二事(包括自己結婚)</option>
-                <option value="陪同行動不便的父母、子女、配偶見醫生(需當日提供合理證明)">陪同行動不便的父母、子女、配偶見醫生(需當日提供合理證明)</option>
-                <option value="陪同寵物見醫生(同事是唯一照顧者&需當日提供合理證明)">陪同寵物見醫生(同事是唯一照顧者&需當日提供合理證明)</option>
-            </select>
+        <!-- Section 1: Add Agent, Add Leave Record, and Add Penalty -->
+        <div class="container">
+            <h2>Admin Interface</h2>
+            <h3>Add Agents</h3>
+            <form id="add-employee-form">
+                <input type="text" id="emp-name" placeholder="Agent Name" required>
+                <input type="text" id="emp-code" placeholder="Agent Code" required>
+                <label for="emp-role">Role position:</label>
+                <select id="emp-role" required>
+                    <option value="Agent">Agent</option>
+                    <option value="AUM/UM">AUM/UM</option>
+                    <option value="SUM">SUM</option>
+                    <option value="BM">BM</option>
+                    <option value="DM">DM</option>
+                    <option value="DD">DD</option>
+                </select>
+                <label for="emp-mdrt">Clubs & Awards</label>
+                <select id="emp-mdrt" required>
+                    <option value="no">NO</option>
+                    <option value="mdrt">MDRT</option>
+                    <option value="cot or above">COT or above</option>
+                </select>
+                <button type="button" id="add-employee-btn" class="add-btn">Add Agent</button>
+            </form>
+    
+            <h3>Add Leave Record</h3>
+            <form id="admin-leave-form">
+                <select id="admin-leave-employee" required>
+                    <option value="">Select Agent</option>
+                </select>
+                <label for="admin-apply-date">Apply Date:</label>
+                <input type="date" id="admin-apply-date" required>
+                <label for="admin-leave-start-date">Leave Start Date:</label>
+                <input type="date" id="admin-leave-start-date" required>
+                <label for="admin-leave-end-date">Leave End Date:</label>
+                <input type="date" id="admin-leave-end-date" required>
+                <label for="admin-leave-type">Leave Type:</label>
+                <select id="admin-leave-type" required>
+                    <option value="Annual Leave (Normal)">Annual Leave (Normal)</option>
+                    <option value="Annual Leave (黃金事假)">Annual Leave (黃金事假)</option>
+                    <option value="Sick Leave">Sick Leave</option>
+                    <option value="不可抗力因素">不可抗力因素</option>
+                    <option value="離港">離港</option>
+                </select>
+                <div id="admin-force-majeure-options" style="display: none;">
+                    <label for="admin-force-majeure-reason">Reason:</label>
+                    <select id="admin-force-majeure-reason">
+                        <option value="">Select a reason</option>
+                        <option value="大學生考試">大學生考試</option>
+                        <option value="IIQE PAPER 1 & 3 考試">IIQE PAPER 1 & 3 考試</option>
+                        <option value="擔任公司/其他區域的分享嘉賓及伴同出席分享的同事">擔任公司/其他區域的分享嘉賓及伴同出席分享的同事</option>
+                        <option value="參加公司活動(只有一個時間)">參加公司活動(只有一個時間)</option>
+                        <option value="參加頒獎典禮及領獎">參加頒獎典禮及領獎</option>
+                        <option value="CIAM課程">CIAM課程</option>
+                        <option value="PA/EDP/PA & EDP Elite/FP/新UM課程">PA/EDP/PA & EDP Elite/FP/新UM課程</option>
+                        <option value="正日莊務">正日莊務</option>
+                        <option value="考車正日">考車正日</option>
+                        <option value="直系親屬紅白二事(包括自己結婚)">直系親屬紅白二事(包括自己結婚)</option>
+                        <option value="陪同行動不便的父母、子女、配偶見醫生(需當日提供合理證明)">陪同行動不便的父母、子女、配偶見醫生(需當日提供合理證明)</option>
+                        <option value="陪同寵物見醫生(同事是唯一照顧者&需當日提供合理證明)">陪同寵物見醫生(同事是唯一照顧者&需當日提供合理證明)</option>
+                    </select>
+                </div>
+                <div id="admin-proof-container" style="display: none;">
+                    <label for="admin-proof-file">Proof:</label>
+                    <input type="file" id="admin-proof-file" accept="image/*">
+                </div>
+                <button type="submit">Add Leave Record</button>
+            </form>
+    
+            <h3>Add 賀金</h3>
+            <form id="penalty-form">
+                <select id="penalty-employee" required>
+                    <option value="">Select Employee</option>
+                </select>
+                <input type="date" id="penalty-date" required>
+                <select id="penalty-reason" required>
+                    <option value="Meeting">Meeting</option>
+                </select>
+                <input type="number" id="penalty-minutes" placeholder="Late Minutes" min="0" required>
+                <p><strong>備註：No Show請輸入500</span></p>
+                <button type="submit">Add 賀金</button>
+            </form>
         </div>
-        <div id="admin-proof-container" style="display: none;">
-            <label for="admin-proof-file">Proof:</label>
-            <input type="file" id="admin-proof-file" accept="image/*">
+    
+        <div class="container">
+            <h3>Agent List</h3>
+            <div style="margin-bottom: 10px;">
+                <button id="toggleAgentList" class="collapse-btn">
+                    <span class="collapse-icon">▼</span> Collapse Agent List
+                </button>
+            </div>
+            <div id="agentListContainer" class="table-container">
+                <table id="employee-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Code</th>
+                            <th>Role</th>
+                            <th>Clubs & Awards</th>
+                            <th>Remaining Annual Leaves (Normal)</th>
+                            <th>Remaining Annual Leaves (黃金事假)</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="employee-list">
+                    </tbody>
+                </table>
+            </div>
         </div>
-        <button type="submit">Add Leave Record</button>
-    </form>
-
-    <h3>Add 賀金</h3>
-    <form id="penalty-form">
-        <select id="penalty-employee" required>
-            <option value="">Select Employee</option>
-        </select>
-        <input type="date" id="penalty-date" required>
-        <select id="penalty-reason" required>
-            <option value="Meeting">Meeting</option>
-        </select>
-        <input type="number" id="penalty-minutes" placeholder="Late Minutes" min="0" required>
-        <p><strong>備註：No Show請輸入500</span></p>
-        <button type="submit">Add 賀金</button>
-    </form>
-
-    <h3>Agent List</h3>
-    <div style="margin-bottom: 10px;">
-        <button id="toggleAgentList" class="collapse-btn">
-            <span class="collapse-icon">▼</span> Collapse Agent List
-        </button>
-    </div>
-    <div id="agentListContainer" class="table-container">
-        <table id="employee-table">
-            <thead>
-                <tr>
-                    <th>Name</th>
-                    <th>Code</th>
-                    <th>Role</th>
-                    <th>Clubs & Awards</th>
-                    <th>Remaining Annual Leaves (Normal)</th>
-                    <th>Remaining Annual Leaves (黃金事假)</th>
-                    <th>Action</th>
-                </tr>
-            </thead>
-            <tbody id="employee-list">
-            </tbody>
-        </table>
-    </div>
-
-    <!-- Update the employee application table -->
-    <h3>Agent Leave Application Record</h3>
-    <div style="margin-bottom: 10px;">
-        <button id="toggleCalendarView" class="collapse-btn">
-            <span class="collapse-icon">▼</span> Toggle Calendar View
-        </button>
-    </div>
-    <div id="calendar-container" class="calendar-container expanded">
-        <h3>Leave Calendar</h3>
-        <div id="calendar-legend" class="mb-4">
-            <div class="flex flex-wrap gap-4 mb-2">
-                <div class="flex items-center">
-                    <div class="w-4 h-4 mr-2 bg-[#4CAF50] rounded"></div>
-                    <span>Annual Leave (Normal)</span>
+        
+        <!-- Section 3: Agent Leave Application Record -->
+        <div class="container">
+            <h3>Agent Leave Application Record</h3>
+            <div style="margin-bottom: 10px;">
+                <button id="toggleCalendarView" class="collapse-btn">
+                    <span class="collapse-icon">▼</span> Toggle Calendar View
+                </button>
+            </div>
+            <div id="calendar-container" class="calendar-container">
+                <div id="calendar-legend" class="mb-4">
+                    <div class="flex flex-wrap gap-4 mb-2">
+                        <div class="flex items-center">
+                            <div class="w-4 h-4 mr-2 bg-[#4CAF50] rounded"></div>
+                            <span>Annual Leave (Normal)</span>
+                        </div>
+                        <div class="flex items-center">
+                            <div class="w-4 h-4 mr-2 bg-[#FFC107] rounded"></div>
+                            <span>Annual Leave (黃金事假)</span>
+                        </div>
+                        <div class="flex items-center">
+                            <div class="w-4 h-4 mr-2 bg-[#F44336] rounded"></div>
+                            <span>Sick Leave</span>
+                        </div>
+                        <div class="flex items-center">
+                            <div class="w-4 h-4 mr-2 bg-[#9C27B0] rounded"></div>
+                            <span>不可抗力因素</span>
+                        </div>
+                        <div class="flex items-center">
+                            <div class="w-4 h-4 mr-2 bg-[#2196F3] rounded"></div>
+                            <span>離港</span>
+                        </div>
+                    </div>
                 </div>
-                <div class="flex items-center">
-                    <div class="w-4 h-4 mr-2 bg-[#FFC107] rounded"></div>
-                    <span>Annual Leave (黃金事假)</span>
-                </div>
-                <div class="flex items-center">
-                    <div class="w-4 h-4 mr-2 bg-[#F44336] rounded"></div>
-                    <span>Sick Leave</span>
-                </div>
-                <div class="flex items-center">
-                    <div class="w-4 h-4 mr-2 bg-[#9C27B0] rounded"></div>
-                    <span>不可抗力因素</span>
-                </div>
-                <div class="flex items-center">
-                    <div class="w-4 h-4 mr-2 bg-[#2196F3] rounded"></div>
-                    <span>離港</span>
+                <div id="leave-calendar"></div>
+            </div>
+        
+            <div style="margin-bottom: 10px;">
+                <button id="toggleApplicationList" class="collapse-btn">
+                    <span class="collapse-icon">▼</span> Collapse Application List
+                </button>
+            </div>
+        
+            <div class="export-buttons" style="margin-top: 20px;">
+                <button id="export-applications-btn" class="export-btn">Export Applications to Excel</button>
+                <button id="clearRecordsBtn" class="clear-records-btn">Clear All Leave Records</button>
+            </div>
+        
+            <div class="table-container applications-container" id="applicationListContainer">
+                <table id="application-list-table">
+                    <thead>
+                        <tr>
+                            <th>Agent Name</th>
+                            <th>Apply Date</th>
+                            <th>Leave Start Date</th>
+                            <th>Leave End Date</th>
+                            <th>Leave Type</th>
+                            <th>Status</th>
+                            <th>Proof</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="application-list-body"></tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- Section 4: 賀金 Info -->
+        <div class="container">
+            <h3>賀金 Info</h3>
+            <div class="export-buttons" style="margin-top: 20px;">
+                <button id="export-penalties-btn" class="export-btn">Export Penalties to Excel</button>
+            </div>
+        
+            <div class="table-container">
+                <table id="penalty-table">
+                    <thead>
+                        <tr>
+                            <th>Agent Name</th>
+                            <th>Date</th>
+                            <th>Reason</th>
+                            <th>Late Minutes</th>
+                            <th>Amount</th>
+                            <th>Deadline</th>
+                            <th>Status/Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="penalty-list"></tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- Section 5: Change Admin Password -->
+        <div class="container">
+            <h3>Change Admin Password</h3>
+            <form id="change-password-form">
+                <input type="password" id="current-password" placeholder="Current Password" required>
+                <input type="password" id="new-password" placeholder="New Password" required>
+                <input type="password" id="confirm-password" placeholder="Confirm New Password" required>
+                <button type="submit" class="add-btn">Change Password</button>
+            </form>
+        </div>
+        
+        <!-- Proof Modal -->
+        <div id="proof-modal" style="display: none;">
+            <div class="proof-modal-content">
+                <button onclick="closeProofModal()" class="close-modal-btn">×</button>
+                <h3 style="margin-bottom: 20px;">Proof Submitted</h3>
+                <div id="proof-content" style="text-align: center;">
+                    <!-- Proof image will be displayed here -->
                 </div>
             </div>
         </div>
-        <div id="leave-calendar" style="margin-top: 20px;"></div>
-    </div>
-
-    <div style="margin-bottom: 10px;">
-        <button id="toggleApplicationList" class="collapse-btn">
-            <span class="collapse-icon">▼</span> Collapse Application List
+        
+        <!-- Scroll to Bottom Button -->
+        <button id="scroll-to-bottom-btn" style="position: fixed; bottom: 20px; right: 20px; z-index: 1000; padding: 10px; border-radius: 50%; width: 50px; height: 50px; background-color: var(--primary-color); color: white; border: none; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.2); display: flex; justify-content: center; align-items: center;">
+            ↓
         </button>
-    </div>
-
-    <div class="export-buttons" style="margin-top: 20px;">
-        <button id="export-applications-btn" class="export-btn">Export Applications to Excel</button>
-        <button id="clearRecordsBtn" class="clear-records-btn">Clear All Leave Records</button>
-    </div>
-
-    <div class="table-container applications-container" id="applicationListContainer">
-        <table id="application-list-table">
-            <thead>
-                <tr>
-                    <th>Agent Name</th>
-                    <th>Apply Date</th>
-                    <th>Leave Start Date</th>
-                    <th>Leave End Date</th>
-                    <th>Leave Type</th>
-                    <th>Status</th>
-                    <th>Proof</th>
-                    <th>Action</th>
-                </tr>
-            </thead>
-            <tbody id="application-list-body"></tbody>
-        </table>
-    </div>
-
-    <h3>賀金 Info</h3>
-    <div class="export-buttons" style="margin-top: 20px;">
-        <button id="export-penalties-btn" class="export-btn">Export Penalties to Excel</button>
-    </div>
-
-    <div class="table-container">
-        <table id="penalty-table">
-            <thead>
-                <tr>
-                    <th>Agent Name</th>
-                    <th>Date</th>
-                    <th>Reason</th>
-                    <th>Late Minutes</th>
-                    <th>Amount</th>
-                    <th>Deadline</th>
-                    <th>Status/Action</th>
-                </tr>
-            </thead>
-            <tbody id="penalty-list"></tbody>
-        </table>
-
-    </div>
-    <div class="container" style="margin-top: 20px;">
-        <h3>Change Admin Password</h3>
-        <form id="change-password-form">
-            <input type="password" id="current-password" placeholder="Current Password" required>
-            <input type="password" id="new-password" placeholder="New Password" required>
-            <input type="password" id="confirm-password" placeholder="Confirm New Password" required>
-            <button type="submit" class="add-btn">Change Password</button>
-        </form>
-    </div>
-
-    <div id="proof-modal" style="display: none;">
-        <div class="proof-modal-content">
-            <button onclick="closeProofModal()" class="close-modal-btn">×</button>
-            <h3 style="margin-bottom: 20px;">Proof Submitted</h3>
-            <div id="proof-content" style="text-align: center;">
-                <!-- Proof image will be displayed here -->
-            </div>
+        
+        <!-- Logout Button -->
+        <button id="logout-btn">Logout</button>
+        
         </div>
-    </div>
-
-    <button id="scroll-to-bottom-btn" style="position: fixed; bottom: 20px; right: 20px; z-index: 1000; padding: 10px; border-radius: 50%; width: 50px; height: 50px; background-color: var(--primary-color); color: white; border: none; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.2); display: flex; justify-content: center; align-items: center;">
-        ↓
-    </button>
-
-    <!-- Add the logout button here -->
-    <button id="logout-btn">Logout</button>
-    </div>
 
     <div class="container" id="employee-page" style="display: none;">
     <h2>Agent Information</h2>
@@ -4852,36 +4869,72 @@
         document.addEventListener('DOMContentLoaded', function() {
             const scrollButton = document.getElementById('scroll-to-bottom-btn');
             let scrollTimeout = null;
-            
+            let isHovering = false;
+
             if (scrollButton) {
-                // Initial check
+                // Initial check (from previous fix)
                 checkScrollPosition();
-                
-                // Click handler
+
+                // Updated click handler
                 scrollButton.addEventListener('click', function() {
+                    // Ensure all content is rendered by forcing a layout recalculation
+                    document.body.scrollHeight; // Trigger reflow
+                    const maxScrollHeight = Math.max(
+                        document.body.scrollHeight,
+                        document.documentElement.scrollHeight,
+                        document.body.offsetHeight,
+                        document.documentElement.offsetHeight,
+                        document.documentElement.clientHeight
+                    );
+
+                    // Scroll to the absolute bottom
                     window.scrollTo({
-                        top: document.documentElement.scrollHeight,
+                        top: maxScrollHeight,
                         behavior: 'smooth'
                     });
+
+                    // Prevent any focusable element from adjusting scroll position
+                    setTimeout(() => {
+                        window.scrollTo({
+                            top: maxScrollHeight,
+                            behavior: 'instant' // Immediate correction if needed
+                        });
+                        document.activeElement.blur(); // Remove focus from any element
+                    }, 500); // Delay matches smooth scroll duration
                 });
 
-                // Throttled scroll handler
+                // Hover handlers (from previous fix)
+                scrollButton.addEventListener('mouseenter', function() {
+                    isHovering = true;
+                    scrollButton.classList.add('visible');
+                });
+
+                scrollButton.addEventListener('mouseleave', function() {
+                    isHovering = false;
+                    checkScrollPosition();
+                });
+
+                // Scroll handler (from previous fix)
                 window.addEventListener('scroll', function() {
                     if (!scrollTimeout) {
                         scrollTimeout = setTimeout(function() {
-                            checkScrollPosition();
+                            if (!isHovering) {
+                                checkScrollPosition();
+                            }
                             scrollTimeout = null;
-                        }, 100);
+                        }, 200);
                     }
                 });
 
-                // Update on window resize
+                // Resize handler (from previous fix)
                 window.addEventListener('resize', function() {
                     if (!scrollTimeout) {
                         scrollTimeout = setTimeout(function() {
-                            checkScrollPosition();
+                            if (!isHovering) {
+                                checkScrollPosition();
+                            }
                             scrollTimeout = null;
-                        }, 100);
+                        }, 200);
                     }
                 });
             }
@@ -4934,113 +4987,102 @@
         // Initialize calendar when DOM is loaded
         document.addEventListener('DOMContentLoaded', function() {
             const calendarEl = document.getElementById('leave-calendar');
-            if (calendarEl) {
-                const calendar = new FullCalendar.Calendar(calendarEl, {
-                    initialView: 'dayGridMonth',
-                    headerToolbar: {
-                        left: 'prev,next today',
-                        center: 'title',
-                        right: 'dayGridMonth,dayGridWeek,dayGridDay'
-                    },
-                    height: 600, // Set a fixed height for better visibility
-                    events: [],
-                    eventDidMount: function(info) {
-                        info.el.title = `${info.event.extendedProps.employeeName}\n${info.event.title}`;
-                    },
-                    displayEventTime: false,
-                    eventDisplay: 'block',
-                    eventOverlap: true,
-                    dayMaxEvents: 3, // Limit visible events per day, with "+more" link
-                    eventClick: function(info) {
-                        alert(`
-                            Employee: ${info.event.extendedProps.employeeName}
-                            Leave Type: ${info.event.extendedProps.leaveType}
-                            From: ${info.event.start.toLocaleDateString()}
-                            To: ${new Date(info.event.end - 86400000).toLocaleDateString()}
-                        `);
-                    },
-                    datesSet: function() {
-                        // Ensure calendar refreshes when view changes
-                        calendar.render();
-                    }
-                });
-                
-                calendar.render();
-                window.leaveCalendar = calendar;
+            if (!calendarEl) {
+                console.error('Calendar element not found');
+                return;
+            }
 
-                // Toggle functionality
-                const toggleBtn = document.getElementById('toggleCalendarView');
-                const container = document.getElementById('calendar-container');
-                if (toggleBtn && container) {
-                    // Load saved state
-                    const isCollapsed = localStorage.getItem('calendarViewCollapsed') === 'true';
-                    if (isCollapsed) {
-                        container.classList.add('collapsed');
-                        container.classList.remove('expanded');
-                        toggleBtn.innerHTML = '<span class="collapse-icon">▼</span> Show Calendar View';
-                    } else {
-                        container.classList.add('expanded');
-                        container.classList.remove('collapsed');
-                        toggleBtn.innerHTML = '<span class="collapse-icon">▼</span> Hide Calendar View';
-                    }
-
-                    toggleBtn.addEventListener('click', function() {
-                        const isCurrentlyCollapsed = container.classList.contains('collapsed');
-                        if (isCurrentlyCollapsed) {
-                            container.classList.remove('collapsed');
-                            container.classList.add('expanded');
-                            toggleBtn.innerHTML = '<span class="collapse-icon">▼</span> Hide Calendar View';
-                            calendar.render();
-                        } else {
-                            container.classList.add('collapsed');
-                            container.classList.remove('expanded');
-                            toggleBtn.innerHTML = '<span class="collapse-icon">▼</span> Show Calendar View';
-                        }
-                        localStorage.setItem('calendarViewCollapsed', isCurrentlyCollapsed ? 'false' : 'true');
-                    });
+            const calendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: 'dayGridMonth',
+                headerToolbar: {
+                    left: 'prev,next today',
+                    center: 'title',
+                    right: 'dayGridMonth,dayGridWeek,dayGridDay'
+                },
+                height: 600,
+                events: [], // Start empty; populated by updateCalendarEvents
+                eventDidMount: function(info) {
+                    info.el.title = `${info.event.extendedProps.employeeName}\n${info.event.title}`;
+                },
+                displayEventTime: false,
+                eventDisplay: 'block',
+                eventOverlap: true,
+                dayMaxEvents: 3,
+                eventClick: function(info) {
+                    alert(`
+                        Employee: ${info.event.extendedProps.employeeName}
+                        Leave Type: ${info.event.extendedProps.leaveType}
+                        From: ${info.event.start.toLocaleDateString()}
+                        To: ${new Date(info.event.end - 86400000).toLocaleDateString()}
+                    `);
                 }
+            });
+
+            // Store calendar globally
+            window.leaveCalendar = calendar;
+
+            // Initial render only if container is expanded
+            const container = document.getElementById('calendar-container');
+            if (container.classList.contains('expanded')) {
+                calendar.render();
+            }
+
+            // Toggle functionality
+            const toggleBtn = document.getElementById('toggleCalendarView');
+            if (toggleBtn) {
+                toggleBtn.addEventListener('click', function() {
+                    const isCollapsed = container.classList.contains('collapsed');
+                    if (isCollapsed) {
+                        container.classList.remove('collapsed');
+                        container.classList.add('expanded');
+                        toggleBtn.innerHTML = '<span class="collapse-icon">▼</span> Hide Calendar View';
+                        calendar.render(); // Render when expanded
+                    } else {
+                        container.classList.remove('expanded');
+                        container.classList.add('collapsed');
+                        toggleBtn.innerHTML = '<span class="collapse-icon">▼</span> Show Calendar View';
+                    }
+                    localStorage.setItem('calendarViewCollapsed', isCollapsed ? 'false' : 'true');
+                });
             }
         });
 
         // Update the existing updateCalendarEvents function
         function updateCalendarEvents(applications) {
-            if (!window.leaveCalendar) return;
+            if (!window.leaveCalendar) {
+                console.error('Calendar not initialized');
+                return;
+            }
 
             window.leaveCalendar.removeAllEvents();
 
-            if (!applications) return;
+            if (!applications) {
+                console.log('No applications to display');
+                return;
+            }
 
             const events = Object.entries(applications)
-                .filter(([_, app]) => app.status === 'Approved')
+                .filter(([_, app]) => app.status === 'Approved') // Only show approved leaves
                 .map(([id, application]) => {
                     let className = '';
                     switch (application.leaveType) {
-                        case 'Annual Leave (Normal)':
-                            className = 'leave-annual-normal';
-                            break;
-                        case 'Annual Leave (黃金事假)':
-                            className = 'leave-annual-golden';
-                            break;
-                        case 'Sick Leave':
-                            className = 'leave-sick';
-                            break;
-                        case '不可抗力因素':
-                            className = 'leave-force-majeure';
-                            break;
-                        case '離港':
-                            className = 'leave-overseas';
-                            break;
+                        case 'Annual Leave (Normal)': className = 'leave-annual-normal'; break;
+                        case 'Annual Leave (黃金事假)': className = 'leave-annual-golden'; break;
+                        case 'Sick Leave': className = 'leave-sick'; break;
+                        case '不可抗力因素': className = 'leave-force-majeure'; break;
+                        case '離港': className = 'leave-overseas'; break;
+                        default: className = 'leave-default';
                     }
 
                     const endDate = new Date(application.leaveEndDate);
-                    endDate.setDate(endDate.getDate() + 1); // Make end date inclusive
+                    endDate.setDate(endDate.getDate() + 1); // Inclusive end date
 
                     return {
                         id: id,
                         title: `${application.employeeName} - ${application.leaveType}`,
                         start: application.leaveStartDate,
                         end: endDate.toISOString().split('T')[0],
-                        className: className,
+                        classNames: [className], // Use classNames array for FullCalendar
                         extendedProps: {
                             employeeName: application.employeeName,
                             leaveType: application.leaveType,
@@ -5050,7 +5092,11 @@
                 });
 
             window.leaveCalendar.addEventSource(events);
-            window.leaveCalendar.render();
+            
+            // Ensure render if visible
+            if (document.getElementById('calendar-container').classList.contains('expanded')) {
+                window.leaveCalendar.render();
+            }
         }
         
         function checkScrollPosition() {
@@ -5059,8 +5105,8 @@
 
             const scrollPosition = window.scrollY + window.innerHeight;
             const documentHeight = document.documentElement.scrollHeight;
-            const buffer = 1500; // Increased buffer
-            
+            const buffer = 100;
+
             if (documentHeight > window.innerHeight && scrollPosition < documentHeight - buffer) {
                 scrollButton.classList.add('visible');
             } else {
