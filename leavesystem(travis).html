@@ -1242,6 +1242,12 @@
             opacity: 0;
         }
 
+        .leave-special-approve {
+            background-color: #9E9E9E !important; /* Grey color for Special Approve */
+            border-color: #9E9E9E !important;
+            color: white !important;
+        }
+
         .fc { /* the calendar root */
             max-width: 100%;
             height: auto !important;
@@ -1561,6 +1567,7 @@
                     <option value="Sick Leave">Sick Leave</option>
                     <option value="不可抗力因素">不可抗力因素</option>
                     <option value="離港">離港</option>
+                    <option value="Special Approve">Special Approve</option>
                 </select>
                 <div id="admin-force-majeure-options" style="display: none;">
                     <label for="admin-force-majeure-reason">Reason:</label>
@@ -1658,6 +1665,10 @@
                         <div class="flex items-center">
                             <div class="w-4 h-4 mr-2 bg-[#2196F3] rounded"></div>
                             <span>離港</span>
+                        </div>
+                        <div class="flex items-center">
+                            <div class="w-4 h-4 mr-2 bg-[#9E9E9E] rounded"></div>
+                            <span>Special Approve</span>
                         </div>
                     </div>
                 </div>
@@ -1784,6 +1795,7 @@
             <option value="Sick Leave">Sick Leave</option>
             <option value="不可抗力因素">不可抗力因素</option>
             <option value="離港">離港</option>
+            <option value="Special Approve">Special Approve</option>
         </select>
         <div id="force-majeure-options" style="display: none;">
             <label for="force-majeure-reason">Reason:</label>
@@ -2881,11 +2893,37 @@
             const proofFileInput = document.getElementById('proof-file');
             const forceMajeureOptions = document.getElementById('force-majeure-options');
             const forceMajeureReasonSelect = document.getElementById('force-majeure-reason');
+            const startDateInput = document.getElementById('leave-start-date');
+            const endDateInput = document.getElementById('leave-end-date');
+            const applyDateInput = document.getElementById('apply-date');
 
-            if (this.value === 'Sick Leave' || this.value === '不可抗力因素' || this.value === '離港') {
+            // Add Special Approve to the types requiring proof
+            if (this.value === 'Sick Leave' || 
+                this.value === '不可抗力因素' || 
+                this.value === '離港' ||
+                this.value === 'Special Approve') {
                 proofContainer.style.display = 'block';
                 proofFileInput.disabled = false;
                 proofFileInput.required = true;
+
+                // Special handling for Special Approve
+                if (this.value === 'Special Approve') {
+                    // Set today's date
+                    const today = new Date().toISOString().split('T')[0];
+                    applyDateInput.value = today;
+                    startDateInput.value = today;
+                    endDateInput.value = today;
+                    
+                    // Disable date inputs for Special Approve
+                    applyDateInput.disabled = true;
+                    startDateInput.disabled = true;
+                    endDateInput.disabled = true;
+                } else {
+                    // Re-enable date inputs for other types
+                    applyDateInput.disabled = false;
+                    startDateInput.disabled = false;
+                    endDateInput.disabled = false;
+                }
 
                 if (this.value === '不可抗力因素') {
                     forceMajeureOptions.style.display = 'block';
@@ -2900,6 +2938,11 @@
                 proofFileInput.required = false;
                 forceMajeureOptions.style.display = 'none';
                 forceMajeureReasonSelect.required = false;
+                
+                // Re-enable date inputs
+                applyDateInput.disabled = false;
+                startDateInput.disabled = false;
+                endDateInput.disabled = false;
             }
         });
 
@@ -2966,7 +3009,7 @@
             }
 
             // Process leave application based on type
-            if (leaveType === 'Sick Leave' || leaveType === '不可抗力因素' || leaveType === '離港') {
+            if (leaveType === 'Sick Leave' || leaveType === '不可抗力因素' || leaveType === '離港' || leaveType === 'Special Approve') {
                 const proofFile = document.getElementById('proof-file').files[0];
                 if (!proofFile) {
                     alert(`Please submit proof for ${leaveType}.`);
@@ -3114,6 +3157,9 @@
                         break;
                     case '離港':
                         updates.usedOverseasDays = currentOverseasDays + leaveDays;
+                        break;
+                    case 'Special Approve':
+                        // No need to update any leave counts for Special Approve
                         break;
                 }
 
@@ -4795,7 +4841,12 @@
                     const forceMajeureOptions = document.getElementById('admin-force-majeure-options');
                     const forceMajeureReasonSelect = document.getElementById('admin-force-majeure-reason');
 
-                    if (this.value === 'Sick Leave' || this.value === '不可抗力因素' || this.value === '離港') {
+                    // Just add Special Approve to the condition, keep everything else the same
+                    if (this.value === 'Sick Leave' || 
+                        this.value === '不可抗力因素' || 
+                        this.value === '離港' ||
+                        this.value === 'Special Approve') {  // Only change is adding this condition
+                        
                         proofContainer.style.display = 'block';
                         proofFileInput.disabled = false;
                         proofFileInput.required = true;
@@ -5049,40 +5100,49 @@
 
         // Update the existing updateCalendarEvents function
         function updateCalendarEvents(applications) {
-            if (!window.leaveCalendar) {
-                console.error('Calendar not initialized');
-                return;
-            }
+            if (!window.leaveCalendar) return;
 
+            // Clear existing events
             window.leaveCalendar.removeAllEvents();
 
-            if (!applications) {
-                console.log('No applications to display');
-                return;
-            }
+            if (!applications) return;
 
+            // Convert applications to calendar events
             const events = Object.entries(applications)
-                .filter(([_, app]) => app.status === 'Approved') // Only show approved leaves
+                .filter(([_, app]) => app.status === 'Approved')
                 .map(([id, application]) => {
                     let className = '';
                     switch (application.leaveType) {
-                        case 'Annual Leave (Normal)': className = 'leave-annual-normal'; break;
-                        case 'Annual Leave (黃金事假)': className = 'leave-annual-golden'; break;
-                        case 'Sick Leave': className = 'leave-sick'; break;
-                        case '不可抗力因素': className = 'leave-force-majeure'; break;
-                        case '離港': className = 'leave-overseas'; break;
-                        default: className = 'leave-default';
+                        case 'Annual Leave (Normal)':
+                            className = 'leave-annual-normal';
+                            break;
+                        case 'Annual Leave (黃金事假)':
+                            className = 'leave-annual-golden';
+                            break;
+                        case 'Sick Leave':
+                            className = 'leave-sick';
+                            break;
+                        case '不可抗力因素':
+                            className = 'leave-force-majeure';
+                            break;
+                        case '離港':
+                            className = 'leave-overseas';
+                            break;
+                        case 'Special Approve':
+                            className = 'leave-special-approve';
+                            break;
                     }
 
+                    // Add one day to end date to make it inclusive
                     const endDate = new Date(application.leaveEndDate);
-                    endDate.setDate(endDate.getDate() + 1); // Inclusive end date
+                    endDate.setDate(endDate.getDate() + 1);
 
                     return {
                         id: id,
                         title: `${application.employeeName} - ${application.leaveType}`,
                         start: application.leaveStartDate,
                         end: endDate.toISOString().split('T')[0],
-                        classNames: [className], // Use classNames array for FullCalendar
+                        className: className,
                         extendedProps: {
                             employeeName: application.employeeName,
                             leaveType: application.leaveType,
@@ -5091,12 +5151,9 @@
                     };
                 });
 
+            // Add events to calendar
             window.leaveCalendar.addEventSource(events);
-            
-            // Ensure render if visible
-            if (document.getElementById('calendar-container').classList.contains('expanded')) {
-                window.leaveCalendar.render();
-            }
+            window.leaveCalendar.render();
         }
         
         function checkScrollPosition() {
@@ -5112,6 +5169,24 @@
             } else {
                 scrollButton.classList.remove('visible');
             }
+        }
+
+        // Add validation to form submission
+        async function validateLeaveApplication(formData) {
+            const leaveType = formData.get('leaveType');
+            if (leaveType === 'Special Approve') {
+                const applyDate = formData.get('applyDate');
+                const startDate = formData.get('startDate');
+                const endDate = formData.get('endDate');
+                
+                // Check if all dates are the same and equal to today
+                const today = new Date().toISOString().split('T')[0];
+                if (applyDate !== today || startDate !== today || endDate !== today) {
+                    alert('For Special Approve, all dates must be today\'s date.');
+                    return false;
+                }
+            }
+            return true;
         }
 
         // Function to remove an employee and their associated penalties
