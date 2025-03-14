@@ -3444,12 +3444,14 @@
 
         // Modify your onScanSuccess function to update the table
         function onScanSuccess(decodedText, decodedResult) {
+            // Stop scanning
             if (html5QrcodeScanner) {
                 html5QrcodeScanner.stop().then(() => {
                     document.getElementById('reader').style.display = 'none';
                 });
             }
 
+            // Show success message with animation
             const resultDiv = document.getElementById('scan-result');
             resultDiv.innerHTML = `
                 <div class="bg-white p-8 rounded-lg shadow-xl text-center">
@@ -3468,14 +3470,26 @@
 
             // Record the attendance in Firebase
             const timestamp = new Date().toISOString();
-            const attendanceRef = database.ref('attendance/' + currentUser.uid);
-            attendanceRef.push({
+            const attendanceData = {
                 timestamp: timestamp,
-                qrCode: decodedText
-            }).then(() => {
-                // Update the table after successful recording
-                updateAttendanceTable();
-            });
+                qrCode: decodedText,
+                employeeName: currentUser.name,
+                employeeRole: currentUser.role
+            };
+
+            // Use the correct path for attendance records
+            const attendanceRef = firebase.database().ref(`attendance/${currentUser.uid}`);
+            
+            attendanceRef.push(attendanceData)
+                .then(() => {
+                    console.log('Attendance recorded successfully');
+                    // Update the attendance table
+                    updateAttendanceTable();
+                })
+                .catch(error => {
+                    console.error('Error recording attendance:', error);
+                    alert('Error recording attendance. Please try again.');
+                });
 
             setTimeout(() => {
                 resultDiv.style.display = 'none';
