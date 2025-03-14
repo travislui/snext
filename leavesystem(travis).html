@@ -4450,28 +4450,77 @@
                 html5QrcodeScanner.clear();
             }
 
-            // Create container for scanner
             const reader = document.getElementById('reader');
             reader.style.display = 'block';
-            reader.innerHTML = ''; // Clear previous content
+            reader.innerHTML = '';
 
-            html5QrcodeScanner = new Html5QrcodeScanner(
-                "reader", 
-                { 
-                    fps: 10,
-                    qrbox: { width: 250, height: 250 },
-                    aspectRatio: 1.0
+            // Create scanner with specific camera settings
+            const html5Qrcode = new Html5Qrcode("reader");
+            
+            // Get back camera
+            Html5Qrcode.getCameras().then(devices => {
+                if (devices && devices.length) {
+                    // Try to get back camera
+                    const backCamera = devices.find(device => 
+                        device.label.toLowerCase().includes('back') ||
+                        device.label.toLowerCase().includes('rear'));
+                    
+                    // Use back camera if found, otherwise use the last camera in the list
+                    const cameraId = backCamera ? backCamera.id : devices[devices.length - 1].id;
+                    
+                    const config = {
+                        fps: 10,
+                        qrbox: { width: 250, height: 250 },
+                        aspectRatio: 1.0,
+                        showTorchButtonIfSupported: true,
+                    };
+
+                    html5Qrcode.start(
+                        cameraId, 
+                        config,
+                        onScanSuccess,
+                        onScanFailure
+                    )
+                    .catch(err => {
+                        console.error(`Unable to start scanning: ${err}`);
+                        alert("Unable to start camera. Please make sure you've granted camera permissions.");
+                    });
+
+                    // Store the instance for later cleanup
+                    html5QrcodeScanner = html5Qrcode;
+
+                    // Modify the scanner interface to remove file upload elements
+                    setTimeout(() => {
+                        // Remove file upload related elements
+                        const selectElement = document.getElementById('reader').querySelector('select');
+                        if (selectElement) selectElement.style.display = 'none';
+                        
+                        const fileElements = document.getElementById('reader').querySelectorAll('[type="file"]');
+                        fileElements.forEach(el => el.parentElement.style.display = 'none');
+                        
+                        // Remove any text about file upload
+                        const textNodes = document.getElementById('reader').querySelectorAll('div');
+                        textNodes.forEach(node => {
+                            if (node.textContent.includes('file')) {
+                                node.style.display = 'none';
+                            }
+                        });
+                    }, 100);
+
+                } else {
+                    alert("No cameras found on your device");
                 }
-            );
-
-            html5QrcodeScanner.render(onScanSuccess, onScanFailure);
+            }).catch(err => {
+                alert("Error accessing camera: " + err);
+            });
         }
 
         function onScanSuccess(decodedText, decodedResult) {
-            // Stop scanning
+            // Stop scanning and hide scanner
             if (html5QrcodeScanner) {
-                html5QrcodeScanner.clear();
-                document.getElementById('reader').style.display = 'none';
+                html5QrcodeScanner.stop().then(() => {
+                    document.getElementById('reader').style.display = 'none';
+                });
             }
 
             // Show success message with animation
@@ -4506,8 +4555,10 @@
         }
 
         function onScanFailure(error) {
-            // Handle scan failure
-            console.warn(`QR code scan failed: ${error}`);
+            // Only log actual errors, ignore empty scans
+            if (error && !error.includes("No QR code found")) {
+                console.warn(`QR code scan failed: ${error}`);
+            }
         }
 
         // Add this CSS for the success animation
