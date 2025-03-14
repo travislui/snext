@@ -3392,18 +3392,24 @@
 
         function updateAttendanceTable() {
             const tableBody = document.getElementById('attendanceTableBody');
-            const attendanceRef = database.ref('attendance/' + currentUser.uid);
+            if (!tableBody || !currentUser) return;
 
+            // Reference to the current user's attendance records
+            const attendanceRef = database.ref(`attendance/${currentUser.uid}`);
+            
+            // Listen for changes in attendance records
             attendanceRef.on('value', (snapshot) => {
                 tableBody.innerHTML = ''; // Clear existing records
                 
                 const records = snapshot.val();
                 if (records) {
                     // Convert to array and sort by timestamp (newest first)
-                    const recordsArray = Object.entries(records).map(([key, value]) => ({
-                        ...value,
-                        id: key
-                    })).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+                    const recordsArray = Object.entries(records)
+                        .map(([key, value]) => ({
+                            ...value,
+                            id: key
+                        }))
+                        .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
                     recordsArray.forEach(record => {
                         const recordTime = new Date(record.timestamp);
@@ -3412,7 +3418,9 @@
                         const row = document.createElement('tr');
                         row.innerHTML = `
                             <td class="px-6 py-4 whitespace-nowrap">
-                                <div class="text-sm font-medium text-gray-900">${currentUser.displayName || 'N/A'}</div>
+                                <div class="text-sm font-medium text-gray-900">
+                                    ${currentUser.name || 'N/A'}
+                                </div>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="text-sm text-gray-900">
@@ -3468,32 +3476,37 @@
             `;
             resultDiv.style.display = 'block';
 
-            // Create attendance data
+            // Get current timestamp
             const timestamp = new Date().toISOString();
+            const recordTime = new Date();
+            const lateInfo = calculateLateStatus(timestamp, currentUser.role);
+
+            // Create attendance data
             const attendanceData = {
                 timestamp: timestamp,
                 qrCode: decodedText,
                 employeeName: currentUser.name,
-                employeeRole: currentUser.role
+                employeeRole: currentUser.role,
+                status: lateInfo.status,
+                amount: lateInfo.amount,
+                lateMinutes: lateInfo.lateMinutes
             };
 
             // Record the attendance in Firebase
             const attendanceRef = database.ref(`attendance/${currentUser.uid}`);
-            
             attendanceRef.push(attendanceData)
                 .then(() => {
                     console.log('Attendance recorded successfully');
-                    
-                    // Update the table immediately after successful recording
+
+                    // Update the attendance table
                     const tableBody = document.getElementById('attendanceTableBody');
                     if (tableBody) {
-                        const recordTime = new Date(timestamp);
-                        const lateInfo = calculateLateStatus(timestamp, currentUser.role);
-
                         const row = document.createElement('tr');
                         row.innerHTML = `
                             <td class="px-6 py-4 whitespace-nowrap">
-                                <div class="text-sm font-medium text-gray-900">${currentUser.name || 'N/A'}</div>
+                                <div class="text-sm font-medium text-gray-900">
+                                    ${currentUser.name || 'N/A'}
+                                </div>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="text-sm text-gray-900">
@@ -3508,23 +3521,22 @@
                                 </span>
                             </td>
                         `;
-                        // Insert the new row at the beginning of the table
+                        // Insert new record at the beginning of the table
                         tableBody.insertBefore(row, tableBody.firstChild);
                     }
 
                     // Create penalty if late
-                    const lateInfo = calculateLateStatus(timestamp, currentUser.role);
                     if (lateInfo.amount > 0) {
                         const penaltyData = {
                             employeeId: currentUser.uid,
                             employeeName: currentUser.name,
                             employeeRole: currentUser.role,
-                            date: new Date(timestamp).toISOString().split('T')[0],
+                            date: recordTime.toISOString().split('T')[0],
                             reason: 'Meeting',
                             minutes: lateInfo.lateMinutes,
                             amount: lateInfo.amount,
                             baseAmount: lateInfo.amount,
-                            deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                            deadline: new Date(recordTime.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
                             status: 'Not Submitted',
                             createdAt: new Date().toISOString(),
                             lastModified: new Date().toISOString()
@@ -4465,11 +4477,21 @@
                 // Load employee data
                 loadEmployeeData(currentUser);
                 
-                // Remove any existing penalty listeners
+                // Remove any existing listeners
                 database.ref('penalties').off('value');
+                database.ref(`attendance/${currentUser.uid}`).off('value');
                 
-                // Load penalties
+                // Load penalties and attendance
                 loadEmployeePenalties(currentUser.id);
+                loadEmployeeApplications(currentUser.id);
+                updateAttendanceTable(); // Add this line to load attendance records
+
+                // Initialize real-time attendance updates
+                const attendanceRef = database.ref(`attendance/${currentUser.uid}`);
+                attendanceRef.on('value', (snapshot) => {
+                    updateAttendanceTable();
+                });
+
             } else {
                 console.error('No current user data available');
             }
@@ -4479,6 +4501,18 @@
             if (applicationTable && !applicationTable.getElementsByTagName('tbody').length) {
                 const tbody = document.createElement('tbody');
                 applicationTable.appendChild(tbody);
+            }
+
+            // Initialize the attendance table if needed
+            const attendanceTable = document.getElementById('attendanceTableBody');
+            if (!attendanceTable.children.length) {
+                const noRecordsRow = document.createElement('tr');
+                noRecordsRow.innerHTML = `
+                    <td colspan="3" class="px-6 py-4 text-center text-gray-500">
+                        No attendance records found
+                    </td>
+                `;
+                attendanceTable.appendChild(noRecordsRow);
             }
 
             // Add event listener for logout
@@ -4761,45 +4795,6 @@
             }).catch(err => {
                 alert("Error accessing camera: " + err);
             });
-        }
-
-        function onScanSuccess(decodedText, decodedResult) {
-            // Stop scanning and hide scanner
-            if (html5QrcodeScanner) {
-                html5QrcodeScanner.stop().then(() => {
-                    document.getElementById('reader').style.display = 'none';
-                });
-            }
-
-            // Show success message with animation
-            const resultDiv = document.getElementById('scan-result');
-            resultDiv.innerHTML = `
-                <div class="bg-white p-8 rounded-lg shadow-xl text-center">
-                    <div class="success-checkmark">
-                        <div class="check-icon">
-                            <span class="icon-line line-tip"></span>
-                            <span class="icon-line line-long"></span>
-                            <div class="icon-circle"></div>
-                            <div class="icon-fix"></div>
-                        </div>
-                    </div>
-                    <h2 class="text-2xl font-bold text-green-600 mt-4">Attendance Recorded!</h2>
-                </div>
-            `;
-            resultDiv.style.display = 'block';
-
-            // Record the attendance in Firebase
-            const timestamp = new Date().toISOString();
-            const attendanceRef = database.ref('attendance/' + currentUser.uid);
-            attendanceRef.push({
-                timestamp: timestamp,
-                qrCode: decodedText
-            });
-
-            // Hide success message after 3 seconds
-            setTimeout(() => {
-                resultDiv.style.display = 'none';
-            }, 3000);
         }
 
         function onScanFailure(error) {
