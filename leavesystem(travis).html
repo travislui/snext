@@ -7,6 +7,7 @@
     <link href='https://cdn.jsdelivr.net/npm/@fullcalendar/daygrid@6.1.10/main.min.css' rel='stylesheet' />
     <script src='https://cdn.jsdelivr.net/npm/@fullcalendar/core@6.1.10/main.min.js'></script>
     <script src='https://cdn.jsdelivr.net/npm/@fullcalendar/daygrid@6.1.10/main.min.js'></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode.js@1.0.0/qrcode.min.js"></script>
     <style>
         /* Responsive styles */
         @media screen and (max-width: 768px) {
@@ -361,6 +362,12 @@
             display: flex;
             gap: 5px;
             margin-top: 5px;
+        }
+
+        .leave-activity {
+            background-color: #FF69B4 !important; /* Hot pink for activity leave */
+            border-color: #FF69B4 !important;
+            color: white !important;
         }
 
         /* Make all action buttons consistent in size */
@@ -1514,6 +1521,9 @@
     </header>
     <div class="container" id="home-page">
         <h3>Login</h3>
+        <button id="show-qr-code" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mt-4">
+            Show Attendance QR Code
+        </button>
         <form id="login-form">
             <input type="text" id="username" placeholder="Username" required>
             <input type="password" id="password" placeholder="Password" required>
@@ -1568,6 +1578,7 @@
                     <option value="不可抗力因素">不可抗力因素</option>
                     <option value="離港">離港</option>
                     <option value="Special Approve">Special Approve</option>
+                    <option value="活動請假">活動請假</option>
                 </select>
                 <div id="admin-force-majeure-options" style="display: none;">
                     <label for="admin-force-majeure-reason">Reason:</label>
@@ -1670,6 +1681,10 @@
                             <div class="w-4 h-4 mr-2 bg-[#9E9E9E] rounded"></div>
                             <span>Special Approve</span>
                         </div>
+                        <div class="flex items-center">
+                            <div class="w-4 h-4 mr-2 bg-[#FF69B4] rounded"></div>
+                            <span>活動請假</span>
+                        </div>
                     </div>
                 </div>
                 <div id="leave-calendar"></div>
@@ -1764,6 +1779,17 @@
 
     <div class="container" id="employee-page" style="display: none;">
     <h2>Agent Information</h2>
+    <div class="text-center mt-4">
+        <button onclick="startScanning()" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg text-lg shadow-lg">
+            Take Attendance
+        </button>
+    </div>
+    
+    <!-- Add this div for the scanner -->
+    <div id="reader" class="mt-4" style="display: none;"></div>
+    
+    <!-- Add this for success/failure messages -->
+    <div id="scan-result" class="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" style="display: none;"></div>
     <p><strong>Name:</strong> <span id="employee-name"></span></p>
     <p><strong>Code:</strong> <span id="employee-code"></span></p>
     <p><strong>Role:</strong> <span id="employee-role"></span></p>
@@ -1796,6 +1822,7 @@
             <option value="不可抗力因素">不可抗力因素</option>
             <option value="離港">離港</option>
             <option value="Special Approve">Special Approve</option>
+            <option value="活動請假">活動請假</option>
         </select>
         <div id="force-majeure-options" style="display: none;">
             <label for="force-majeure-reason">Reason:</label>
@@ -1873,8 +1900,10 @@
     <script src="https://www.gstatic.com/firebasejs/11.3.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/11.3.1/firebase-database-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/11.3.1/firebase-auth-compat.js"></script>
+    <script src="https://unpkg.com/html5-qrcode"></script>
 
     <script>
+
         // Firebase configuration
         const firebaseConfig = {
             apiKey: "AIzaSyCzHtfZxBlFCdIeu0-omlGhgDkgg9Q3_wY",
@@ -1886,7 +1915,7 @@
             appId: "1:1037446729152:web:a534362d4d3e7e67bd4c25",
             measurementId: "G-7R61R118TN"
         };
-
+        
         // Initialize Firebase
         firebase.initializeApp(firebaseConfig);
         const database = firebase.database();
@@ -3054,43 +3083,76 @@
                     throw new Error('Employee data not found');
                 }
 
-                // Check leave quota before processing
-                if (leaveType === 'Annual Leave (Normal)') {
-                    if (employeeData.remainingNormalLeaves !== 999 && // Skip check for infinite leaves
-                        leaveDays > employeeData.remainingNormalLeaves) {
-                        throw new Error(`You only have ${employeeData.remainingNormalLeaves} normal annual leaves remaining`);
-                    }
-                } else if (leaveType === 'Annual Leave (黃金事假)') {
-                    if (employeeData.remainingGoldenLeaves !== 999 && // Skip check for infinite leaves
-                        leaveDays > employeeData.remainingGoldenLeaves) {
-                        throw new Error(`You only have ${employeeData.remainingGoldenLeaves} golden annual leaves remaining`);
-                    }
-                    if (employeeData.remainingNormalLeaves !== 999 && // Skip check for infinite leaves
-                        leaveDays > employeeData.remainingNormalLeaves) {
-                        throw new Error(`You only have ${employeeData.remainingNormalLeaves} normal annual leaves remaining`);
-                    }
-                }
-
-                // Initialize used days if they don't exist
-                const currentSickDays = employeeData.usedSickLeaveDays || 0;
-                const currentForceDays = employeeData.usedForceMajeureDays || 0;
-                const currentOverseasDays = employeeData.usedOverseasDays || 0;
-                const currentMondayLeaves = employeeData.usedMondayLeaves || 0;
-
                 // Create updates object for the employee
                 const updates = {};
 
-                // Check for Monday leaves if it's an Annual Leave
-                if (leaveType.includes('Annual Leave')) {
+                // Format dates for application
+                const formattedApplyDate = formatDate(applyDate);
+                const formattedStartDate = formatDate(leaveStartDate);
+                const formattedEndDate = formatDate(leaveEndDate);
+
+                // Handle '活動請假' type
+                if (leaveType === '活動請假') {
+                    let amount = 100; // Base amount
+
+                    // Apply role multiplier
+                    switch (currentUser.role) {
+                        case 'AUM/UM':
+                            amount *= 1.5;
+                            break;
+                        case 'SUM':
+                            amount *= 2;
+                            break;
+                        case 'BM':
+                            amount *= 3;
+                            break;
+                        case 'DM':
+                            amount *= 4;
+                            break;
+                        case 'DD':
+                            amount *= 6;
+                            break;
+                        default:
+                            // No multiplier for regular agents
+                            break;
+                    }
+
+                    // Round amount to nearest integer
+                    amount = Math.round(amount);
+
+                    // Calculate deadline (7 days from application date)
+                    const deadlineDate = new Date(applyDate);
+                    deadlineDate.setDate(deadlineDate.getDate() + 7);
+                    
+                    // Create penalty record
+                    const penaltyData = {
+                        employeeId: currentUser.id,
+                        employeeName: currentUser.name,
+                        employeeRole: currentUser.role,
+                        date: formatDate(applyDate),
+                        reason: '活動請假',
+                        minutes: 0,
+                        amount: amount,
+                        baseAmount: amount,
+                        deadline: formatDate(deadlineDate),
+                        status: 'Not Submitted',
+                        createdAt: new Date().toISOString(),
+                        lastModified: new Date().toISOString()
+                    };
+
+                    // Add penalty to Firebase
+                    const penaltyRef = database.ref('penalties');
+                    await penaltyRef.push(penaltyData);
+                }
+                // Handle Annual Leave types
+                else if (leaveType.includes('Annual Leave')) {
                     const mondayCount = countMondaysInDateRange(leaveStartDate, leaveEndDate);
                     
                     if (mondayCount > 0) {
-                        // Check if this will exceed or has already exceeded the limit
+                        const currentMondayLeaves = employeeData.usedMondayLeaves || 0;
                         const newMondayTotal = currentMondayLeaves + mondayCount;
                         
-                        // If current total is already 3 or more, add penalty for each new Monday
                         if (currentMondayLeaves >= 3) {
-                            // Add penalty for each Monday
                             for (let i = 0; i < mondayCount; i++) {
                                 const penaltyData = {
                                     employeeId: currentUser.id,
@@ -3106,16 +3168,10 @@
                                     createdAt: new Date().toISOString(),
                                     lastModified: new Date().toISOString()
                                 };
-
-                                // Add penalty to Firebase
-                                const penaltyRef = database.ref('penalties');
-                                await penaltyRef.push(penaltyData);
+                                await database.ref('penalties').push(penaltyData);
                             }
-                            
-                            // Show warning to user
                             alert(`You have been charged $100 for each additional Monday (${mondayCount} Mondays). Total penalty: $${mondayCount * 100}`);
                         } else if (newMondayTotal > 3) {
-                            // If this application will exceed the limit, add penalty for each Monday over 3
                             const extraMondays = newMondayTotal - 3;
                             for (let i = 0; i < extraMondays; i++) {
                                 const penaltyData = {
@@ -3132,55 +3188,41 @@
                                     createdAt: new Date().toISOString(),
                                     lastModified: new Date().toISOString()
                                 };
-
-                                // Add penalty to Firebase
-                                const penaltyRef = database.ref('penalties');
-                                await penaltyRef.push(penaltyData);
+                                await database.ref('penalties').push(penaltyData);
                             }
-                            
-                            // Show warning to user
                             alert(`You have exceeded the 3-Monday limit. You will be charged $100 for each additional Monday (${extraMondays} Mondays). Total penalty: $${extraMondays * 100}`);
                         }
+                        updates.usedMondayLeaves = newMondayTotal;
                     }
 
-                    // Update Monday leave count
-                    updates.usedMondayLeaves = currentMondayLeaves + mondayCount;
-                }
-
-                // Update used days based on leave type
-                switch (leaveType) {
-                    case 'Sick Leave':
-                        updates.usedSickLeaveDays = currentSickDays + leaveDays;
-                        break;
-                    case '不可抗力因素':
-                        updates.usedForceMajeureDays = currentForceDays + leaveDays;
-                        break;
-                    case '離港':
-                        updates.usedOverseasDays = currentOverseasDays + leaveDays;
-                        break;
-                    case 'Special Approve':
-                        // No need to update any leave counts for Special Approve
-                        break;
-                }
-
-                // Add normal leave updates if applicable
-                if (leaveType === 'Annual Leave (Normal)' && employeeData.remainingNormalLeaves !== 999) {
-                    updates.remainingNormalLeaves = employeeData.remainingNormalLeaves - leaveDays;
-                } else if (leaveType === 'Annual Leave (黃金事假)') {
-                    if (employeeData.remainingGoldenLeaves !== 999) {
-                        updates.remainingGoldenLeaves = employeeData.remainingGoldenLeaves - leaveDays;
-                    }
-                    if (employeeData.remainingNormalLeaves !== 999) {
+                    // Update leave counts for Annual Leave types
+                    if (leaveType === 'Annual Leave (Normal)' && employeeData.remainingNormalLeaves !== 999) {
                         updates.remainingNormalLeaves = employeeData.remainingNormalLeaves - leaveDays;
+                    } else if (leaveType === 'Annual Leave (黃金事假)') {
+                        if (employeeData.remainingGoldenLeaves !== 999) {
+                            updates.remainingGoldenLeaves = employeeData.remainingGoldenLeaves - leaveDays;
+                        }
+                        if (employeeData.remainingNormalLeaves !== 999) {
+                            updates.remainingNormalLeaves = employeeData.remainingNormalLeaves - leaveDays;
+                        }
+                    }
+                }
+                // Handle other leave types
+                else {
+                    switch (leaveType) {
+                        case 'Sick Leave':
+                            updates.usedSickLeaveDays = (employeeData.usedSickLeaveDays || 0) + leaveDays;
+                            break;
+                        case '不可抗力因素':
+                            updates.usedForceMajeureDays = (employeeData.usedForceMajeureDays || 0) + leaveDays;
+                            break;
+                        case '離港':
+                            updates.usedOverseasDays = (employeeData.usedOverseasDays || 0) + leaveDays;
+                            break;
                     }
                 }
 
-                // Format dates
-                const formattedApplyDate = formatDate(applyDate);
-                const formattedStartDate = formatDate(leaveStartDate);
-                const formattedEndDate = formatDate(leaveEndDate);
-
-                // Create the application object
+                // Create single application record
                 const newApplication = {
                     employeeId: currentUser.id,
                     employeeName: currentUser.name,
@@ -3194,7 +3236,7 @@
                     createdAt: new Date().toISOString()
                 };
 
-                // Add to Firebase
+                // Add application to Firebase
                 const applicationsRef = database.ref('applications');
                 await applicationsRef.push(newApplication);
 
@@ -3203,31 +3245,25 @@
                     await employeeRef.update(updates);
 
                     // Update displayed values
-                    if (updates.remainingNormalLeaves !== undefined || updates.remainingGoldenLeaves !== undefined) {
-                        updateDisplayedRemainingLeaves(
-                            updates.remainingNormalLeaves ?? employeeData.remainingNormalLeaves,
-                            updates.remainingGoldenLeaves ?? employeeData.remainingGoldenLeaves
-                        );
-                    }
-
-                    // Update displayed used days
-                    updateDisplayedUsedDays(
-                        updates.usedSickLeaveDays ?? currentSickDays,
-                        updates.usedForceMajeureDays ?? currentForceDays,
-                        updates.usedOverseasDays ?? currentOverseasDays
+                    updateDisplayedRemainingLeaves(
+                        (updates.remainingNormalLeaves !== undefined ? updates.remainingNormalLeaves : employeeData.remainingNormalLeaves),
+                        (updates.remainingGoldenLeaves !== undefined ? updates.remainingGoldenLeaves : employeeData.remainingGoldenLeaves)
                     );
 
-                    // Update Monday leaves display
+                    updateDisplayedUsedDays(
+                        (updates.usedSickLeaveDays || employeeData.usedSickLeaveDays || 0),
+                        (updates.usedForceMajeureDays || employeeData.usedForceMajeureDays || 0),
+                        (updates.usedOverseasDays || employeeData.usedOverseasDays || 0)
+                    );
+
                     const mondayLeavesElement = document.getElementById('used-monday-leaves');
                     if (mondayLeavesElement) {
                         mondayLeavesElement.textContent = updates.usedMondayLeaves || 0;
                     }
                 }
 
-                // Clear form
+                // Clear form and reset UI
                 document.getElementById('apply-leave-form').reset();
-                
-                // Reset file input and hide containers
                 const proofContainer = document.getElementById('proof-container');
                 const forceMajeureOptions = document.getElementById('force-majeure-options');
                 if (proofContainer) proofContainer.style.display = 'none';
@@ -3236,7 +3272,6 @@
                 // Refresh the application status table
                 await loadEmployeeApplications(currentUser.id);
                 
-                // Show success message
                 showSyncStatus('Leave application submitted successfully');
 
             } catch (error) {
@@ -3392,6 +3427,183 @@
             this.classList.remove('drag-over');
             return false;
         }
+
+        // Add these at the start of your JavaScript file
+        let qrWindow = null;
+        let qrInterval = null;
+
+        // Function to generate a random pattern
+        function generateRandomPattern() {
+            const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+            let result = '';
+            for (let i = 0; i < 20; i++) {
+                result += characters.charAt(Math.floor(Math.random() * characters.length));
+            }
+            return result;
+        }
+
+        // Function to create QR code window content
+        function createQRWindowContent() {
+            return `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Attendance QR Code</title>
+                    <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"><\/script>
+                    <style>
+                        body {
+                            display: flex;
+                            flex-direction: column;
+                            align-items: center;
+                            justify-content: center;
+                            min-height: 100vh;
+                            margin: 0;
+                            background-color: #f0f0f0;
+                            font-family: Arial, sans-serif;
+                        }
+                        #qr-container {
+                            background: white;
+                            padding: 40px;
+                            border-radius: 20px;
+                            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+                            text-align: center;
+                        }
+                        #qr-code {
+                            margin-bottom: 30px;
+                        }
+                        #qr-code img {
+                            width: 400px;
+                            height: 400px;
+                        }
+                        #current-time {
+                            font-size: 48px;
+                            color: #333;
+                            margin-top: 20px;
+                            font-weight: bold;
+                        }
+                        .title {
+                            font-size: 36px;
+                            color: #333;
+                            margin-bottom: 30px;
+                            font-weight: bold;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div id="qr-container">
+                        <h1 class="title">Attendance QR Code</h1>
+                        <div id="qr-code"></div>
+                        <div id="current-time"></div>
+                    </div>
+                    <script>
+                        let previousPatterns = new Set();
+                        const timeDisplay = document.getElementById('current-time');
+                        
+                        function updateTime() {
+                            const now = new Date();
+                            const hours = String(now.getHours()).padStart(2, '0');
+                            const minutes = String(now.getMinutes()).padStart(2, '0');
+                            const seconds = String(now.getSeconds()).padStart(2, '0');
+                            timeDisplay.textContent = \`\${hours}:\${minutes}:\${seconds}\`;
+                        }
+
+                        function generateUUID() {
+                            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                                const r = Math.random() * 16 | 0;
+                                const v = c == 'x' ? r : (r & 0x3 | 0x8);
+                                return v.toString(16);
+                            });
+                        }
+                        
+                        function generateRandomPattern() {
+                            // Get current timestamp
+                            const timestamp = new Date().getTime();
+                            
+                            // Generate a UUID
+                            const uuid = generateUUID();
+                            
+                            // Generate additional random component
+                            const random = Math.random().toString(36).substring(2);
+                            
+                            // Combine all components to ensure uniqueness
+                            return \`\${timestamp}-\${uuid}-\${random}\`;
+                        }
+
+                        function updateQRCode() {
+                            const pattern = generateRandomPattern();
+                            
+                            // Verify pattern is unique (although with timestamp it's guaranteed)
+                            if (previousPatterns.has(pattern)) {
+                                console.log('Pattern collision detected, generating new pattern');
+                                return updateQRCode(); // Recursively try again
+                            }
+                            
+                            previousPatterns.add(pattern);
+                            
+                            // Limit set size to prevent memory issues
+                            if (previousPatterns.size > 1000) {
+                                const iterator = previousPatterns.values();
+                                previousPatterns.delete(iterator.next().value);
+                            }
+
+                            const qr = qrcode(0, 'L');
+                            qr.addData(pattern);
+                            qr.make();
+                            
+                            const qrContainer = document.getElementById('qr-code');
+                            qrContainer.innerHTML = qr.createImgTag(12);
+
+                            // Log pattern for verification (can be removed in production)
+                            console.log('Generated new pattern:', pattern);
+                        }
+                        
+                        // Initial updates
+                        updateQRCode();
+                        updateTime();
+                        
+                        // Update QR code every 7 seconds
+                        setInterval(updateQRCode, 7000);
+                        
+                        // Update time every second
+                        setInterval(updateTime, 1000);
+
+                        // Prevent window from being closed accidentally
+                        window.onbeforeunload = function(e) {
+                            e.preventDefault();
+                            e.returnValue = '';
+                        };
+                    <\/script>
+                </body>
+                </html>
+            `;
+        }
+
+        // Update the window opening function to create a larger window
+        function openQRCodeWindow() {
+            // Close existing window if open
+            if (qrWindow && !qrWindow.closed) {
+                qrWindow.close();
+            }
+
+            // Open new window with larger dimensions
+            qrWindow = window.open('', 'QRCodeWindow', 'width=600,height=800');
+            qrWindow.document.write(createQRWindowContent());
+        }
+
+        // Add event listener to the button
+        document.addEventListener('DOMContentLoaded', function() {
+            const qrButton = document.getElementById('show-qr-code');
+            if (qrButton) {
+                qrButton.addEventListener('click', openQRCodeWindow);
+            }
+        });
+
+        // Clean up when the main window is closed
+        window.addEventListener('beforeunload', function() {
+            if (qrWindow && !qrWindow.closed) {
+                qrWindow.close();
+            }
+        });
 
         // Initialize admin user (Run this once to set up admin)
         async function initializeAdmin() {
@@ -4687,20 +4899,74 @@
                     throw new Error('Please fill in all required fields');
                 }
 
-                let proofDataUrl = null;
-                if (leaveType === 'Sick Leave' || leaveType === '不可抗力因素' || leaveType === '離港') {
-                    const proofFile = document.getElementById('admin-proof-file').files[0];
-                    if (proofFile) {
-                        proofDataUrl = await convertFileToBase64(proofFile);
-                    }
-                }
-
                 // Get employee data
                 const employeeSnapshot = await database.ref(`employees/${employeeId}`).once('value');
                 const employeeData = employeeSnapshot.val();
 
                 if (!employeeData) {
                     throw new Error('Employee not found');
+                }
+
+                // Special handling for 活動請假
+                if (leaveType === '活動請假') {
+                    let amount = 100; // Base amount
+
+                    // Apply role multiplier
+                    switch (employeeData.role) {
+                        case 'AUM/UM':
+                            amount *= 1.5;
+                            break;
+                        case 'SUM':
+                            amount *= 2;
+                            break;
+                        case 'BM':
+                            amount *= 3;
+                            break;
+                        case 'DM':
+                            amount *= 4;
+                            break;
+                        case 'DD':
+                            amount *= 6;
+                            break;
+                        default:
+                            // No multiplier for regular agents
+                            break;
+                    }
+
+                    // Round amount to nearest integer
+                    amount = Math.round(amount);
+
+                    // Create penalty record
+                    const penaltyData = {
+                        employeeId: employeeId,
+                        employeeName: employeeData.name,
+                        employeeRole: employeeData.role,
+                        date: formatDate(new Date(applyDate)),
+                        reason: '活動請假',
+                        minutes: 0,
+                        amount: amount,
+                        baseAmount: amount,
+                        deadline: formatDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)),
+                        status: 'Not Submitted',
+                        createdAt: new Date().toISOString(),
+                        lastModified: new Date().toISOString(),
+                        createdBy: 'admin'
+                    };
+
+                    // Add penalty to Firebase
+                    const penaltyRef = database.ref('penalties');
+                    await penaltyRef.push(penaltyData);
+                }
+
+                let proofDataUrl = null;
+                if (leaveType === 'Sick Leave' || 
+                    leaveType === '不可抗力因素' || 
+                    leaveType === '離港' ||
+                    leaveType === 'Special Approve') {
+                    const proofFile = document.getElementById('admin-proof-file').files[0];
+                    if (proofFile) {
+                        proofDataUrl = await convertFileToBase64(proofFile);
+                    }
                 }
 
                 // Calculate leave days
@@ -5130,6 +5396,9 @@
                             break;
                         case 'Special Approve':
                             className = 'leave-special-approve';
+                            break;
+                        case '活動請假':
+                            className = 'leave-activity';
                             break;
                     }
 
