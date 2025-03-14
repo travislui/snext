@@ -1754,6 +1754,69 @@
             </div>
         </div>
         
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="bg-white shadow rounded-lg">
+                <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900">
+                        All Employees Attendance Records
+                    </h3>
+                </div>
+                
+                <!-- Filter controls -->
+                <div class="p-4 bg-gray-50 border-b border-gray-200">
+                    <div class="flex flex-wrap gap-4 items-center">
+                        <div class="flex-1 min-w-md">
+                            <label for="dateFilter" class="block text-sm font-medium text-gray-700">Date Filter</label>
+                            <input type="date" id="dateFilter" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                        </div>
+                        <div class="flex-1 min-w-md">
+                            <label for="statusFilter" class="block text-sm font-medium text-gray-700">Status</label>
+                            <select id="statusFilter" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                <option value="">All</option>
+                                <option value="Punctual">Punctual</option>
+                                <option value="Late">Late</option>
+                            </select>
+                        </div>
+                        <div class="flex-1 min-w-md">
+                            <label for="employeeFilter" class="block text-sm font-medium text-gray-700">Employee</label>
+                            <input type="text" id="employeeFilter" placeholder="Search by name..." class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                        </div>
+                        <button id="resetFilters" class="mt-6 px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                            Reset Filters
+                        </button>
+                    </div>
+                </div>
+        
+                <!-- Table -->
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Employee Name
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Role
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Date & Time
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Status
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    IP Address
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody id="allAttendanceTableBody" class="bg-white divide-y divide-gray-200">
+                            <!-- Records will be inserted here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
         <!-- Section 4: 賀金 Info -->
         <div class="container">
             <h3>賀金 Info</h3>
@@ -4383,6 +4446,9 @@
                     toggleButton.innerHTML = '<span class="collapse-icon">▼</span> Collapse Agent List';
                 }
             }
+            // Initialize attendance records table and filters
+            loadAllAttendanceRecords();
+            setupAttendanceFilters();
         }
 
         // Function to show proof for leave applications
@@ -4475,6 +4541,124 @@
                 console.error('Error exporting applications:', error);
                 alert('Error exporting applications: ' + error.message);
             }
+        }
+
+        // Function to load all attendance records
+        function loadAllAttendanceRecords() {
+            const attendanceRef = database.ref('attendance');
+            const tableBody = document.getElementById('allAttendanceTableBody');
+            const dateFilter = document.getElementById('dateFilter');
+            const statusFilter = document.getElementById('statusFilter');
+            const employeeFilter = document.getElementById('employeeFilter');
+
+            attendanceRef.on('value', (snapshot) => {
+                const records = [];
+                snapshot.forEach(userSnapshot => {
+                    const userId = userSnapshot.key;
+                    userSnapshot.forEach(recordSnapshot => {
+                        const record = recordSnapshot.val();
+                        records.push({
+                            ...record,
+                            userId: userId
+                        });
+                    });
+                });
+
+                // Sort records by timestamp (most recent first)
+                records.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+                // Apply filters
+                let filteredRecords = records;
+
+                if (dateFilter.value) {
+                    filteredRecords = filteredRecords.filter(record => {
+                        const recordDate = new Date(record.timestamp).toISOString().split('T')[0];
+                        return recordDate === dateFilter.value;
+                    });
+                }
+
+                if (statusFilter.value) {
+                    filteredRecords = filteredRecords.filter(record => 
+                        record.status === statusFilter.value
+                    );
+                }
+
+                if (employeeFilter.value) {
+                    const searchTerm = employeeFilter.value.toLowerCase();
+                    filteredRecords = filteredRecords.filter(record =>
+                        record.employeeName.toLowerCase().includes(searchTerm)
+                    );
+                }
+
+                // Clear existing table
+                tableBody.innerHTML = '';
+
+                if (filteredRecords.length === 0) {
+                    tableBody.innerHTML = `
+                        <tr>
+                            <td colspan="5" class="px-6 py-4 text-center text-gray-500">
+                                No attendance records found
+                            </td>
+                        </tr>
+                    `;
+                    return;
+                }
+
+                // Populate table with filtered records
+                filteredRecords.forEach(record => {
+                    const row = document.createElement('tr');
+                    const recordTime = new Date(record.timestamp);
+                    
+                    row.innerHTML = `
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm font-medium text-gray-900">
+                                ${record.employeeName || 'N/A'}
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-900">
+                                ${record.employeeRole || 'N/A'}
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-900">
+                                ${recordTime.toLocaleDateString()} ${recordTime.toLocaleTimeString()}
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="status-badge ${record.status === 'Punctual' ? 'punctual' : 'late'}">
+                                ${record.status}
+                                ${record.amount > 0 ? `<span class="penalty-amount">(-$${record.amount})</span>` : ''}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-900">
+                                ${record.ipAddress || 'N/A'}
+                            </div>
+                        </td>
+                    `;
+                    tableBody.appendChild(row);
+                });
+            });
+        }
+
+        // Add event listeners for filters
+        function setupAttendanceFilters() {
+            const dateFilter = document.getElementById('dateFilter');
+            const statusFilter = document.getElementById('statusFilter');
+            const employeeFilter = document.getElementById('employeeFilter');
+            const resetFilters = document.getElementById('resetFilters');
+
+            dateFilter.addEventListener('change', loadAllAttendanceRecords);
+            statusFilter.addEventListener('change', loadAllAttendanceRecords);
+            employeeFilter.addEventListener('input', loadAllAttendanceRecords);
+
+            resetFilters.addEventListener('click', () => {
+                dateFilter.value = '';
+                statusFilter.value = '';
+                employeeFilter.value = '';
+                loadAllAttendanceRecords();
+            });
         }
 
         // Function to export penalties to Excel
