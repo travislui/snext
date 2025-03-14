@@ -3351,7 +3351,7 @@
                     leaveDays: leaveDays,
                     status: 'Approved',
                     proof: proofDataUrl,
-                    createdAt: new Date().toISOString()
+                    createdAt: new Date().toISOString() // This will store the exact timestamp
                 };
 
                 // Add application to Firebase
@@ -4055,18 +4055,18 @@
                     for (const [id, application] of sortedApplications) {
                         const row = document.createElement('tr');
                         
-                        // Format dates
-                        const applyDate = new Date(application.applyDate);
+                        // Format dates with time for apply date
+                        const applyDateTime = new Date(application.createdAt || application.applyDate);
                         const startDate = new Date(application.leaveStartDate);
                         const endDate = new Date(application.leaveEndDate);
 
-                        const formattedApplyDate = `${applyDate.getFullYear()}-${String(applyDate.getMonth() + 1).padStart(2, '0')}-${String(applyDate.getDate()).padStart(2, '0')}`;
-                        const formattedStartDate = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')}`;
-                        const formattedEndDate = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}`;
+                        const formattedApplyDateTime = `${formatDate(applyDateTime)} ${formatTime(applyDateTime)}`;
+                        const formattedStartDate = formatDate(startDate);
+                        const formattedEndDate = formatDate(endDate);
 
                         row.innerHTML = `
                             <td>${application.employeeName}</td>
-                            <td>${formattedApplyDate}</td>
+                            <td>${formattedApplyDateTime}</td>
                             <td>${formattedStartDate}</td>
                             <td>${formattedEndDate}</td>
                             <td>${application.leaveType}</td>
@@ -4100,6 +4100,16 @@
                 console.error('Error loading applications:', error);
                 showSyncStatus('Error loading applications', 'error');
             }
+        }
+
+        // Add this helper function to format time
+        function formatTime(date) {
+            return date.toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false
+            });
         }
 
         // Add this new handler function
@@ -5785,7 +5795,7 @@
                     leaveDays: leaveDays,
                     status: 'Approved',
                     proof: proofDataUrl,
-                    createdAt: new Date().toISOString(),
+                    createdAt: new Date().toISOString(), // Add exact timestamp
                     createdBy: 'admin'
                 };
 
