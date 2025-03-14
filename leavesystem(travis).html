@@ -3468,7 +3468,7 @@
             `;
             resultDiv.style.display = 'block';
 
-            // Record the attendance in Firebase
+            // Create attendance data
             const timestamp = new Date().toISOString();
             const attendanceData = {
                 timestamp: timestamp,
@@ -3477,20 +3477,69 @@
                 employeeRole: currentUser.role
             };
 
-            // Use the correct path for attendance records
-            const attendanceRef = firebase.database().ref(`attendance/${currentUser.uid}`);
+            // Record the attendance in Firebase
+            const attendanceRef = database.ref(`attendance/${currentUser.uid}`);
             
             attendanceRef.push(attendanceData)
                 .then(() => {
                     console.log('Attendance recorded successfully');
-                    // Update the attendance table
-                    updateAttendanceTable();
+                    
+                    // Update the table immediately after successful recording
+                    const tableBody = document.getElementById('attendanceTableBody');
+                    if (tableBody) {
+                        const recordTime = new Date(timestamp);
+                        const lateInfo = calculateLateStatus(timestamp, currentUser.role);
+
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm font-medium text-gray-900">${currentUser.name || 'N/A'}</div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm text-gray-900">
+                                    ${recordTime.toLocaleDateString()} ${recordTime.toLocaleTimeString()}
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                    ${lateInfo.status === 'Punctual' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                                    ${lateInfo.status}
+                                    ${lateInfo.amount > 0 ? ` (-$${lateInfo.amount})` : ''}
+                                </span>
+                            </td>
+                        `;
+                        // Insert the new row at the beginning of the table
+                        tableBody.insertBefore(row, tableBody.firstChild);
+                    }
+
+                    // Create penalty if late
+                    const lateInfo = calculateLateStatus(timestamp, currentUser.role);
+                    if (lateInfo.amount > 0) {
+                        const penaltyData = {
+                            employeeId: currentUser.uid,
+                            employeeName: currentUser.name,
+                            employeeRole: currentUser.role,
+                            date: new Date(timestamp).toISOString().split('T')[0],
+                            reason: 'Meeting',
+                            minutes: lateInfo.lateMinutes,
+                            amount: lateInfo.amount,
+                            baseAmount: lateInfo.amount,
+                            deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                            status: 'Not Submitted',
+                            createdAt: new Date().toISOString(),
+                            lastModified: new Date().toISOString()
+                        };
+
+                        // Add penalty to Firebase
+                        database.ref('penalties').push(penaltyData);
+                    }
                 })
                 .catch(error => {
                     console.error('Error recording attendance:', error);
                     alert('Error recording attendance. Please try again.');
                 });
 
+            // Hide success message after 3 seconds
             setTimeout(() => {
                 resultDiv.style.display = 'none';
             }, 3000);
