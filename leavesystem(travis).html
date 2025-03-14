@@ -1779,6 +1779,7 @@
 
     <div class="container" id="employee-page" style="display: none;">
     <h2>Agent Information</h2>
+
     <div class="text-center mt-4">
         <button onclick="startScanning()" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg text-lg shadow-lg">
             Take Attendance
@@ -1790,6 +1791,7 @@
     
     <!-- Add this for success/failure messages -->
     <div id="scan-result" class="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" style="display: none;"></div>
+
     <p><strong>Name:</strong> <span id="employee-name"></span></p>
     <p><strong>Code:</strong> <span id="employee-code"></span></p>
     <p><strong>Role:</strong> <span id="employee-role"></span></p>
@@ -4470,7 +4472,7 @@
                     
                     const config = {
                         fps: 10,
-                        qrbox: { width: 250, height: 250 },
+                        qrbox: { width: 700, height: 700 },
                         aspectRatio: 1.0,
                         showTorchButtonIfSupported: true,
                     };
