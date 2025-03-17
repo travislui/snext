@@ -1807,6 +1807,9 @@
                                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     IP Address
                                 </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Action
+                                </th>
                             </tr>
                         </thead>
                         <tbody id="allAttendanceTableBody" class="bg-white divide-y divide-gray-200">
@@ -3508,6 +3511,17 @@
                         }))
                         .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
+                    if (recordsArray.length === 0) {
+                        const noRecordsRow = document.createElement('tr');
+                        noRecordsRow.innerHTML = `
+                            <td colspan="3" class="px-6 py-4 text-center text-gray-500">
+                                No attendance records found
+                            </td>
+                        `;
+                        tableBody.appendChild(noRecordsRow);
+                        return;
+                    }
+
                     recordsArray.forEach(record => {
                         const recordTime = new Date(record.timestamp);
                         const lateInfo = calculateLateStatus(record.timestamp, currentUser.role);
@@ -4569,7 +4583,8 @@
                         const record = recordSnapshot.val();
                         records.push({
                             ...record,
-                            userId: userId
+                            userId: userId,
+                            recordId: recordSnapshot.key // Add this to store the record ID
                         });
                     });
                 });
@@ -4606,7 +4621,7 @@
                 if (filteredRecords.length === 0) {
                     tableBody.innerHTML = `
                         <tr>
-                            <td colspan="5" class="px-6 py-4 text-center text-gray-500">
+                            <td colspan="6" class="px-6 py-4 text-center text-gray-500">
                                 No attendance records found
                             </td>
                         </tr>
@@ -4646,10 +4661,47 @@
                                 ${record.ipAddress || 'N/A'}
                             </div>
                         </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <button onclick="removeAttendanceRecord('${record.userId}', '${record.recordId}')" 
+                                    class="remove-btn-small">
+                                Remove
+                            </button>
+                        </td>
                     `;
                     tableBody.appendChild(row);
                 });
             });
+        }
+
+        async function removeAttendanceRecord(userId, recordId) {
+            try {
+                // Check if user is admin
+                const currentUser = auth.currentUser;
+                if (!currentUser) {
+                    throw new Error('You must be logged in to remove records');
+                }
+
+                const adminSnapshot = await database.ref(`users/${currentUser.uid}/isAdmin`).once('value');
+                if (!adminSnapshot.val()) {
+                    throw new Error('Only administrators can remove attendance records');
+                }
+
+                // Confirm deletion
+                if (!confirm('Are you sure you want to remove this attendance record?')) {
+                    return;
+                }
+
+                // Remove the record
+                await database.ref(`attendance/${userId}/${recordId}`).remove();
+
+                // Show success message
+                showSyncStatus('Attendance record removed successfully');
+
+                // Records will automatically update due to the real-time listener
+            } catch (error) {
+                console.error('Error removing attendance record:', error);
+                alert('Error removing attendance record: ' + error.message);
+            }
         }
 
         // Add event listeners for filters
