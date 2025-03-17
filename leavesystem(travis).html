@@ -1716,6 +1716,7 @@
                         </tr>
                     </thead>
                     <tbody id="employee-list">
+                        <!-- Rows will be dynamically added here -->
                     </tbody>
                 </table>
             </div>
@@ -1838,8 +1839,10 @@
                             </select>
                         </div>
                         <div class="flex-1 min-w-md">
-                            <label for="employeeFilter" class="block text-sm font-medium text-gray-700">Agent</label>
-                            <input type="text" id="employeeFilter" placeholder="Search by name..." class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            <label for="attendanceEmployeeFilter" class="block text-sm font-medium text-gray-700">Agent</label>
+                            <select id="attendanceEmployeeFilter" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                <option value="">All Agents</option>
+                            </select>
                         </div>
                         <button id="resetFilters" class="mt-6 px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
                             Reset Filters
@@ -4843,19 +4846,141 @@
         function setupAttendanceFilters() {
             const dateFilter = document.getElementById('dateFilter');
             const statusFilter = document.getElementById('statusFilter');
-            const employeeFilter = document.getElementById('employeeFilter');
+            const employeeFilter = document.getElementById('attendanceEmployeeFilter');
             const resetFilters = document.getElementById('resetFilters');
 
-            dateFilter.addEventListener('change', loadAllAttendanceRecords);
-            statusFilter.addEventListener('change', loadAllAttendanceRecords);
-            employeeFilter.addEventListener('input', loadAllAttendanceRecords);
+            // Update employee filter options when employees are loaded
+            const employeeRef = database.ref('employees');
+            employeeRef.on('value', (snapshot) => {
+                const employees = snapshot.val() || {};
+                
+                // Sort employees by name
+                const sortedEmployees = Object.entries(employees)
+                    .sort(([, a], [, b]) => a.name.localeCompare(b.name));
+
+                // Keep the "All Agents" option and add sorted employees
+                employeeFilter.innerHTML = '<option value="">All Agents</option>';
+                sortedEmployees.forEach(([id, employee]) => {
+                    employeeFilter.innerHTML += `<option value="${id}">${employee.name}</option>`;
+                });
+            });
+
+            // Modify the loadAllAttendanceRecords function to use the new filter
+            function filterAttendanceRecords() {
+                const attendanceRef = database.ref('attendance');
+                const tableBody = document.getElementById('allAttendanceTableBody');
+
+                attendanceRef.once('value', (snapshot) => {
+                    const records = [];
+                    snapshot.forEach(userSnapshot => {
+                        const userId = userSnapshot.key;
+                        userSnapshot.forEach(recordSnapshot => {
+                            const record = recordSnapshot.val();
+                            records.push({
+                                ...record,
+                                userId: userId,
+                                recordId: recordSnapshot.key
+                            });
+                        });
+                    });
+
+                    // Sort records by timestamp (most recent first)
+                    records.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+                    // Apply filters
+                    let filteredRecords = records;
+
+                    if (dateFilter.value) {
+                        filteredRecords = filteredRecords.filter(record => {
+                            const recordDate = new Date(record.timestamp).toISOString().split('T')[0];
+                            return recordDate === dateFilter.value;
+                        });
+                    }
+
+                    if (statusFilter.value) {
+                        filteredRecords = filteredRecords.filter(record => 
+                            record.status === statusFilter.value
+                        );
+                    }
+
+                    if (employeeFilter.value) {
+                        filteredRecords = filteredRecords.filter(record => 
+                            record.userId === employeeFilter.value
+                        );
+                    }
+
+                    // Clear existing table
+                    tableBody.innerHTML = '';
+
+                    if (filteredRecords.length === 0) {
+                        tableBody.innerHTML = `
+                            <tr>
+                                <td colspan="6" class="px-6 py-4 text-center text-gray-500">
+                                    No attendance records found
+                                </td>
+                            </tr>
+                        `;
+                        return;
+                    }
+
+                    // Populate table with filtered records
+                    filteredRecords.forEach(record => {
+                        const row = document.createElement('tr');
+                        const recordTime = new Date(record.timestamp);
+                        
+                        row.innerHTML = `
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm font-medium text-gray-900">
+                                    ${record.employeeName || 'N/A'}
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm text-gray-900">
+                                    ${record.employeeRole || 'N/A'}
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm text-gray-900">
+                                    ${recordTime.toLocaleDateString()} ${recordTime.toLocaleTimeString()}
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="status-badge ${record.status === 'Punctual' ? 'punctual' : 'late'}">
+                                    ${record.status}
+                                    ${record.amount > 0 ? `<span class="penalty-amount">(-$${record.amount})</span>` : ''}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm text-gray-900">
+                                    ${record.ipAddress || 'N/A'}
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <button onclick="removeAttendanceRecord('${record.userId}', '${record.recordId}')" 
+                                        class="remove-btn-small">
+                                    Remove
+                                </button>
+                            </td>
+                        `;
+                        tableBody.appendChild(row);
+                    });
+                });
+            }
+
+            // Add event listeners
+            dateFilter.addEventListener('change', filterAttendanceRecords);
+            statusFilter.addEventListener('change', filterAttendanceRecords);
+            employeeFilter.addEventListener('change', filterAttendanceRecords);
 
             resetFilters.addEventListener('click', () => {
                 dateFilter.value = '';
                 statusFilter.value = '';
                 employeeFilter.value = '';
-                loadAllAttendanceRecords();
+                filterAttendanceRecords();
             });
+
+            // Initial load
+            filterAttendanceRecords();
         }
 
         // Function to export penalties to Excel
@@ -5454,10 +5579,9 @@
             employeeRef.on('value', (snapshot) => {
                 const employees = snapshot.val();
                 const employeeList = document.getElementById('employee-list');
-                if (employeeList) employeeList.innerHTML = '';
-
-                // Update all employee selects
-                updateAllEmployeeSelects();
+                if (!employeeList) return;
+                
+                employeeList.innerHTML = ''; // Clear existing list
 
                 let employeeOrder;
                 try {
@@ -5466,7 +5590,10 @@
                     employeeOrder = [];
                 }
 
+                // Convert to array and sort
                 let employeesArray = Object.entries(employees || {});
+                
+                // Apply sorting
                 if (employeeOrder.length > 0) {
                     employeesArray.sort((a, b) => {
                         const indexA = employeeOrder.indexOf(a[0]);
@@ -5479,76 +5606,88 @@
                     employeesArray.sort(([, a], [, b]) => a.name.localeCompare(b.name));
                 }
 
-                for (const [id, emp] of employeesArray) {
-                    if (employeeList) {
-                        const row = document.createElement('tr');
-                        row.draggable = true;
-                        row.dataset.id = id;
-                        row.className = 'draggable';
-                        
-                        const normalLeavesDisplay = emp.remainingNormalLeaves === 999 ? "∞" : emp.remainingNormalLeaves;
-                        const goldenLeavesDisplay = emp.remainingGoldenLeaves === 999 ? "∞" : emp.remainingGoldenLeaves;
-                        
-                        // Add code field as editable
-                        const codeInput = `
-                            <input type="text" class="edit-input" 
-                                value="${emp.code}" 
-                                style="display: none;"
-                                onchange="updateEmployeeField('${id}', 'code', this.value)">
-                            <span class="display-text">${emp.code}</span>
-                        `;
-
-                        const roleSelect = `
-                            <select class="edit-select" style="display: none;" 
-                                    onchange="updateEmployeeField('${id}', 'role', this.value)">
-                                ${['Agent', 'AUM/UM', 'SUM', 'BM', 'DM', 'DD']
-                                    .map(role => `<option value="${role}" ${emp.role === role ? 'selected' : ''}>${role}</option>`)
-                                    .join('')}
-                            </select>
-                            <span class="display-text">${emp.role}</span>
-                        `;
-
-                        const mdrtSelect = `
-                            <select class="edit-select" style="display: none;" 
-                                    onchange="updateEmployeeField('${id}', 'mdrt', this.value)">
-                                ${['NO', 'MDRT', 'COT or above']
-                                    .map(status => `<option value="${status}" ${emp.mdrt === status ? 'selected' : ''}>${status}</option>`)
-                                    .join('')}
-                            </select>
-                            <span class="display-text">${emp.mdrt}</span>
-                        `;
-                        
-                        row.innerHTML = `
-                            <td class="drag-handle">
-                                <div class="drag-handle-inner">${emp.name}</div>
-                            </td>
-                            <td class="editable-cell">${codeInput}</td>
-                            <td class="editable-cell">${roleSelect}</td>
-                            <td class="editable-cell">${mdrtSelect}</td>
-                            <td>${normalLeavesDisplay}</td>
-                            <td>${goldenLeavesDisplay}</td>
-                            <td class="action-column">
-                                <div class="button-stack">
-                                    <button class="adjust-btn action-btn" onclick="toggleAdjustMode(this)">Adjust</button>
-                                    <button class="remove-btn action-btn" onclick="removeAgent('${id}', this.parentElement.parentElement.parentElement)">Remove</button>
-                                </div>
-                            </td>
-                        `;
-
-                        row.addEventListener('dragstart', handleDragStart);
-                        row.addEventListener('dragend', handleDragEnd);
-                        row.addEventListener('dragover', handleDragOver);
-                        row.addEventListener('drop', handleDrop);
-                        row.addEventListener('dragenter', handleDragEnter);
-                        row.addEventListener('dragleave', handleDragLeave);
-
-                        employeeList.appendChild(row);
-                    }
-
-                    const option = `<option value="${id}">${emp.name}</option>`;
-                    if (penaltySelect) penaltySelect.innerHTML += option;
-                    if (leaveSelect) leaveSelect.innerHTML += option;
+                // Check if there are any employees
+                if (employeesArray.length === 0) {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td colspan="7" class="text-center py-4 text-gray-500">
+                            No agents found
+                        </td>
+                    `;
+                    employeeList.appendChild(row);
+                    return;
                 }
+
+                // Create and append rows for each employee
+                employeesArray.forEach(([id, emp]) => {
+                    const row = document.createElement('tr');
+                    row.draggable = true;
+                    row.dataset.id = id;
+                    row.className = 'draggable';
+
+                    // Format leave displays
+                    const normalLeavesDisplay = emp.remainingNormalLeaves === 999 ? "∞" : emp.remainingNormalLeaves;
+                    const goldenLeavesDisplay = emp.remainingGoldenLeaves === 999 ? "∞" : emp.remainingGoldenLeaves;
+
+                    // Create editable fields
+                    const codeInput = `
+                        <input type="text" class="edit-input" 
+                            value="${emp.code}" 
+                            style="display: none;"
+                            onchange="updateEmployeeField('${id}', 'code', this.value)">
+                        <span class="display-text">${emp.code}</span>
+                    `;
+
+                    const roleSelect = `
+                        <select class="edit-select" style="display: none;" 
+                                onchange="updateEmployeeField('${id}', 'role', this.value)">
+                            ${['Agent', 'AUM/UM', 'SUM', 'BM', 'DM', 'DD']
+                                .map(role => `<option value="${role}" ${emp.role === role ? 'selected' : ''}>${role}</option>`)
+                                .join('')}
+                        </select>
+                        <span class="display-text">${emp.role}</span>
+                    `;
+
+                    const mdrtSelect = `
+                        <select class="edit-select" style="display: none;" 
+                                onchange="updateEmployeeField('${id}', 'mdrt', this.value)">
+                            ${['no', 'mdrt', 'cot or above']
+                                .map(status => `<option value="${status.toLowerCase()}" ${emp.mdrt?.toLowerCase() === status ? 'selected' : ''}>${status}</option>`)
+                                .join('')}
+                        </select>
+                        <span class="display-text">${emp.mdrt}</span>
+                    `;
+
+                    row.innerHTML = `
+                        <td class="drag-handle">
+                            <div class="drag-handle-inner">${emp.name}</div>
+                        </td>
+                        <td class="editable-cell">${codeInput}</td>
+                        <td class="editable-cell">${roleSelect}</td>
+                        <td class="editable-cell">${mdrtSelect}</td>
+                        <td>${normalLeavesDisplay}</td>
+                        <td>${goldenLeavesDisplay}</td>
+                        <td class="action-column">
+                            <div class="button-stack">
+                                <button class="adjust-btn action-btn" onclick="toggleAdjustMode(this)">Adjust</button>
+                                <button class="remove-btn action-btn" onclick="removeAgent('${id}', this.parentElement.parentElement.parentElement)">Remove</button>
+                            </div>
+                        </td>
+                    `;
+
+                    // Add drag and drop event listeners
+                    row.addEventListener('dragstart', handleDragStart);
+                    row.addEventListener('dragend', handleDragEnd);
+                    row.addEventListener('dragover', handleDragOver);
+                    row.addEventListener('drop', handleDrop);
+                    row.addEventListener('dragenter', handleDragEnter);
+                    row.addEventListener('dragleave', handleDragLeave);
+
+                    employeeList.appendChild(row);
+                });
+
+                // Update all employee selects
+                updateAllEmployeeSelects();
             });
         }
 
