@@ -213,7 +213,8 @@
         }
 
         .container {
-            max-width: 1000px;
+            max-width: 1100px;
+            width: 95%;
             margin: 20px auto;
             padding: 20px;
             background-color: white;
@@ -1426,6 +1427,46 @@
             border-color: #2196F3 !important;
         }
 
+        .filter-container {
+            background-color: #f8f9fa;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border-radius: 0.5rem;
+        }
+
+        .filter-group {
+            min-width: 150px;
+        }
+
+        .filter-group select {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.375rem;
+            background-color: white;
+        }
+
+        .filter-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: #374151;
+        }
+
+        #resetFilters {
+            background-color: #6b7280;
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 0.375rem;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        #resetFilters:hover {
+            background-color: #4b5563;
+        }
+
         /* Animation for the table container */
         #agentListContainer {
             max-height: 400px; /* You can adjust this value to your preferred height */
@@ -1642,7 +1683,7 @@
             <h3>Add 賀金</h3>
             <form id="penalty-form">
                 <select id="penalty-employee" required>
-                    <option value="">Select Employee</option>
+                    <option value="">Select Agent</option>
                 </select>
                 <input type="date" id="penalty-date" required>
                 <select id="penalty-reason" required>
@@ -1724,17 +1765,36 @@
                 <div id="leave-calendar"></div>
             </div>
         
+            <div class="export-buttons" style="margin-top: 20px;">
+                <button id="export-applications-btn" class="export-btn">Export Applications to Excel</button>
+                <button id="clearRecordsBtn" class="clear-records-btn">Clear All Leave Records</button>
+            </div>
+
             <div style="margin-bottom: 10px;">
                 <button id="toggleApplicationList" class="collapse-btn">
                     <span class="collapse-icon">▼</span> Collapse Application List
                 </button>
             </div>
         
-            <div class="export-buttons" style="margin-top: 20px;">
-                <button id="export-applications-btn" class="export-btn">Export Applications to Excel</button>
-                <button id="clearRecordsBtn" class="clear-records-btn">Clear All Leave Records</button>
+            <div class="filter-container p-4 bg-white shadow-sm rounded-lg mb-4">
+                <div class="flex flex-wrap gap-4">
+                    <!-- Agent filter -->
+                    <div class="filter-group">
+                        <label for="application-employee-filter" class="block text-sm font-medium text-gray-700 mb-1">Agent</label>
+                        <select id="application-employee-filter" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            <option value="">All Agents</option>
+                        </select>
+                    </div>
+            
+                    <!-- Reset button -->
+                    <div class="flex items-end">
+                        <button id="resetFilter" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded">
+                            Reset Filter
+                        </button>
+                    </div>
+                </div>
             </div>
-        
+
             <div class="table-container applications-container" id="applicationListContainer">
                 <table id="application-list-table">
                     <thead>
@@ -1778,7 +1838,7 @@
                             </select>
                         </div>
                         <div class="flex-1 min-w-md">
-                            <label for="employeeFilter" class="block text-sm font-medium text-gray-700">Employee</label>
+                            <label for="employeeFilter" class="block text-sm font-medium text-gray-700">Agent</label>
                             <input type="text" id="employeeFilter" placeholder="Search by name..." class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                         </div>
                         <button id="resetFilters" class="mt-6 px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
@@ -1793,7 +1853,7 @@
                         <thead class="bg-gray-50">
                             <tr>
                                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Employee Name
+                                    Agent Name
                                 </th>
                                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Role
@@ -4049,12 +4109,14 @@
             }
         }
 
-        async function loadAllApplications() {
+        // Update the loadAllApplications function
+        async function loadAllApplications(filterEmployeeId = null) {
             try {
                 const applicationsRef = database.ref('applications');
                 applicationsRef.on('value', (snapshot) => {
                     const applications = snapshot.val() || {};
 
+                    // Update calendar regardless of filter
                     updateCalendarEvents(applications);
 
                     const tableBody = document.getElementById('application-list-body');
@@ -4062,9 +4124,28 @@
 
                     tableBody.innerHTML = '';
 
+                    // Filter applications if employeeId is provided and not empty
+                    let filteredApplications = Object.entries(applications);
+                    if (filterEmployeeId && filterEmployeeId.trim() !== '') {
+                        filteredApplications = filteredApplications.filter(([, app]) => 
+                            app.employeeId === filterEmployeeId
+                        );
+                    }
+
                     // Sort applications by date (newest first)
-                    const sortedApplications = Object.entries(applications)
+                    const sortedApplications = filteredApplications
                         .sort(([, a], [, b]) => new Date(b.applyDate) - new Date(a.applyDate));
+
+                    if (sortedApplications.length === 0) {
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td colspan="8" class="text-center py-4 text-gray-500">
+                                No records found
+                            </td>
+                        `;
+                        tableBody.appendChild(row);
+                        return;
+                    }
 
                     for (const [id, application] of sortedApplications) {
                         const row = document.createElement('tr');
@@ -4438,14 +4519,14 @@
             document.getElementById('admin-page').style.display = 'block';
             document.getElementById('employee-page').style.display = 'none';
             
-            // Initialize employee data storage
             window.employeeData = {};
             window.penaltyData = {};
 
-            // Load data
             loadEmployees();
             loadAllPenalties();
             loadAllApplications();
+            updateAllEmployeeSelects();
+            initializeFilter(); // Initialize the simplified filter
             
             // Add event listeners for logout buttons
             document.getElementById('logout-btn').addEventListener('click', logout);
@@ -4473,6 +4554,26 @@
             // Initialize attendance records table and filters
             loadAllAttendanceRecords();
             setupAttendanceFilters();
+        }
+
+        // Handle agent filter changes
+        function handleAgentFilterChange() {
+            const agentFilter = document.getElementById('application-employee-filter');
+            const yearFilter = document.getElementById('yearFilter');
+            const monthFilter = document.getElementById('monthFilter');
+            const dayFilter = document.getElementById('dayFilter');
+
+            agentFilter.addEventListener('change', function() {
+                const selectedAgentId = this.value;
+                
+                // Reset date filters when agent changes
+                yearFilter.value = '';
+                monthFilter.value = '';
+                dayFilter.value = '';
+
+                // Reload applications with the selected agent filter
+                loadAllApplications(selectedAgentId);
+            });
         }
 
         // Function to show proof for leave applications
@@ -4511,6 +4612,40 @@
                     console.error('Error loading proof:', error);
                     proofContent.innerHTML = '<div style="text-align: center; padding: 20px; color: red;">Error loading proof</div>';
                 });
+        }
+
+        // Add this function to synchronize all employee select dropdowns
+        function updateAllEmployeeSelects() {
+            const penaltySelect = document.getElementById('penalty-employee');
+            const leaveSelect = document.getElementById('admin-leave-employee');
+            const applicationFilter = document.getElementById('application-employee-filter');
+            
+            // Get employees from database
+            const employeeRef = database.ref('employees');
+            employeeRef.once('value', (snapshot) => {
+                const employees = snapshot.val() || {};
+                
+                // Sort employees by name
+                const sortedEmployees = Object.entries(employees)
+                    .sort(([, a], [, b]) => a.name.localeCompare(b.name));
+
+                // Create the HTML options
+                const optionsHTML = sortedEmployees.map(([id, employee]) => 
+                    `<option value="${id}">${employee.name}</option>`
+                ).join('');
+
+                // Set different default options for different selects
+                if (penaltySelect) {
+                    penaltySelect.innerHTML = '<option value="">Select Agent</option>' + optionsHTML;
+                }
+                if (leaveSelect) {
+                    leaveSelect.innerHTML = '<option value="">Select Agent</option>' + optionsHTML;
+                }
+                if (applicationFilter) {
+                    // Make sure "All Agents" is always the first option for the filter
+                    applicationFilter.innerHTML = '<option value="">All Agents</option>' + optionsHTML;
+                }
+            });
         }
 
         // Function to export applications to Excel
@@ -5313,6 +5448,7 @@
             }
         });
 
+        // Update the loadEmployees function to use updateAllEmployeeSelects
         async function loadEmployees() {
             const employeeRef = database.ref('employees');
             employeeRef.on('value', (snapshot) => {
@@ -5320,11 +5456,8 @@
                 const employeeList = document.getElementById('employee-list');
                 if (employeeList) employeeList.innerHTML = '';
 
-                const penaltySelect = document.getElementById('penalty-employee');
-                const leaveSelect = document.getElementById('admin-leave-employee');
-                
-                if (penaltySelect) penaltySelect.innerHTML = '<option value="">Select Employee</option>';
-                if (leaveSelect) leaveSelect.innerHTML = '<option value="">Select Agent</option>';
+                // Update all employee selects
+                updateAllEmployeeSelects();
 
                 let employeeOrder;
                 try {
@@ -6153,6 +6286,106 @@
                 });
             }
         });
+
+        // Add this to your existing JavaScript
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeFilters();
+        });
+
+        // Modify the initializeFilters function
+        function initializeFilters() {
+            const applicationFilter = document.getElementById('application-employee-filter');
+            const resetFilters = document.getElementById('resetFilters');
+
+            // Handle agent filter change
+            applicationFilter.addEventListener('change', function() {
+                const selectedAgentId = this.value;
+                loadAllApplications(selectedAgentId);
+            });
+
+            // Reset filters - update this part
+            resetFilters.addEventListener('click', function() {
+                // Set filter back to "All Agents" (empty value)
+                applicationFilter.value = '';
+                
+                // Load all applications
+                loadAllApplications();
+                
+                // Optional: trigger change event if needed
+                const changeEvent = new Event('change');
+                applicationFilter.dispatchEvent(changeEvent);
+            });
+
+            // Initialize employee select
+            updateAllEmployeeSelects();
+        }
+
+        // Helper function to update the application table
+        function updateApplicationTable(applications) {
+            const tableBody = document.getElementById('application-list-body');
+            if (!tableBody) return;
+
+            tableBody.innerHTML = '';
+
+            if (Object.keys(applications).length === 0) {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td colspan="8" class="px-6 py-4 text-center text-gray-500">
+                        No applications found
+                    </td>
+                `;
+                tableBody.appendChild(row);
+                return;
+            }
+
+            // Sort applications by date (newest first)
+            const sortedApplications = Object.entries(applications)
+                .sort(([, a], [, b]) => new Date(b.applyDate) - new Date(a.applyDate));
+
+            sortedApplications.forEach(([id, application]) => {
+                const row = document.createElement('tr');
+                
+                // Format dates
+                const applyDateTime = new Date(application.createdAt || application.applyDate);
+                const startDate = new Date(application.leaveStartDate);
+                const endDate = new Date(application.leaveEndDate);
+
+                const formattedApplyDateTime = `${formatDate(applyDateTime)} ${formatTime(applyDateTime)}`;
+                const formattedStartDate = formatDate(startDate);
+                const formattedEndDate = formatDate(endDate);
+
+                row.innerHTML = `
+                    <td>${application.employeeName}</td>
+                    <td>${formattedApplyDateTime}</td>
+                    <td>${formattedStartDate}</td>
+                    <td>${formattedEndDate}</td>
+                    <td>${application.leaveType}</td>
+                    <td>
+                        <span class="status-${application.status.toLowerCase()}">${application.status}</span>
+                        ${application.status === 'Approved' ? `
+                            <button type="button" class="reject-btn" onclick="rejectApplication('${id}', '${application.employeeId}', '${application.leaveType}')">
+                                Reject
+                            </button>
+                        ` : ''}
+                    </td>
+                    <td>
+                        ${(application.leaveType === 'Sick Leave' || 
+                        application.leaveType === '不可抗力因素' || 
+                        application.leaveType === '離港') && application.proof ? 
+                            `<button type="button" class="show-proof-btn" onclick="showProof('${id}')">View Proof</button>` : 
+                            'N/A'}
+                    </td>
+                    <td>
+                        <button type="button" 
+                                class="remove-btn-small" 
+                                onclick="handleRemoveSingleApplication(event, '${id}', '${application.employeeId}', '${application.leaveType}', ${application.leaveDays}, '${application.status}')">
+                            Remove
+                        </button>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            });
+        }
 
         // Update the existing updateCalendarEvents function
         function updateCalendarEvents(applications) {
