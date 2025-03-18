@@ -1281,6 +1281,7 @@
             max-height: 0;
             padding: 0;
             margin: 0;
+            overflow: hidden;
             opacity: 0;
         }
 
@@ -1343,37 +1344,6 @@
             background-color: var(--accent-color) !important;
         }
 
-        /* Custom leave type colors */
-        .leave-annual-normal {
-            background-color: #4CAF50 !important;
-            border-color: #4CAF50 !important;
-            color: white !important;
-        }
-
-        .leave-annual-golden {
-            background-color: #FFC107 !important;
-            border-color: #FFC107 !important;
-            color: black !important;
-        }
-
-        .leave-sick {
-            background-color: #F44336 !important;
-            border-color: #F44336 !important;
-            color: white !important;
-        }
-
-        .leave-force-majeure {
-            background-color: #9C27B0 !important;
-            border-color: #9C27B0 !important;
-            color: white !important;
-        }
-
-        .leave-overseas {
-            background-color: #2196F3 !important;
-            border-color: #2196F3 !important;
-            color: white !important;
-        }
-
         #calendar-legend {
             margin-bottom: 1rem;
             padding: 0.5rem;
@@ -1425,6 +1395,16 @@
         .leave-overseas {
             background-color: #2196F3 !important;
             border-color: #2196F3 !important;
+        }
+
+        .leave-special-approve {
+            background-color: #9E9E9E !important;
+            border-color: #9E9E9E !important;
+        }
+
+        .leave-activity {
+            background-color: #FF69B4 !important;
+            border-color: #FF69B4 !important;
         }
 
         .filter-container {
@@ -1815,74 +1795,76 @@
             </div>
         </div>
         
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            <div class="bg-white shadow rounded-lg">
-                <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
-                    <h3 class="text-lg leading-6 font-medium text-gray-900">
-                        All Agents Attendance Records
-                    </h3>
-                </div>
-                
-                <!-- Filter controls -->
-                <div class="p-4 bg-gray-50 border-b border-gray-200">
-                    <div class="flex flex-wrap gap-4 items-center">
-                        <div class="flex-1 min-w-md">
-                            <label for="dateFilter" class="block text-sm font-medium text-gray-700">Date Filter</label>
-                            <input type="date" id="dateFilter" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                        </div>
-                        <div class="flex-1 min-w-md">
-                            <label for="statusFilter" class="block text-sm font-medium text-gray-700">Status</label>
-                            <select id="statusFilter" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                                <option value="">All</option>
-                                <option value="Punctual">Punctual</option>
-                                <option value="Late">Late</option>
-                            </select>
-                        </div>
-                        <div class="flex-1 min-w-md">
-                            <label for="attendanceEmployeeFilter" class="block text-sm font-medium text-gray-700">Agent</label>
-                            <select id="attendanceEmployeeFilter" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                                <option value="">All Agents</option>
-                            </select>
-                        </div>
-                        <button id="resetFilters" class="mt-6 px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                            Reset Filters
-                        </button>
+        <div class="container">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                <div class="bg-white shadow rounded-lg">
+                    <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900">
+                            All Agents Attendance Records
+                        </h3>
                     </div>
-                </div>
-        
-                <!-- Table -->
-                <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-50">
-                            <tr>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Agent Name
-                                </th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Role
-                                </th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Date & Time
-                                </th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Status
-                                </th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    IP Address
-                                </th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Action
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody id="allAttendanceTableBody" class="bg-white divide-y divide-gray-200">
-                            <!-- Records will be inserted here -->
-                        </tbody>
-                    </table>
+                    
+                    <!-- Filter controls -->
+                    <div class="p-4 bg-gray-50 border-b border-gray-200">
+                        <div class="flex flex-wrap gap-4 items-center">
+                            <div class="flex-1 min-w-md">
+                                <label for="dateFilter" class="block text-sm font-medium text-gray-700">Date Filter</label>
+                                <input type="date" id="dateFilter" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            </div>
+                            <div class="flex-1 min-w-md">
+                                <label for="statusFilter" class="block text-sm font-medium text-gray-700">Status</label>
+                                <select id="statusFilter" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                    <option value="">All</option>
+                                    <option value="Punctual">Punctual</option>
+                                    <option value="Late">Late</option>
+                                </select>
+                            </div>
+                            <div class="flex-1 min-w-md">
+                                <label for="attendanceEmployeeFilter" class="block text-sm font-medium text-gray-700">Agent</label>
+                                <select id="attendanceEmployeeFilter" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                    <option value="">All Agents</option>
+                                </select>
+                            </div>
+                            <button id="resetFilters" class="mt-6 px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                                Reset Filters
+                            </button>
+                        </div>
+                    </div>
+            
+                    <!-- Table -->
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Agent Name
+                                    </th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Role
+                                    </th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Date & Time
+                                    </th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Status
+                                    </th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        IP Address
+                                    </th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Action
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody id="allAttendanceTableBody" class="bg-white divide-y divide-gray-200">
+                                <!-- Records will be inserted here -->
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
-
+        
         <!-- Section 4: 賀金 Info -->
         <div class="container">
             <h3>賀金 Info</h3>
@@ -6371,6 +6353,7 @@
                 return;
             }
 
+            // Initialize FullCalendar
             const calendar = new FullCalendar.Calendar(calendarEl, {
                 initialView: 'dayGridMonth',
                 headerToolbar: {
@@ -6378,7 +6361,7 @@
                     center: 'title',
                     right: 'dayGridMonth,dayGridWeek,dayGridDay'
                 },
-                height: 600,
+                height: 'auto', // This will make the calendar adjust to its content
                 events: [], // Start empty; populated by updateCalendarEvents
                 eventDidMount: function(info) {
                     info.el.title = `${info.event.extendedProps.employeeName}\n${info.event.title}`;
@@ -6386,42 +6369,50 @@
                 displayEventTime: false,
                 eventDisplay: 'block',
                 eventOverlap: true,
-                dayMaxEvents: 3,
-                eventClick: function(info) {
-                    alert(`
-                        Employee: ${info.event.extendedProps.employeeName}
-                        Leave Type: ${info.event.extendedProps.leaveType}
-                        From: ${info.event.start.toLocaleDateString()}
-                        To: ${new Date(info.event.end - 86400000).toLocaleDateString()}
-                    `);
-                }
+                dayMaxEvents: true, // Allow "more" link when too many events
+                firstDay: 1, // Start week on Monday
             });
 
-            // Store calendar globally
+            // Store calendar instance globally
             window.leaveCalendar = calendar;
 
-            // Initial render only if container is expanded
-            const container = document.getElementById('calendar-container');
-            if (container.classList.contains('expanded')) {
-                calendar.render();
-            }
+            // Initial render
+            calendar.render();
 
-            // Toggle functionality
+            // Set up toggle functionality
             const toggleBtn = document.getElementById('toggleCalendarView');
-            if (toggleBtn) {
+            const container = document.getElementById('calendar-container');
+            
+            if (toggleBtn && container) {
+                // Load saved state
+                const isCollapsed = localStorage.getItem('calendarViewCollapsed') === 'true';
+                
+                // Set initial state
+                if (isCollapsed) {
+                    container.classList.add('collapsed');
+                    toggleBtn.innerHTML = '<span class="collapse-icon">▼</span> Show Calendar View';
+                } else {
+                    container.classList.remove('collapsed');
+                    toggleBtn.innerHTML = '<span class="collapse-icon">▼</span> Hide Calendar View';
+                    // Re-render calendar when expanded
+                    setTimeout(() => calendar.render(), 0);
+                }
+
+                // Add click handler
                 toggleBtn.addEventListener('click', function() {
-                    const isCollapsed = container.classList.contains('collapsed');
-                    if (isCollapsed) {
+                    const isCurrentlyCollapsed = container.classList.contains('collapsed');
+                    
+                    if (isCurrentlyCollapsed) {
                         container.classList.remove('collapsed');
-                        container.classList.add('expanded');
                         toggleBtn.innerHTML = '<span class="collapse-icon">▼</span> Hide Calendar View';
-                        calendar.render(); // Render when expanded
+                        // Re-render calendar when expanded
+                        setTimeout(() => calendar.render(), 0);
                     } else {
-                        container.classList.remove('expanded');
                         container.classList.add('collapsed');
                         toggleBtn.innerHTML = '<span class="collapse-icon">▼</span> Show Calendar View';
                     }
-                    localStorage.setItem('calendarViewCollapsed', isCollapsed ? 'false' : 'true');
+                    
+                    localStorage.setItem('calendarViewCollapsed', !isCurrentlyCollapsed);
                 });
             }
         });
