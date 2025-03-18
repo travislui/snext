@@ -3,11 +3,13 @@
 
 <head>
     <title>S-Next 請假及賀金系統</title>
+    
     <link href='https://cdn.jsdelivr.net/npm/@fullcalendar/core@6.1.10/main.min.css' rel='stylesheet' />
     <link href='https://cdn.jsdelivr.net/npm/@fullcalendar/daygrid@6.1.10/main.min.css' rel='stylesheet' />
     <script src='https://cdn.jsdelivr.net/npm/@fullcalendar/core@6.1.10/main.min.js'></script>
     <script src='https://cdn.jsdelivr.net/npm/@fullcalendar/daygrid@6.1.10/main.min.js'></script>
-    <script src="https://cdn.jsdelivr.net/npm/qrcode.js@1.0.0/qrcode.min.js"></script>
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    
     <style>
         /* Responsive styles */
         @media screen and (max-width: 768px) {
@@ -1261,34 +1263,50 @@
             min-width: 120px;
         }
 
-        #leave-calendar {
-            max-width: 100%;
-            height: 600px; /* Ensure height is set */
-        }
-
         .calendar-container {
-            margin: 20px 0;
-            padding: 20px;
             background: white;
+            padding: 20px;
             border-radius: 8px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-            transition: all 0.3s ease;
-            max-height: 800px;
-            overflow: hidden;
+            margin: 20px 0;
         }
 
         .calendar-container.collapsed {
             max-height: 0;
             padding: 0;
             margin: 0;
-            overflow: hidden;
             opacity: 0;
+        }
+
+        #leave-calendar {
+            width: 100%;
+            height: 600px;
         }
 
         .leave-special-approve {
             background-color: #9E9E9E !important; /* Grey color for Special Approve */
             border-color: #9E9E9E !important;
             color: white !important;
+        }
+
+        .fc .fc-toolbar {
+            display: flex !important;
+            justify-content: space-between !important;
+            padding: 10px !important;
+        }
+
+        .fc .fc-toolbar-title {
+            font-size: 1.2em !important;
+            margin: 0 !important;
+        }
+
+        /* Ensure calendar grid is visible */
+        .fc .fc-daygrid-body {
+            width: 100% !important;
+        }
+
+        .fc .fc-daygrid-day-frame {
+            min-height: 100px !important;
         }
 
         .fc { /* the calendar root */
@@ -1300,9 +1318,15 @@
         }
 
         .fc-event {
-            cursor: pointer;
             margin: 2px 0;
-            padding: 2px 4px;
+            padding: 4px 6px;
+            border-radius: 4px;
+            font-size: 0.9em;
+            white-space: normal !important; /* Allow text wrapping */
+        }
+
+        .fc-daygrid-event {
+            height: auto !important; /* Ensure events take up appropriate space */
         }
 
         .fc-event-title {
@@ -1371,40 +1395,45 @@
             border-radius: 0.25rem;
         }
 
-        /* Custom leave type colors */
         .leave-annual-normal {
-            background-color: #4CAF50 !important;
+            background-color: #4CAF50 !important; /* Green */
             border-color: #4CAF50 !important;
+            color: white !important;
         }
-
         .leave-annual-golden {
-            background-color: #FFC107 !important;
+            background-color: #FFC107 !important; /* Yellow */
             border-color: #FFC107 !important;
+            color: black !important;
         }
-
         .leave-sick {
-            background-color: #F44336 !important;
+            background-color: #F44336 !important; /* Red */
             border-color: #F44336 !important;
+            color: white !important;
         }
-
         .leave-force-majeure {
-            background-color: #9C27B0 !important;
+            background-color: #9C27B0 !important; /* Purple */
             border-color: #9C27B0 !important;
+            color: white !important;
         }
-
         .leave-overseas {
-            background-color: #2196F3 !important;
+            background-color: #2196F3 !important; /* Blue */
             border-color: #2196F3 !important;
+            color: white !important;
         }
-
         .leave-special-approve {
-            background-color: #9E9E9E !important;
+            background-color: #9E9E9E !important; /* Grey */
             border-color: #9E9E9E !important;
+            color: white !important;
         }
-
         .leave-activity {
-            background-color: #FF69B4 !important;
+            background-color: #FF69B4 !important; /* Pink */
             border-color: #FF69B4 !important;
+            color: white !important;
+        }
+        .leave-default {
+            background-color: #607D8B !important; /* Greyish-blue fallback */
+            border-color: #607D8B !important;
+            color: white !important;
         }
 
         .filter-container {
@@ -1710,7 +1739,7 @@
                     <span class="collapse-icon">▼</span> Toggle Calendar View
                 </button>
             </div>
-            <div id="calendar-container" class="calendar-container">
+            <div id="calendar-container" class="calendar-container" style="min-height: 700px;">
                 <div id="calendar-legend" class="mb-4">
                     <div class="flex flex-wrap gap-4 mb-2">
                         <div class="flex items-center">
@@ -1743,7 +1772,7 @@
                         </div>
                     </div>
                 </div>
-                <div id="leave-calendar"></div>
+                <div id="leave-calendar" style="height: 600px;"></div>
             </div>
         
             <div class="export-buttons" style="margin-top: 20px;">
@@ -2365,15 +2394,13 @@
         
         // Utility function to show status messages
         function showSyncStatus(message, type = 'success') {
-            const statusDiv = document.getElementById('sync-status');
-            if (statusDiv) {
-                statusDiv.textContent = message;
-                statusDiv.className = `sync-status ${type}`;
-                statusDiv.style.display = 'block';
-                setTimeout(() => {
-                    statusDiv.style.display = 'none';
-                }, 3000);
-            }
+            const syncStatus = document.getElementById('sync-status');
+            syncStatus.textContent = message;
+            syncStatus.className = `sync-status ${type}`;
+            syncStatus.style.display = 'block';
+            setTimeout(() => {
+                syncStatus.style.display = 'none';
+            }, 3000);
         }
 
         // Add necessary event listeners
@@ -3609,140 +3636,155 @@
         // Modify your onScanSuccess function to update the table
         async function onScanSuccess(decodedText, decodedResult) {
             try {
-                // Get IP address
-                const ipAddress = await getIPAddress();
-                if (!ipAddress) {
-                    throw new Error('Could not verify IP address');
+                const user = auth.currentUser;
+                if (!user) {
+                    throw new Error('You must be logged in to take attendance');
                 }
 
-                const today = new Date().toISOString().split('T')[0];
+                // Get employee data
+                const employeeSnapshot = await database.ref(`employees/${user.uid}`).once('value');
+                const employeeData = employeeSnapshot.val();
+                if (!employeeData) {
+                    throw new Error('Employee not found');
+                }
+
+                // Get current date and time
+                const now = new Date();
+                const currentDate = formatDate(now);
+                const currentTime = formatTime(now);
+
+                // Check for existing attendance record for today
                 const attendanceRef = database.ref('attendance');
-                
-                // Get all attendance records for today
-                const snapshot = await attendanceRef.once('value');
-                const allRecords = snapshot.val() || {};
-                
-                // Check if IP has been used today
-                const ipUsedToday = Object.values(allRecords).some(userRecords => {
-                    return Object.values(userRecords).some(record => {
-                        const recordDate = new Date(record.timestamp).toISOString().split('T')[0];
-                        return recordDate === today && record.ipAddress === ipAddress;
-                    });
-                });
+                const existingAttendanceSnapshot = await attendanceRef
+                    .orderByChild('employeeId')
+                    .equalTo(user.uid)
+                    .once('value');
 
-                if (ipUsedToday) {
-                    // Stop scanning
-                    if (html5QrcodeScanner) {
-                        html5QrcodeScanner.stop().then(() => {
-                            document.getElementById('reader').style.display = 'none';
-                        });
+                let existingRecord = null;
+                let existingRecordId = null;
+                existingAttendanceSnapshot.forEach(child => {
+                    const record = child.val();
+                    if (record.date === currentDate) {
+                        existingRecord = record;
+                        existingRecordId = child.key;
                     }
-
-                    // Show IP already used message
-                    const resultDiv = document.getElementById('scan-result');
-                    resultDiv.innerHTML = `
-                        <div class="bg-white p-8 rounded-lg shadow-xl text-center">
-                            <div style="color: #e74c3c; font-size: 24px; margin-bottom: 10px;">⚠️</div>
-                            <h2 class="text-xl font-bold text-red-600 mt-4">This device has already been used for attendance today!</h2>
-                            <p class="text-gray-600 mt-2">Each device can only be used once per day for attendance.</p>
-                        </div>
-                    `;
-                    resultDiv.style.display = 'block';
-
-                    setTimeout(() => {
-                        resultDiv.style.display = 'none';
-                    }, 3000);
-
-                    return;
-                }
-
-                // Check if user has already scanned today
-                const userRecords = allRecords[currentUser.uid] || {};
-                const hasScannedToday = Object.values(userRecords).some(record => {
-                    const recordDate = new Date(record.timestamp).toISOString().split('T')[0];
-                    return recordDate === today;
                 });
 
-                if (hasScannedToday) {
-                    // Show already scanned message
-                    // [Previous already scanned message code...]
+                if (existingRecord) {
+                    // Record already exists for today, show message and stop
+                    showScanResult('Attendance already recorded for today', false);
+                    stopScanner();
                     return;
                 }
 
-                // If passed all checks, proceed with recording attendance
-                const timestamp = new Date().toISOString();
-                const recordTime = new Date();
-                const lateInfo = calculateLateStatus(timestamp, currentUser.role);
+                // Get user's IP address (simplified, you might need an API for accuracy)
+                const ipResponse = await fetch('https://api.ipify.org?format=json');
+                const ipData = await ipResponse.json();
+                const ipAddress = ipData.ip;
 
-                // Create attendance data with IP address
+                // Determine status based on time (assuming 9:00 AM cutoff)
+                const cutoffTime = new Date();
+                cutoffTime.setHours(9, 0, 0, 0);
+                const status = now > cutoffTime ? 'Late' : 'Punctual';
+
+                // Create new attendance record
                 const attendanceData = {
-                    timestamp: timestamp,
-                    qrCode: decodedText,
-                    employeeName: currentUser.name,
-                    employeeRole: currentUser.role,
-                    status: lateInfo.status,
-                    amount: lateInfo.amount,
-                    lateMinutes: lateInfo.lateMinutes,
-                    ipAddress: ipAddress, // Add IP address to the record
-                    deviceInfo: navigator.userAgent // Optional: also store device info
+                    employeeId: user.uid,
+                    employeeName: employeeData.name,
+                    role: employeeData.role,
+                    date: currentDate,
+                    time: currentTime,
+                    timestamp: now.toISOString(),
+                    status: status,
+                    ipAddress: ipAddress
                 };
 
-                // Record the attendance
-                await database.ref(`attendance/${currentUser.uid}`).push(attendanceData);
+                // Save to Firebase
+                const newAttendanceRef = await attendanceRef.push(attendanceData);
 
-                // Show success message and update table
-                // [Rest of your existing success handling code...]
-
-                // Create penalty if late
-                if (lateInfo.amount > 0) {
-                    const penaltyData = {
-                        employeeId: currentUser.uid,
-                        employeeName: currentUser.name,
-                        employeeRole: currentUser.role,
-                        date: recordTime.toISOString().split('T')[0],
-                        reason: 'Meeting',
-                        minutes: lateInfo.lateMinutes,
-                        amount: lateInfo.amount,
-                        baseAmount: lateInfo.amount,
-                        deadline: new Date(recordTime.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-                        status: 'Not Submitted',
-                        createdAt: new Date().toISOString(),
-                        lastModified: new Date().toISOString(),
-                        ipAddress: ipAddress // Optional: store IP in penalty record too
-                    };
-
-                    // Add penalty to Firebase
-                    await database.ref('penalties').push(penaltyData);
-                }
-
-                // Success message and UI updates
-                const resultDiv = document.getElementById('scan-result');
-                resultDiv.innerHTML = `
-                    <div class="bg-white p-8 rounded-lg shadow-xl text-center">
-                        <div class="success-checkmark">
-                            <div class="check-icon">
-                                <span class="icon-line line-tip"></span>
-                                <span class="icon-line line-long"></span>
-                                <div class="icon-circle"></div>
-                                <div class="icon-fix"></div>
-                            </div>
-                        </div>
-                        <h2 class="text-2xl font-bold text-green-600 mt-4">Attendance Recorded!</h2>
-                    </div>
-                `;
-                resultDiv.style.display = 'block';
+                // Show success message
+                showScanResult('Attendance recorded successfully', true);
 
                 // Update the attendance table
                 updateAttendanceTable();
 
-                // Hide success message after 3 seconds
-                setTimeout(() => {
-                    resultDiv.style.display = 'none';
-                }, 3000);
+                // Stop the scanner
+                stopScanner();
 
             } catch (error) {
-                console.error('Error in attendance recording:', error);
-                alert('Error recording attendance: ' + error.message);
+                console.error('Error recording attendance:', error);
+                showScanResult('Error recording attendance: ' + error.message, false);
+                stopScanner();
+            }
+        }
+
+        function stopScanner() {
+            if (html5QrcodeScanner) {
+                html5QrcodeScanner.stop().then(() => {
+                    html5QrcodeScanner.clear();
+                    document.getElementById('reader').style.display = 'none';
+                }).catch(err => {
+                    console.error('Error stopping scanner:', err);
+                });
+                html5QrcodeScanner = null;
+            }
+        }
+
+        async function updateAttendanceTable() {
+            try {
+                const tableBody = document.getElementById('allAttendanceTableBody');
+                if (!tableBody) return;
+
+                const attendanceRef = database.ref('attendance');
+                const snapshot = await attendanceRef.once('value');
+                const attendanceRecords = snapshot.val() || {};
+
+                // Clear existing rows
+                tableBody.innerHTML = '';
+
+                // Convert to array and sort by timestamp (newest first)
+                const recordsArray = Object.entries(attendanceRecords)
+                    .sort(([, a], [, b]) => new Date(b.timestamp) - new Date(a.timestamp));
+
+                // Populate table
+                recordsArray.forEach(([id, record]) => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td class="px-6 py-4">${record.employeeName}</td>
+                        <td class="px-6 py-4">${record.role}</td>
+                        <td class="px-6 py-4">${record.date} ${record.time}</td>
+                        <td class="px-6 py-4">
+                            <span class="status-badge ${record.status.toLowerCase()}">${record.status}</span>
+                        </td>
+                        <td class="px-6 py-4">${record.ipAddress}</td>
+                        <td class="px-6 py-4">
+                            <button class="remove-btn-small" onclick="removeAttendanceRecord('${id}')">Remove</button>
+                        </td>
+                    `;
+                    tableBody.appendChild(row);
+                });
+
+            } catch (error) {
+                console.error('Error updating attendance table:', error);
+            }
+        }
+
+        async function removeAttendanceRecord(recordId) {
+            try {
+                const user = auth.currentUser;
+                if (!user) throw new Error('You must be logged in');
+                
+                const adminSnapshot = await database.ref(`users/${user.uid}/isAdmin`).once('value');
+                if (!adminSnapshot.val()) throw new Error('Only admins can remove records');
+
+                if (confirm('Are you sure you want to remove this attendance record?')) {
+                    await database.ref(`attendance/${recordId}`).remove();
+                    updateAttendanceTable();
+                    showSyncStatus('Attendance record removed successfully');
+                }
+            } catch (error) {
+                console.error('Error removing attendance record:', error);
+                alert('Error: ' + error.message);
             }
         }
 
@@ -4197,6 +4239,27 @@
             event.preventDefault();
             event.stopPropagation();
             removeSingleApplication(...args);
+        }
+
+        function showScanResult(message, isSuccess) {
+            const resultDiv = document.getElementById('scan-result');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = isSuccess
+                ? `
+                    <div class="success-checkmark">
+                        <div class="check-icon">
+                            <span class="icon-line line-tip"></span>
+                            <span class="icon-line line-long"></span>
+                            <div class="icon-circle"></div>
+                            <div class="icon-fix"></div>
+                        </div>
+                    </div>
+                    <p class="text-center mt-2">${message}</p>
+                `
+                : `<p class="text-center text-red-500">${message}</p>`;
+            setTimeout(() => {
+                resultDiv.style.display = 'none';
+            }, 3000);
         }
 
         // Add the rejectApplication function to handle rejection
@@ -6353,7 +6416,11 @@
                 return;
             }
 
-            // Initialize FullCalendar
+            if (typeof FullCalendar === 'undefined') {
+                console.error('FullCalendar not loaded');
+                return;
+            }
+
             const calendar = new FullCalendar.Calendar(calendarEl, {
                 initialView: 'dayGridMonth',
                 headerToolbar: {
@@ -6361,66 +6428,128 @@
                     center: 'title',
                     right: 'dayGridMonth,dayGridWeek,dayGridDay'
                 },
-                height: 'auto', // This will make the calendar adjust to its content
-                events: [], // Start empty; populated by updateCalendarEvents
-                eventDidMount: function(info) {
-                    info.el.title = `${info.event.extendedProps.employeeName}\n${info.event.title}`;
+                height: '600px',
+                events: function(fetchInfo, successCallback, failureCallback) {
+                    database.ref('applications').once('value')
+                        .then(snapshot => {
+                            const applications = snapshot.val() || {};
+                            console.log('Applications fetched:', applications);
+
+                            const events = Object.entries(applications)
+                                .filter(([_, app]) => app.status === 'Approved')
+                                .map(([id, app]) => {
+                                    const endDate = new Date(app.leaveEndDate);
+                                    endDate.setDate(endDate.getDate() + 1);
+
+                                    const className = {
+                                        'Annual Leave (Normal)': 'leave-annual-normal',
+                                        'Annual Leave (黃金事假)': 'leave-annual-golden',
+                                        'Sick Leave': 'leave-sick',
+                                        '不可抗力因素': 'leave-force-majeure',
+                                        '離港': 'leave-overseas',
+                                        'Special Approve': 'leave-special-approve',
+                                        '活動請假': 'leave-activity'
+                                    }[app.leaveType] || 'leave-default';
+
+                                    return {
+                                        id: id,
+                                        title: `${app.employeeName} - ${app.leaveType}`,
+                                        start: app.leaveStartDate,
+                                        end: endDate.toISOString().split('T')[0],
+                                        className: className
+                                    };
+                                });
+
+                            console.log('Events generated:', events);
+                            successCallback(events);
+                        })
+                        .catch(error => {
+                            console.error('Error fetching applications:', error);
+                            failureCallback(error);
+                        });
                 },
-                displayEventTime: false,
                 eventDisplay: 'block',
-                eventOverlap: true,
-                dayMaxEvents: true, // Allow "more" link when too many events
-                firstDay: 1, // Start week on Monday
+                firstDay: 1
             });
 
-            // Store calendar instance globally
-            window.leaveCalendar = calendar;
-
-            // Initial render
-            calendar.render();
-
-            // Set up toggle functionality
-            const toggleBtn = document.getElementById('toggleCalendarView');
+            // Render only if container is visible
             const container = document.getElementById('calendar-container');
-            
-            if (toggleBtn && container) {
-                // Load saved state
-                const isCollapsed = localStorage.getItem('calendarViewCollapsed') === 'true';
-                
-                // Set initial state
-                if (isCollapsed) {
-                    container.classList.add('collapsed');
-                    toggleBtn.innerHTML = '<span class="collapse-icon">▼</span> Show Calendar View';
-                } else {
-                    container.classList.remove('collapsed');
-                    toggleBtn.innerHTML = '<span class="collapse-icon">▼</span> Hide Calendar View';
-                    // Re-render calendar when expanded
-                    setTimeout(() => calendar.render(), 0);
-                }
-
-                // Add click handler
-                toggleBtn.addEventListener('click', function() {
-                    const isCurrentlyCollapsed = container.classList.contains('collapsed');
-                    
-                    if (isCurrentlyCollapsed) {
-                        container.classList.remove('collapsed');
-                        toggleBtn.innerHTML = '<span class="collapse-icon">▼</span> Hide Calendar View';
-                        // Re-render calendar when expanded
-                        setTimeout(() => calendar.render(), 0);
-                    } else {
-                        container.classList.add('collapsed');
-                        toggleBtn.innerHTML = '<span class="collapse-icon">▼</span> Show Calendar View';
-                    }
-                    
-                    localStorage.setItem('calendarViewCollapsed', !isCurrentlyCollapsed);
-                });
+            if (!container.classList.contains('collapsed')) {
+                calendar.render();
             }
+
+            window.leaveCalendar = calendar;
         });
 
         // Add this to your existing JavaScript
         document.addEventListener('DOMContentLoaded', function() {
             initializeFilters();
         });
+
+        document.addEventListener('DOMContentLoaded', function() {
+            updateAttendanceTable();
+
+            // Add filter listeners
+            const dateFilter = document.getElementById('dateFilter');
+            const statusFilter = document.getElementById('statusFilter');
+            const employeeFilter = document.getElementById('attendanceEmployeeFilter');
+            const resetFilters = document.getElementById('resetFilters');
+
+            if (dateFilter) dateFilter.addEventListener('change', filterAttendanceTable);
+            if (statusFilter) statusFilter.addEventListener('change', filterAttendanceTable);
+            if (employeeFilter) employeeFilter.addEventListener('change', filterAttendanceTable);
+            if (resetFilters) resetFilters.addEventListener('click', resetAttendanceFilters);
+        });        
+
+        async function filterAttendanceTable() {
+            const dateFilter = document.getElementById('dateFilter').value;
+            const statusFilter = document.getElementById('statusFilter').value;
+            const employeeFilter = document.getElementById('attendanceEmployeeFilter').value;
+
+            const attendanceRef = database.ref('attendance');
+            const snapshot = await attendanceRef.once('value');
+            let records = snapshot.val() || {};
+
+            // Apply filters
+            let filteredRecords = Object.entries(records).filter(([_, record]) => {
+                let matches = true;
+                if (dateFilter && record.date !== dateFilter) matches = false;
+                if (statusFilter && record.status !== statusFilter) matches = false;
+                if (employeeFilter && record.employeeId !== employeeFilter) matches = false;
+                return matches;
+            });
+
+            // Sort by timestamp
+            filteredRecords.sort(([, a], [, b]) => new Date(b.timestamp) - new Date(a.timestamp));
+
+            // Update table
+            const tableBody = document.getElementById('allAttendanceTableBody');
+            tableBody.innerHTML = '';
+
+            filteredRecords.forEach(([id, record]) => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="px-6 py-4">${record.employeeName}</td>
+                    <td class="px-6 py-4">${record.role}</td>
+                    <td class="px-6 py-4">${record.date} ${record.time}</td>
+                    <td class="px-6 py-4">
+                        <span class="status-badge ${record.status.toLowerCase()}">${record.status}</span>
+                    </td>
+                    <td class="px-6 py-4">${record.ipAddress}</td>
+                    <td class="px-6 py-4">
+                        <button class="remove-btn-small" onclick="removeAttendanceRecord('${id}')">Remove</button>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            });
+        }
+
+        function resetAttendanceFilters() {
+            document.getElementById('dateFilter').value = '';
+            document.getElementById('statusFilter').value = '';
+            document.getElementById('attendanceEmployeeFilter').value = '';
+            updateAttendanceTable();
+        }
 
         // Modify the initializeFilters function
         function initializeFilters() {
@@ -6516,67 +6645,6 @@
                 tableBody.appendChild(row);
             });
         }
-
-        // Update the existing updateCalendarEvents function
-        function updateCalendarEvents(applications) {
-            if (!window.leaveCalendar) return;
-
-            // Clear existing events
-            window.leaveCalendar.removeAllEvents();
-
-            if (!applications) return;
-
-            // Convert applications to calendar events
-            const events = Object.entries(applications)
-                .filter(([_, app]) => app.status === 'Approved')
-                .map(([id, application]) => {
-                    let className = '';
-                    switch (application.leaveType) {
-                        case 'Annual Leave (Normal)':
-                            className = 'leave-annual-normal';
-                            break;
-                        case 'Annual Leave (黃金事假)':
-                            className = 'leave-annual-golden';
-                            break;
-                        case 'Sick Leave':
-                            className = 'leave-sick';
-                            break;
-                        case '不可抗力因素':
-                            className = 'leave-force-majeure';
-                            break;
-                        case '離港':
-                            className = 'leave-overseas';
-                            break;
-                        case 'Special Approve':
-                            className = 'leave-special-approve';
-                            break;
-                        case '活動請假':
-                            className = 'leave-activity';
-                            break;
-                    }
-
-                    // Add one day to end date to make it inclusive
-                    const endDate = new Date(application.leaveEndDate);
-                    endDate.setDate(endDate.getDate() + 1);
-
-                    return {
-                        id: id,
-                        title: `${application.employeeName} - ${application.leaveType}`,
-                        start: application.leaveStartDate,
-                        end: endDate.toISOString().split('T')[0],
-                        className: className,
-                        extendedProps: {
-                            employeeName: application.employeeName,
-                            leaveType: application.leaveType,
-                            status: application.status
-                        }
-                    };
-                });
-
-            // Add events to calendar
-            window.leaveCalendar.addEventSource(events);
-            window.leaveCalendar.render();
-        }
         
         function checkScrollPosition() {
             const scrollButton = document.getElementById('scroll-to-bottom-btn');
@@ -6667,7 +6735,37 @@
             }
         }
 
+        // Update the existing updateCalendarEvents function
+        function updateCalendarEvents(applications) {
+            if (!window.leaveCalendar) {
+                console.error('Calendar not initialized');
+                return;
+            }
+
+            window.leaveCalendar.removeAllEvents();
+            if (!applications) return;
+
+            const events = Object.entries(applications)
+                .filter(([_, app]) => app.status === 'Approved')
+                .map(([id, application]) => {
+                    const endDate = new Date(application.leaveEndDate);
+                    endDate.setDate(endDate.getDate() + 1);
+                    return {
+                        id: id,
+                        title: `${application.employeeName} - ${application.leaveType}`,
+                        start: application.leaveStartDate,
+                        end: endDate.toISOString().split('T')[0],
+                        className: `leave-${application.leaveType.toLowerCase().replace(/[^a-z0-9]/g, '-')}`
+                    };
+                });
+
+            window.leaveCalendar.addEventSource(events);
+            window.leaveCalendar.render();
+            console.log('Calendar events updated:', events);
+        }
+
     </script>
+
 </body>
 </html>
 
