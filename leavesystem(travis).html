@@ -1500,6 +1500,30 @@
             margin-bottom: 20px;
         }
 
+        .bg-red-600 {
+            background-color: #dc2626;
+        }
+
+        .hover\:bg-red-700:hover {
+            background-color: #b91c1c;
+        }
+
+        .focus\:ring-red-500:focus {
+            --tw-ring-color: rgba(239, 68, 68, 0.5);
+        }
+
+        #clearAttendanceBtn {
+            transition: all 0.2s ease-in-out;
+        }
+
+        #clearAttendanceBtn:hover {
+            transform: translateY(-1px);
+        }
+
+        #clearAttendanceBtn:active {
+            transform: translateY(1px);
+        }
+
         /* Animation for the table container */
         #agentListContainer {
             max-height: 400px; /* You can adjust this value to your preferred height */
@@ -1876,6 +1900,9 @@
                             <div class="flex items-end gap-10">
                                 <button id="resetFilters" class="mt-6 px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
                                     Reset Filters
+                                </button>
+                                <button id="clearAttendanceBtn" class="mt-6 px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+                                    Clear All Attendance Records
                                 </button>
                                 <button id="toggleAttendanceRecords" class="collapse-btn mt-6">
                                     <span class="collapse-icon">▼</span> Collapse Attendance Records
@@ -6248,6 +6275,70 @@
             }
         }
 
+        async function clearAllAttendanceRecords() {
+            try {
+                // Check if user is admin
+                const user = auth.currentUser;
+                if (!user) {
+                    throw new Error('You must be logged in to clear records');
+                }
+
+                const adminSnapshot = await database.ref(`users/${user.uid}/isAdmin`).once('value');
+                if (!adminSnapshot.val()) {
+                    throw new Error('Only administrators can clear attendance records');
+                }
+
+                // Show confirmation dialog with warning
+                const confirmMessage = 'WARNING: This will permanently delete ALL attendance records for ALL agents. This action cannot be undone.\n\nAre you sure you want to continue?';
+                
+                if (!confirm(confirmMessage)) {
+                    return;
+                }
+
+                // Clear all attendance records
+                await database.ref('attendance').remove();
+
+                // Clear the table in the UI
+                const tableBody = document.getElementById('allAttendanceTableBody');
+                if (tableBody) {
+                    tableBody.innerHTML = `
+                        <tr>
+                            <td colspan="6" class="px-6 py-4 text-center text-gray-500">
+                                No attendance records found
+                            </td>
+                        </tr>
+                    `;
+                }
+
+                // Show success message
+                showSyncStatus('All attendance records have been cleared successfully');
+
+                // Reset filters
+                const dateFilter = document.getElementById('dateFilter');
+                const statusFilter = document.getElementById('statusFilter');
+                const employeeFilter = document.getElementById('attendanceEmployeeFilter');
+
+                if (dateFilter) dateFilter.value = '';
+                if (statusFilter) statusFilter.value = '';
+                if (employeeFilter) employeeFilter.value = '';
+
+            } catch (error) {
+                console.error('Error clearing attendance records:', error);
+                alert('Error clearing attendance records: ' + error.message);
+            }
+        }
+
+        // Add this to your existing DOMContentLoaded event listener
+        document.addEventListener('DOMContentLoaded', function() {
+            const clearAttendanceBtn = document.getElementById('clearAttendanceBtn');
+            if (clearAttendanceBtn) {
+                clearAttendanceBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    clearAllAttendanceRecords();
+                });
+            }
+        });
+        
         // Add this after your existing event listeners
         document.addEventListener('DOMContentLoaded', function() {
             // Leave type change handler for admin form
