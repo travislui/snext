@@ -3621,45 +3621,59 @@
             // Get today's date in YYYY-MM-DD format
             const today = new Date().toISOString().split('T')[0];
 
-            // Reference to the attendance records
+            // Reference to all attendance records
             const attendanceRef = database.ref('attendance');
             
-            // Listen for changes in attendance records
             attendanceRef.on('value', (snapshot) => {
                 tableBody.innerHTML = ''; // Clear existing records
                 
-                let todayRecord = null;
                 const records = snapshot.val() || {};
+                let todayRecord = null;
 
-                // Search through all records to find today's record for current user
-                Object.values(records).forEach(userRecords => {
-                    Object.values(userRecords).forEach(record => {
-                        if (record.employeeId === currentUser.id && record.date === today) {
-                            todayRecord = record;
-                        }
-                    });
+                // Find today's record for the current user
+                Object.entries(records).forEach(([userId, userRecords]) => {
+                    if (userId === currentUser.uid) {
+                        Object.entries(userRecords).forEach(([recordId, record]) => {
+                            const recordDate = new Date(record.timestamp).toISOString().split('T')[0];
+                            if (recordDate === today) {
+                                todayRecord = record;
+                            }
+                        });
+                    }
                 });
 
                 if (todayRecord) {
                     const recordTime = new Date(todayRecord.timestamp);
+                    const formattedTime = recordTime.toLocaleTimeString();
+                    const formattedDate = recordTime.toLocaleDateString();
+
                     const row = document.createElement('tr');
                     row.innerHTML = `
                         <td class="px-6 py-4 whitespace-nowrap">
                             <div class="text-sm font-medium text-gray-900">
-                                ${currentUser.name || 'N/A'}
+                                ${currentUser.name}
                             </div>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
                             <div class="text-sm text-gray-900">
-                                ${todayRecord.date} ${todayRecord.time}
+                                ${currentUser.role}
                             </div>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
-                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                                ${todayRecord.status === 'Punctual' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                            <div class="text-sm text-gray-900">
+                                ${formattedDate} ${formattedTime}
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="status-badge ${todayRecord.status.toLowerCase()}">
                                 ${todayRecord.status}
                                 ${todayRecord.amount > 0 ? ` (-$${todayRecord.amount})` : ''}
                             </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-900">
+                                ${todayRecord.ipAddress || 'N/A'}
+                            </div>
                         </td>
                     `;
                     tableBody.appendChild(row);
@@ -3667,7 +3681,7 @@
                     // Show "No record for today" message
                     const noRecordRow = document.createElement('tr');
                     noRecordRow.innerHTML = `
-                        <td colspan="3" class="px-6 py-4 text-center text-gray-500">
+                        <td colspan="5" class="px-6 py-4 text-center text-gray-500">
                             No attendance record for today
                         </td>
                     `;
