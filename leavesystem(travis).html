@@ -3621,24 +3621,24 @@
             // Get today's date in YYYY-MM-DD format
             const today = new Date().toISOString().split('T')[0];
 
-            // Reference to all attendance records
-            const attendanceRef = database.ref('attendance');
+            // Reference to the current user's attendance records
+            const attendanceRef = database.ref(`attendance/${currentUser.uid}`);
             
+            // Remove any existing listeners
+            attendanceRef.off('value');
+            
+            // Set up a new listener
             attendanceRef.on('value', (snapshot) => {
                 tableBody.innerHTML = ''; // Clear existing records
                 
                 const records = snapshot.val() || {};
                 let todayRecord = null;
 
-                // Find today's record for the current user
-                Object.entries(records).forEach(([userId, userRecords]) => {
-                    if (userId === currentUser.uid) {
-                        Object.entries(userRecords).forEach(([recordId, record]) => {
-                            const recordDate = new Date(record.timestamp).toISOString().split('T')[0];
-                            if (recordDate === today) {
-                                todayRecord = record;
-                            }
-                        });
+                // Find today's record
+                Object.entries(records).forEach(([recordId, record]) => {
+                    const recordDate = new Date(record.timestamp).toISOString().split('T')[0];
+                    if (recordDate === today) {
+                        todayRecord = record;
                     }
                 });
 
@@ -3656,11 +3656,6 @@
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
                             <div class="text-sm text-gray-900">
-                                ${currentUser.role}
-                            </div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm text-gray-900">
                                 ${formattedDate} ${formattedTime}
                             </div>
                         </td>
@@ -3670,18 +3665,13 @@
                                 ${todayRecord.amount > 0 ? ` (-$${todayRecord.amount})` : ''}
                             </span>
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm text-gray-900">
-                                ${todayRecord.ipAddress || 'N/A'}
-                            </div>
-                        </td>
                     `;
                     tableBody.appendChild(row);
                 } else {
                     // Show "No record for today" message
                     const noRecordRow = document.createElement('tr');
                     noRecordRow.innerHTML = `
-                        <td colspan="5" class="px-6 py-4 text-center text-gray-500">
+                        <td colspan="3" class="px-6 py-4 text-center text-gray-500">
                             No attendance record for today
                         </td>
                     `;
