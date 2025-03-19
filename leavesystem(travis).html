@@ -3666,9 +3666,18 @@
                     throw new Error('You must be logged in to take attendance');
                 }
 
-                // Get employee data
-                const employeeSnapshot = await database.ref(`employees/${user.uid}`).once('value');
-                const employeeData = employeeSnapshot.val();
+                // Find employee by UID
+                const employeesRef = database.ref('employees');
+                const employeesSnapshot = await employeesRef.orderByChild('uid').equalTo(user.uid).once('value');
+                
+                let employeeData = null;
+                let employeeId = null;
+
+                employeesSnapshot.forEach((childSnapshot) => {
+                    employeeData = childSnapshot.val();
+                    employeeId = childSnapshot.key;
+                });
+
                 if (!employeeData) {
                     throw new Error('Employee not found');
                 }
@@ -3682,7 +3691,7 @@
                 const attendanceRef = database.ref('attendance');
                 const existingAttendanceSnapshot = await attendanceRef
                     .orderByChild('employeeId')
-                    .equalTo(user.uid)
+                    .equalTo(employeeId)  // Use employeeId instead of user.uid
                     .once('value');
 
                 let existingRecord = null;
@@ -3696,31 +3705,42 @@
                 });
 
                 if (existingRecord) {
-                    // Record already exists for today, show message and stop
                     showScanResult('Attendance already recorded for today', false);
                     stopScanner();
                     return;
                 }
 
-                // Get user's IP address (simplified, you might need an API for accuracy)
+                // Get user's IP address
                 const ipResponse = await fetch('https://api.ipify.org?format=json');
                 const ipData = await ipResponse.json();
                 const ipAddress = ipData.ip;
 
-                // Determine status based on time (assuming 9:00 AM cutoff)
+                // Determine status based on time
                 const cutoffTime = new Date();
-                cutoffTime.setHours(9, 0, 0, 0);
+                cutoffTime.setHours(9, 30, 0, 0);  // Changed to 9:30 AM to match your penalty rules
                 const status = now > cutoffTime ? 'Late' : 'Punctual';
+
+                // Calculate late minutes and amount if late
+                let lateMinutes = 0;
+                let amount = 0;
+
+                if (status === 'Late') {
+                    lateMinutes = Math.floor((now - cutoffTime) / (1000 * 60));
+                    const lateInfo = calculateLateStatus(now.toISOString(), employeeData.role);
+                    amount = lateInfo.amount;
+                }
 
                 // Create new attendance record
                 const attendanceData = {
-                    employeeId: user.uid,
+                    employeeId: employeeId,  // Use employeeId instead of user.uid
                     employeeName: employeeData.name,
                     role: employeeData.role,
                     date: currentDate,
                     time: currentTime,
                     timestamp: now.toISOString(),
                     status: status,
+                    lateMinutes: lateMinutes,
+                    amount: amount,
                     ipAddress: ipAddress
                 };
 
