@@ -3618,42 +3618,30 @@
             const tableBody = document.getElementById('attendanceTableBody');
             if (!tableBody || !currentUser) return;
 
-            // Reference to the current user's attendance records
+            // Get today's date in YYYY-MM-DD format
+            const today = new Date().toISOString().split('T')[0];
+
+            // Reference to the attendance records
             const attendanceRef = database.ref('attendance');
             
             // Listen for changes in attendance records
             attendanceRef.on('value', (snapshot) => {
                 tableBody.innerHTML = ''; // Clear existing records
                 
-                const records = snapshot.val();
-                if (!records) {
-                    // Show "No records" message if there are no records
-                    const noRecordsRow = document.createElement('tr');
-                    noRecordsRow.innerHTML = `
-                        <td colspan="3" class="px-6 py-4 text-center text-gray-500">
-                            No attendance records found
-                        </td>
-                    `;
-                    tableBody.appendChild(noRecordsRow);
-                    return;
-                }
-
-                // Get today's date
-                const today = new Date().toISOString().split('T')[0];
-
-                // Find today's record
                 let todayRecord = null;
-                Object.values(records).forEach(record => {
-                    if (record.employeeId === currentUser.id && record.date === today) {
-                        todayRecord = record;
-                    }
+                const records = snapshot.val() || {};
+
+                // Search through all records to find today's record for current user
+                Object.values(records).forEach(userRecords => {
+                    Object.values(userRecords).forEach(record => {
+                        if (record.employeeId === currentUser.id && record.date === today) {
+                            todayRecord = record;
+                        }
+                    });
                 });
 
                 if (todayRecord) {
                     const recordTime = new Date(todayRecord.timestamp);
-                    const formattedTime = recordTime.toLocaleTimeString();
-                    const formattedDate = recordTime.toLocaleDateString();
-                    
                     const row = document.createElement('tr');
                     row.innerHTML = `
                         <td class="px-6 py-4 whitespace-nowrap">
@@ -3663,7 +3651,7 @@
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
                             <div class="text-sm text-gray-900">
-                                ${formattedDate} ${formattedTime}
+                                ${todayRecord.date} ${todayRecord.time}
                             </div>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
