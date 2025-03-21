@@ -3343,7 +3343,7 @@
                 }
 
                 // Check remaining leaves based on leave type
-                if (leaveType === 'Annual Leave (Normal)') {
+                if (leaveType === 'Annual Leave (Normal)' || leaveType === 'Annual Leave (黃金事假)') {
                     if (employeeData.remainingNormalLeaves <= 0) {
                         alert('You have no remaining Annual Leaves (Normal).');
                         return;
@@ -3352,14 +3352,15 @@
                         alert(`You have only ${employeeData.remainingNormalLeaves} Annual Leaves (Normal) remaining. Cannot apply for ${leaveDays} days.`);
                         return;
                     }
-                } else if (leaveType === 'Annual Leave (黃金事假)') {
-                    if (employeeData.remainingGoldenLeaves <= 0) {
-                        alert('You have no remaining Annual Leaves (黃金事假).');
-                        return;
-                    }
-                    if (leaveDays > employeeData.remainingGoldenLeaves) {
-                        alert(`You have only ${employeeData.remainingGoldenLeaves} Annual Leaves (黃金事假) remaining. Cannot apply for ${leaveDays} days.`);
-                        return;
+                    if (leaveType === 'Annual Leave (黃金事假)') {
+                        if (employeeData.remainingGoldenLeaves <= 0) {
+                            alert('You have no remaining Annual Leaves (黃金事假).');
+                            return;
+                        }
+                        if (leaveDays > employeeData.remainingGoldenLeaves) {
+                            alert(`You have only ${employeeData.remainingGoldenLeaves} Annual Leaves (黃金事假) remaining. Cannot apply for ${leaveDays} days.`);
+                            return;
+                        }
                     }
                 }
 
