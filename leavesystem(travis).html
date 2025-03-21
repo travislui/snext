@@ -6119,6 +6119,13 @@
                     throw new Error('Employee not found');
                 }
 
+                // Calculate leave days
+                const start = new Date(leaveStartDate);
+                const end = new Date(leaveEndDate);
+                const leaveDays = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+
+                let adjustedLeaveDays = leaveDays; // Days that count against quota
+
                 // Special handling for 活動請假
                 if (leaveType === '活動請假') {
                     let amount = 100; // Base amount
@@ -6181,25 +6188,23 @@
                     }
                 }
 
-                // Calculate leave days
-                const start = new Date(leaveStartDate);
-                const end = new Date(leaveEndDate);
-                const leaveDays = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
-
                 // Check for Mondays in leave period for Annual Leaves
                 if (leaveType.includes('Annual Leave')) {
                     const mondayCount = countMondaysInDateRange(new Date(leaveStartDate), new Date(leaveEndDate));
                     
                     if (mondayCount > 0) {
-                        // Get current Monday leave count
                         const currentMondayLeaves = employeeData.usedMondayLeaves || 0;
                         const newTotalMondays = currentMondayLeaves + mondayCount;
 
+                        let excessMondays = 0;
                         if (newTotalMondays > 3) {
-                            // Calculate penalties for excess Mondays
-                            const excessMondays = newTotalMondays - Math.max(3, currentMondayLeaves);
-                            
-                            // Add penalties for each excess Monday
+                            excessMondays = newTotalMondays - Math.max(3, currentMondayLeaves);
+                        } else if (currentMondayLeaves >= 3) {
+                            excessMondays = mondayCount;
+                        }
+
+                        if (excessMondays > 0) {
+                            // Add penalties for excess Mondays
                             for (let i = 0; i < excessMondays; i++) {
                                 const penaltyData = {
                                     employeeId: employeeId,
@@ -6216,42 +6221,20 @@
                                     lastModified: new Date().toISOString(),
                                     createdBy: 'admin'
                                 };
-
-                                // Add penalty to Firebase
-                                const penaltyRef = database.ref('penalties');
-                                await penaltyRef.push(penaltyData);
+                                await database.ref('penalties').push(penaltyData);
                             }
 
-                            // Show warning about penalties
-                            alert(`This leave application includes ${mondayCount} Monday(s). The employee has already used ${currentMondayLeaves} Monday leaves. A penalty of $100 will be added for each excess Monday (${excessMondays} penalties added).`);
-                        } else if (currentMondayLeaves >= 3) {
-                            // All new Mondays will be penalized
-                            for (let i = 0; i < mondayCount; i++) {
-                                const penaltyData = {
-                                    employeeId: employeeId,
-                                    employeeName: employeeData.name,
-                                    employeeRole: employeeData.role,
-                                    date: formatDate(new Date()),
-                                    reason: 'Additional Monday Leave After Limit',
-                                    minutes: 0,
-                                    amount: 100,
-                                    baseAmount: 100,
-                                    deadline: formatDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)),
-                                    status: 'Not Submitted',
-                                    createdAt: new Date().toISOString(),
-                                    lastModified: new Date().toISOString(),
-                                    createdBy: 'admin'
-                                };
+                            // Adjust leave days that count against quota
+                            adjustedLeaveDays = leaveDays - excessMondays;
 
-                                // Add penalty to Firebase
-                                const penaltyRef = database.ref('penalties');
-                                await penaltyRef.push(penaltyData);
+                            // Show appropriate message
+                            if (currentMondayLeaves >= 3) {
+                                alert(`This leave includes ${mondayCount} Monday(s). All will be penalized at $100 each as the 3-Monday limit is reached.`);
+                            } else {
+                                alert(`This leave includes ${mondayCount} Monday(s). ${excessMondays} will be penalized at $100 each as they exceed the 3-Monday limit.`);
                             }
-
-                            alert(`This leave application includes ${mondayCount} Monday(s). The employee has already used their 3 Monday leaves. A penalty of $100 will be added for each Monday (${mondayCount} penalties added).`);
                         }
 
-                        // Update the Monday leave count for the employee
                         await database.ref(`employees/${employeeId}`).update({
                             usedMondayLeaves: newTotalMondays
                         });
@@ -6266,10 +6249,10 @@
                     leaveStartDate: leaveStartDate,
                     leaveEndDate: leaveEndDate,
                     leaveType: leaveType,
-                    leaveDays: leaveDays,
+                    leaveDays: leaveDays, // Keep total days for record
                     status: 'Approved',
                     proof: proofDataUrl,
-                    createdAt: new Date().toISOString(), // Add exact timestamp
+                    createdAt: new Date().toISOString(),
                     createdBy: 'admin'
                 };
 
@@ -6277,17 +6260,17 @@
                 const applicationsRef = database.ref('applications');
                 await applicationsRef.push(newApplication);
 
-                // Update employee's remaining leaves if necessary
+                // Update employee's remaining leaves using adjusted days
                 if (leaveType.includes('Annual Leave')) {
                     const updates = {};
                     if (leaveType === 'Annual Leave (Normal)' && employeeData.remainingNormalLeaves !== 999) {
-                        updates.remainingNormalLeaves = employeeData.remainingNormalLeaves - leaveDays;
+                        updates.remainingNormalLeaves = employeeData.remainingNormalLeaves - adjustedLeaveDays;
                     } else if (leaveType === 'Annual Leave (黃金事假)') {
                         if (employeeData.remainingGoldenLeaves !== 999) {
-                            updates.remainingGoldenLeaves = employeeData.remainingGoldenLeaves - leaveDays;
+                            updates.remainingGoldenLeaves = employeeData.remainingGoldenLeaves - adjustedLeaveDays;
                         }
                         if (employeeData.remainingNormalLeaves !== 999) {
-                            updates.remainingNormalLeaves = employeeData.remainingNormalLeaves - leaveDays;
+                            updates.remainingNormalLeaves = employeeData.remainingNormalLeaves - adjustedLeaveDays;
                         }
                     }
 
