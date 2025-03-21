@@ -367,20 +367,6 @@
             margin-top: 5px;
         }
 
-        .adjust-amount-btn {
-            background-color: #2196F3;
-            color: white;
-            border: none;
-            border-radius: 3px;
-            cursor: pointer;
-            padding: 5px 10px;
-            font-size: 12px;
-        }
-
-        .adjust-amount-btn:hover {
-            background-color: #1976D2;
-        }
-
         .leave-activity {
             background-color: #FF69B4 !important; /* Hot pink for activity leave */
             border-color: #FF69B4 !important;
@@ -3280,64 +3266,17 @@
                     const currentMondayLeaves = snapshot.val()?.usedMondayLeaves || 0;
 
                     if (currentMondayLeaves >= 3) {
-                        // Already at or over limit, calculate penalty
-                        let penaltyAmount = 100; // Base amount
-
-                        // Apply role multiplier
-                        switch (currentUser.role) {
-                            case 'AUM/UM':
-                                penaltyAmount *= 1.5;
-                                break;
-                            case 'SUM':
-                                penaltyAmount *= 2;
-                                break;
-                            case 'BM':
-                                penaltyAmount *= 3;
-                                break;
-                            case 'DM':
-                                penaltyAmount *= 4;
-                                break;
-                            case 'DD':
-                                penaltyAmount *= 6;
-                                break;
+                        // Already at or over limit
+                        if (!confirm(`Warning: You have already used ${currentMondayLeaves} Monday leaves. You will be charged $100 for each additional Monday (${mondayCount} Mondays = $${mondayCount * 100}). Do you want to continue?`)) {
+                            return;
                         }
-
-                        // Round penalty amount to nearest integer
-                        penaltyAmount = Math.round(penaltyAmount);
-
-                        // Create penalty record for each additional Monday
-                        for (let i = 0; i < mondayCount; i++) {
-                            const penaltyData = {
-                                employeeId: currentUser.id,
-                                employeeName: currentUser.name,
-                                employeeRole: currentUser.role,
-                                date: formatDate(applyDate),
-                                reason: 'Additional Monday Leave After Limit',
-                                minutes: 0,
-                                amount: penaltyAmount,
-                                baseAmount: 100,
-                                deadline: formatDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)),
-                                status: 'Not Submitted',
-                                createdAt: new Date().toISOString(),
-                                lastModified: new Date().toISOString()
-                            };
-
-                            // Add penalty to Firebase
-                            const penaltyRef = database.ref('penalties');
-                            await penaltyRef.push(penaltyData);
-                        }
-
-                        // Update used Monday leaves count
-                        updates.usedMondayLeaves = currentMondayLeaves + mondayCount;
-
-                        alert(`You have exceeded the 3-Monday limit. A penalty of $${penaltyAmount} will be added for each additional Monday (${mondayCount} Mondays = $${penaltyAmount * mondayCount} total penalty).`);
                     } else {
                         const newTotal = currentMondayLeaves + mondayCount;
-                        updates.usedMondayLeaves = newTotal;
-
                         if (newTotal > 3) {
                             const extraMondays = newTotal - 3;
-                            alert(`This will exceed your 3-Monday limit. ${extraMondays} Monday(s) will incur penalties.`);
+                            if (!confirm(`Warning: This will exceed your 3-Monday limit. You will be charged $100 for each additional Monday (${extraMondays} Mondays = $${extraMondays * 100}). Do you want to continue?`)) {
+                                return;
+                            }
                         }
                     }
                 }
@@ -5428,10 +5367,6 @@
                                         class="remove-btn-small">
                                     Remove
                                 </button>
-                                <button onclick="adjustPenaltyAmount('${id}')" 
-                                        class="adjust-amount-btn">
-                                    Adjust Amount
-                                </button>
                             </div>
                         </div>
                     </td>
@@ -5738,49 +5673,6 @@
             } catch (error) {
                 console.error('Error rejecting penalty:', error);
                 alert('Error rejecting penalty: ' + error.message);
-            }
-        }
-
-        async function adjustPenaltyAmount(penaltyId) {
-            try {
-                // Check if user is authenticated and is admin
-                const user = auth.currentUser;
-                if (!user) {
-                    throw new Error('You must be logged in to adjust penalty amounts');
-                }
-
-                const adminSnapshot = await database.ref(`users/${user.uid}/isAdmin`).once('value');
-                if (!adminSnapshot.val()) {
-                    throw new Error('Only administrators can adjust penalty amounts');
-                }
-
-                // Prompt for the new amount
-                const newAmount = prompt('Enter the new amount for this penalty:');
-                if (newAmount === null) {
-                    return; // User cancelled
-                }
-
-                const parsedAmount = parseFloat(newAmount);
-                if (isNaN(parsedAmount) || parsedAmount < 0) {
-                    throw new Error('Invalid amount. Please enter a non-negative number.');
-                }
-
-                // Update the penalty amount in Firebase
-                await database.ref(`penalties/${penaltyId}`).update({
-                    amount: parsedAmount,
-                    lastModified: new Date().toISOString()
-                });
-
-                // Refresh the penalty tables on both admin and agent pages
-                loadAllPenalties();
-                if (currentUser && currentUser.id) {
-                    loadEmployeePenalties(currentUser.id);
-                }
-
-                showSyncStatus('Penalty amount adjusted successfully');
-            } catch (error) {
-                console.error('Error adjusting penalty amount:', error);
-                alert('Error adjusting penalty amount: ' + error.message);
             }
         }
 
