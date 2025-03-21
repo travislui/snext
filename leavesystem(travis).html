@@ -1389,6 +1389,12 @@
             background-color: #f8f9fa;
         }
 
+        .leave-applied-leaves-for-monday {
+            background-color: #FF9800 !important; /* Orange */
+            border-color: #FF9800 !important;
+            color: white !important;
+        }
+
         #calendar-legend .flex {
             display: flex;
             flex-wrap: wrap;
@@ -6083,7 +6089,7 @@
                 const applyDate = document.getElementById('admin-apply-date').value;
                 const leaveStartDate = document.getElementById('admin-leave-start-date').value;
                 const leaveEndDate = document.getElementById('admin-leave-end-date').value;
-                const leaveType = document.getElementById('admin-leave-type').value;
+                let leaveType = document.getElementById('admin-leave-type').value;
                 
                 if (!employeeId || !applyDate || !leaveStartDate || !leaveEndDate || !leaveType) {
                     throw new Error('Please fill in all required fields');
@@ -6099,34 +6105,16 @@
 
                 // Special handling for 活動請假
                 if (leaveType === '活動請假') {
-                    let amount = 100; // Base amount
-
-                    // Apply role multiplier
+                    let amount = 100;
                     switch (employeeData.role) {
-                        case 'AUM/UM':
-                            amount *= 1.5;
-                            break;
-                        case 'SUM':
-                            amount *= 2;
-                            break;
-                        case 'BM':
-                            amount *= 3;
-                            break;
-                        case 'DM':
-                            amount *= 4;
-                            break;
-                        case 'DD':
-                            amount *= 6;
-                            break;
-                        default:
-                            // No multiplier for regular agents
-                            break;
+                        case 'AUM/UM': amount *= 1.5; break;
+                        case 'SUM': amount *= 2; break;
+                        case 'BM': amount *= 3; break;
+                        case 'DM': amount *= 4; break;
+                        case 'DD': amount *= 6; break;
                     }
-
-                    // Round amount to nearest integer
                     amount = Math.round(amount);
 
-                    // Create penalty record
                     const penaltyData = {
                         employeeId: employeeId,
                         employeeName: employeeData.name,
@@ -6143,16 +6131,11 @@
                         createdBy: 'admin'
                     };
 
-                    // Add penalty to Firebase
-                    const penaltyRef = database.ref('penalties');
-                    await penaltyRef.push(penaltyData);
+                    await database.ref('penalties').push(penaltyData);
                 }
 
                 let proofDataUrl = null;
-                if (leaveType === 'Sick Leave' || 
-                    leaveType === '不可抗力因素' || 
-                    leaveType === '離港' ||
-                    leaveType === 'Special Approve') {
+                if (leaveType === 'Sick Leave' || leaveType === '不可抗力因素' || leaveType === '離港' || leaveType === 'Special Approve') {
                     const proofFile = document.getElementById('admin-proof-file').files[0];
                     if (proofFile) {
                         proofDataUrl = await convertFileToBase64(proofFile);
@@ -6164,75 +6147,62 @@
                 const end = new Date(leaveEndDate);
                 const leaveDays = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
 
-                // Check for Mondays in leave period for Annual Leaves
-                if (leaveType.includes('Annual Leave')) {
-                    const mondayCount = countMondaysInDateRange(new Date(leaveStartDate), new Date(leaveEndDate));
-                    
+                // Handle Monday leave limit and penalties for Annual Leaves
+                if (leaveType === 'Annual Leave (Normal)' || leaveType === 'Annual Leave (黃金事假)') {
+                    const mondayCount = countMondaysInDateRange(start, end);
+                    const currentMondayLeaves = employeeData.usedMondayLeaves || 0;
+                    const newTotalMondays = currentMondayLeaves + mondayCount;
+
                     if (mondayCount > 0) {
-                        // Get current Monday leave count
-                        const currentMondayLeaves = employeeData.usedMondayLeaves || 0;
-                        const newTotalMondays = currentMondayLeaves + mondayCount;
+                        let updates = {};
+                        updates.usedMondayLeaves = newTotalMondays;
 
-                        if (newTotalMondays > 3) {
-                            // Calculate penalties for excess Mondays
-                            const excessMondays = newTotalMondays - Math.max(3, currentMondayLeaves);
+                        if (newTotalMondays >= 3) {
+                            // Change leave type to "Applied Leaves for 區會 (Monday)" when reaching/exceeding 3 Mondays
+                            leaveType = 'Applied Leaves for 區會 (Monday)';
                             
-                            // Add penalties for each excess Monday
-                            for (let i = 0; i < excessMondays; i++) {
-                                const penaltyData = {
-                                    employeeId: employeeId,
-                                    employeeName: employeeData.name,
-                                    employeeRole: employeeData.role,
-                                    date: formatDate(new Date()),
-                                    reason: 'Additional Monday Leave After Limit',
-                                    minutes: 0,
-                                    amount: 100,
-                                    baseAmount: 100,
-                                    deadline: formatDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)),
-                                    status: 'Not Submitted',
-                                    createdAt: new Date().toISOString(),
-                                    lastModified: new Date().toISOString(),
-                                    createdBy: 'admin'
-                                };
-
-                                // Add penalty to Firebase
-                                const penaltyRef = database.ref('penalties');
-                                await penaltyRef.push(penaltyData);
+                            if (newTotalMondays > 3) {
+                                // Add penalties for Mondays beyond 3
+                                const excessMondays = newTotalMondays - 3;
+                                for (let i = 0; i < excessMondays; i++) {
+                                    const penaltyData = {
+                                        employeeId: employeeId,
+                                        employeeName: employeeData.name,
+                                        employeeRole: employeeData.role,
+                                        date: formatDate(new Date()),
+                                        reason: 'Additional Monday Leave After Limit',
+                                        minutes: 0,
+                                        amount: 100,
+                                        baseAmount: 100,
+                                        deadline: formatDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)),
+                                        status: 'Not Submitted',
+                                        createdAt: new Date().toISOString(),
+                                        lastModified: new Date().toISOString(),
+                                        createdBy: 'admin'
+                                    };
+                                    await database.ref('penalties').push(penaltyData);
+                                }
+                                alert(`This leave application includes ${mondayCount} Monday(s). Total Mondays will be ${newTotalMondays}. It has been reclassified as "Applied Leaves for 區會 (Monday)" and ${excessMondays} penalty(ies) of $100 each will be added for exceeding 3 Mondays. No Annual Leave balance will be deducted.`);
+                            } else {
+                                alert(`This leave application includes ${mondayCount} Monday(s). Total Mondays will be ${newTotalMondays}. It has been reclassified as "Applied Leaves for 區會 (Monday)" to preserve Annual Leave balances.`);
                             }
-
-                            // Show warning about penalties
-                            alert(`This leave application includes ${mondayCount} Monday(s). The employee has already used ${currentMondayLeaves} Monday leaves. A penalty of $100 will be added for each excess Monday (${excessMondays} penalties added).`);
-                        } else if (currentMondayLeaves >= 3) {
-                            // All new Mondays will be penalized
-                            for (let i = 0; i < mondayCount; i++) {
-                                const penaltyData = {
-                                    employeeId: employeeId,
-                                    employeeName: employeeData.name,
-                                    employeeRole: employeeData.role,
-                                    date: formatDate(new Date()),
-                                    reason: 'Additional Monday Leave After Limit',
-                                    minutes: 0,
-                                    amount: 100,
-                                    baseAmount: 100,
-                                    deadline: formatDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)),
-                                    status: 'Not Submitted',
-                                    createdAt: new Date().toISOString(),
-                                    lastModified: new Date().toISOString(),
-                                    createdBy: 'admin'
-                                };
-
-                                // Add penalty to Firebase
-                                const penaltyRef = database.ref('penalties');
-                                await penaltyRef.push(penaltyData);
+                        } else {
+                            // Deduct leaves normally if total Mondays will be less than 3
+                            if (leaveType === 'Annual Leave (Normal)' && employeeData.remainingNormalLeaves !== 999) {
+                                updates.remainingNormalLeaves = employeeData.remainingNormalLeaves - leaveDays;
+                            } else if (leaveType === 'Annual Leave (黃金事假)') {
+                                if (employeeData.remainingGoldenLeaves !== 999) {
+                                    updates.remainingGoldenLeaves = employeeData.remainingGoldenLeaves - leaveDays;
+                                }
+                                if (employeeData.remainingNormalLeaves !== 999) {
+                                    updates.remainingNormalLeaves = employeeData.remainingNormalLeaves - leaveDays;
+                                }
                             }
-
-                            alert(`This leave application includes ${mondayCount} Monday(s). The employee has already used their 3 Monday leaves. A penalty of $100 will be added for each Monday (${mondayCount} penalties added).`);
                         }
 
-                        // Update the Monday leave count for the employee
-                        await database.ref(`employees/${employeeId}`).update({
-                            usedMondayLeaves: newTotalMondays
-                        });
+                        if (Object.keys(updates).length > 0) {
+                            await database.ref(`employees/${employeeId}`).update(updates);
+                        }
                     }
                 }
 
@@ -6247,43 +6217,35 @@
                     leaveDays: leaveDays,
                     status: 'Approved',
                     proof: proofDataUrl,
-                    createdAt: new Date().toISOString(), // Add exact timestamp
+                    createdAt: new Date().toISOString(),
                     createdBy: 'admin'
                 };
 
                 // Add to Firebase
-                const applicationsRef = database.ref('applications');
-                await applicationsRef.push(newApplication);
-
-                // Update employee's remaining leaves if necessary
-                if (leaveType.includes('Annual Leave')) {
-                    const updates = {};
-                    if (leaveType === 'Annual Leave (Normal)' && employeeData.remainingNormalLeaves !== 999) {
-                        updates.remainingNormalLeaves = employeeData.remainingNormalLeaves - leaveDays;
-                    } else if (leaveType === 'Annual Leave (黃金事假)') {
-                        if (employeeData.remainingGoldenLeaves !== 999) {
-                            updates.remainingGoldenLeaves = employeeData.remainingGoldenLeaves - leaveDays;
-                        }
-                        if (employeeData.remainingNormalLeaves !== 999) {
-                            updates.remainingNormalLeaves = employeeData.remainingNormalLeaves - leaveDays;
-                        }
-                    }
-
-                    if (Object.keys(updates).length > 0) {
-                        await database.ref(`employees/${employeeId}`).update(updates);
-                    }
-                }
+                await database.ref('applications').push(newApplication);
 
                 // Clear form
                 document.getElementById('admin-leave-form').reset();
                 
-                // Show success message
                 showSyncStatus('Leave record added successfully');
 
             } catch (error) {
                 console.error('Error adding leave record:', error);
                 alert('Error adding leave record: ' + error.message);
             }
+        }
+
+        // Helper function (ensure it exists in your code)
+        function countMondaysInDateRange(start, end) {
+            let count = 0;
+            let current = new Date(start);
+            while (current <= end) {
+                if (current.getDay() === 1) { // Monday
+                    count++;
+                }
+                current.setDate(current.getDate() + 1);
+            }
+            return count;
         }
 
         async function clearAllAttendanceRecords() {
@@ -6792,48 +6754,66 @@
             const sortedApplications = Object.entries(applications)
                 .sort(([, a], [, b]) => new Date(b.applyDate) - new Date(a.applyDate));
 
-            sortedApplications.forEach(([id, application]) => {
-                const row = document.createElement('tr');
-                
-                // Format dates
-                const applyDateTime = new Date(application.createdAt || application.applyDate);
-                const startDate = new Date(application.leaveStartDate);
-                const endDate = new Date(application.leaveEndDate);
+            Promise.all(
+                sortedApplications.map(async ([id, application]) => {
+                    const row = document.createElement('tr');
 
-                const formattedApplyDateTime = `${formatDate(applyDateTime)} ${formatTime(applyDateTime)}`;
-                const formattedStartDate = formatDate(startDate);
-                const formattedEndDate = formatDate(endDate);
+                    const applyDateTime = new Date(application.createdAt || application.applyDate);
+                    const startDate = new Date(application.leaveStartDate);
+                    const endDate = new Date(application.leaveEndDate);
 
-                row.innerHTML = `
-                    <td>${application.employeeName}</td>
-                    <td>${formattedApplyDateTime}</td>
-                    <td>${formattedStartDate}</td>
-                    <td>${formattedEndDate}</td>
-                    <td>${application.leaveType}</td>
-                    <td>
-                        <span class="status-${application.status.toLowerCase()}">${application.status}</span>
-                        ${application.status === 'Approved' ? `
-                            <button type="button" class="reject-btn" onclick="rejectApplication('${id}', '${application.employeeId}', '${application.leaveType}')">
-                                Reject
+                    const formattedApplyDateTime = `${formatDate(applyDateTime)} ${formatTime(applyDateTime)}`;
+                    const formattedStartDate = formatDate(startDate);
+                    const formattedEndDate = formatDate(endDate);
+
+                    // Check total Monday count for this employee
+                    const totalMondays = await getEmployeeMondayCount(application.employeeId);
+                    let displayLeaveType = application.leaveType;
+
+                    // If total Mondays >= 3 and this leave includes Mondays, override display type
+                    if (totalMondays >= 3 && 
+                        (application.leaveType === 'Annual Leave (Normal)' || 
+                        application.leaveType === 'Annual Leave (黃金事假)')) {
+                        const mondayCount = countMondaysInDateRange(startDate, endDate);
+                        if (mondayCount > 0) {
+                            displayLeaveType = 'Applied Leaves for 區會 (Monday)';
+                        }
+                    }
+
+                    row.innerHTML = `
+                        <td>${application.employeeName}</td>
+                        <td>${formattedApplyDateTime}</td>
+                        <td>${formattedStartDate}</td>
+                        <td>${formattedEndDate}</td>
+                        <td>${displayLeaveType}</td>
+                        <td>
+                            <span class="status-${application.status.toLowerCase()}">${application.status}</span>
+                            ${application.status === 'Approved' ? `
+                                <button type="button" class="reject-btn" onclick="rejectApplication('${id}', '${application.employeeId}', '${application.leaveType}')">
+                                    Reject
+                                </button>
+                            ` : ''}
+                        </td>
+                        <td>
+                            ${(application.leaveType === 'Sick Leave' || 
+                            application.leaveType === '不可抗力因素' || 
+                            application.leaveType === '離港') && application.proof ? 
+                                `<button type="button" class="show-proof-btn" onclick="showProof('${id}')">View Proof</button>` : 
+                                'N/A'}
+                        </td>
+                        <td>
+                            <button type="button" 
+                                    class="remove-btn-small" 
+                                    onclick="handleRemoveSingleApplication(event, '${id}', '${application.employeeId}', '${application.leaveType}', ${application.leaveDays}, '${application.status}')">
+                                Remove
                             </button>
-                        ` : ''}
-                    </td>
-                    <td>
-                        ${(application.leaveType === 'Sick Leave' || 
-                        application.leaveType === '不可抗力因素' || 
-                        application.leaveType === '離港') && application.proof ? 
-                            `<button type="button" class="show-proof-btn" onclick="showProof('${id}')">View Proof</button>` : 
-                            'N/A'}
-                    </td>
-                    <td>
-                        <button type="button" 
-                                class="remove-btn-small" 
-                                onclick="handleRemoveSingleApplication(event, '${id}', '${application.employeeId}', '${application.leaveType}', ${application.leaveDays}, '${application.status}')">
-                            Remove
-                        </button>
-                    </td>
-                `;
-                tableBody.appendChild(row);
+                        </td>
+                    `;
+                    tableBody.appendChild(row);
+                })
+            ).then(() => {
+                // Ensure table updates after all rows are added
+                tableBody.scrollTop = tableBody.scrollHeight;
             });
         }
         
@@ -6969,6 +6949,12 @@
             }
         }
 
+        async function getEmployeeMondayCount(employeeId) {
+            const snapshot = await database.ref('employees').child(employeeId).once('value');
+            const employeeData = snapshot.val();
+            return employeeData?.usedMondayLeaves || 0;
+        }
+
         // Update the existing updateCalendarEvents function
         function updateCalendarEvents(applications) {
             if (!window.leaveCalendar) {
@@ -6979,23 +6965,53 @@
             window.leaveCalendar.removeAllEvents();
             if (!applications) return;
 
-            const events = Object.entries(applications)
-                .filter(([_, app]) => app.status === 'Approved')
-                .map(([id, application]) => {
-                    const endDate = new Date(application.leaveEndDate);
-                    endDate.setDate(endDate.getDate() + 1);
-                    return {
-                        id: id,
-                        title: `${application.employeeName} - ${application.leaveType}`,
-                        start: application.leaveStartDate,
-                        end: endDate.toISOString().split('T')[0],
-                        className: `leave-${application.leaveType.toLowerCase().replace(/[^a-z0-9]/g, '-')}`
-                    };
-                });
+            Promise.all(
+                Object.entries(applications)
+                    .filter(([_, app]) => app.status === 'Approved')
+                    .map(async ([id, application]) => {
+                        const endDate = new Date(application.leaveEndDate);
+                        endDate.setDate(endDate.getDate() + 1);
 
-            window.leaveCalendar.addEventSource(events);
-            window.leaveCalendar.render();
-            console.log('Calendar events updated:', events);
+                        const totalMondays = await getEmployeeMondayCount(application.employeeId);
+                        let displayLeaveType = application.leaveType;
+                        let className;
+
+                        if (totalMondays >= 3 && 
+                            (application.leaveType === 'Annual Leave (Normal)' || 
+                            application.leaveType === 'Annual Leave (黃金事假)')) {
+                            const mondayCount = countMondaysInDateRange(
+                                new Date(application.leaveStartDate), 
+                                new Date(application.leaveEndDate)
+                            );
+                            if (mondayCount > 0) {
+                                displayLeaveType = 'Applied Leaves for 區會 (Monday)';
+                            }
+                        }
+
+                        const classMap = {
+                            'Annual Leave (Normal)': 'leave-annual-normal',
+                            'Annual Leave (黃金事假)': 'leave-annual-golden',
+                            'Sick Leave': 'leave-sick',
+                            '不可抗力因素': 'leave-force-majeure',
+                            '離港': 'leave-overseas',
+                            'Special Approve': 'leave-special-approve',
+                            '活動請假': 'leave-activity',
+                            'Applied Leaves for 區會 (Monday)': 'leave-applied-leaves-for-monday'
+                        };
+                        className = classMap[displayLeaveType] || 'leave-default';
+
+                        return {
+                            id: id,
+                            title: `${application.employeeName} - ${displayLeaveType}`,
+                            start: application.leaveStartDate,
+                            end: endDate.toISOString().split('T')[0],
+                            className: className
+                        };
+                    })
+            ).then(events => {
+                window.leaveCalendar.addEventSource(events);
+                window.leaveCalendar.render();
+            });
         }
 
     </script>
