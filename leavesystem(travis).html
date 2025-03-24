@@ -3809,6 +3809,7 @@
                 const attendanceRef = database.ref('attendance');
                 const snapshot = await attendanceRef.once('value');
                 const records = snapshot.val() || {};
+                console.log('Records fetched:', records);
 
                 const tableBody = document.getElementById('allAttendanceTableBody');
                 tableBody.innerHTML = '';
@@ -5392,45 +5393,39 @@
             const readerDiv = document.getElementById('reader');
             readerDiv.style.display = 'block';
 
-            try {
-                await html5QrCode.start(
-                    { facingMode: "environment" },
-                    { fps: 10, qrbox: { width: 250, height: 250 } },
-                    async (decodedText) => {
-                        const employeeId = decodedText;
-                        const employeeSnapshot = await database.ref(`employees/${employeeId}`).once('value');
-                        const employeeData = employeeSnapshot.val();
+            await html5QrCode.start(
+                { facingMode: "environment" },
+                { fps: 10, qrbox: { width: 250, height: 250 } },
+                async (decodedText) => {
+                    const employeeId = decodedText;
+                    const employeeSnapshot = await database.ref(`employees/${employeeId}`).once('value');
+                    const employeeData = employeeSnapshot.val();
 
-                        if (!employeeData) {
-                            throw new Error('Employee not found');
-                        }
+                    if (!employeeData) throw new Error('Employee not found');
 
-                        const now = new Date();
-                        const attendanceData = {
-                            employeeId: employeeId,
-                            employeeName: employeeData.name || 'Unknown',
-                            role: employeeData.role || 'Unknown',
-                            date: formatDate(now),
-                            time: formatTime(now),
-                            timestamp: now.toISOString(),
-                            status: now.getHours() < 9 ? 'Punctual' : 'Late',
-                            ipAddress: await fetch('https://api.ipify.org').then(res => res.text()).catch(() => 'N/A'),
-                        };
+                    const now = new Date();
+                    const attendanceData = {
+                        employeeId: employeeId,
+                        employeeName: employeeData.name || 'Unknown',
+                        role: employeeData.role || 'Unknown',
+                        date: formatDate(now),
+                        time: formatTime(now),
+                        timestamp: now.toISOString(),
+                        status: now.getHours() < 9 ? 'Punctual' : 'Late',
+                        ipAddress: await fetch('https://api.ipify.org').then(res => res.text()).catch(() => 'N/A'),
+                    };
 
-                        const attendanceRef = database.ref('attendance');
-                        await attendanceRef.push(attendanceData);
+                    const attendanceRef = database.ref('attendance');
+                    await attendanceRef.push(attendanceData);
 
-                        await html5QrCode.stop();
-                        readerDiv.style.display = 'none';
+                    await html5QrCode.stop();
+                    readerDiv.style.display = 'none';
 
-                        showSyncStatus('Attendance recorded successfully');
-                        await updateAttendanceTable(); // Ensure this runs after write
-                    }
-                );
-            } catch (error) {
-                console.error('Error in QR scanning:', error);
-                showSyncStatus('Error recording attendance: ' + error.message, 'error');
-            }
+                    showSyncStatus('Attendance recorded successfully');
+                    await updateAttendanceTable(); // Single source of truth
+                },
+                (error) => console.warn('QR scan error:', error)
+            );
         }
 
         function onScanFailure(error) {
@@ -6716,64 +6711,67 @@
             const statusFilter = document.getElementById('statusFilter').value;
             const employeeFilter = document.getElementById('attendanceEmployeeFilter').value;
 
+            // Only filter if at least one filter is set
+            if (!dateFilter && !statusFilter && !employeeFilter) {
+                await updateAttendanceTable(); // Show all records
+                return;
+            }
+
             const attendanceRef = database.ref('attendance');
             const snapshot = await attendanceRef.once('value');
             let records = snapshot.val() || {};
 
-            // Only apply filters if they are explicitly set
-            let filteredRecords = Object.entries(records);
-            if (dateFilter || statusFilter || employeeFilter) {
-                filteredRecords = filteredRecords.filter(([_, record]) => {
-                    let matches = true;
-                    if (dateFilter && record.date !== dateFilter) matches = false;
-                    if (statusFilter && record.status !== statusFilter) matches = false;
-                    if (employeeFilter && record.employeeId !== employeeFilter) matches = false;
-                    return matches;
-                });
-            }
+            let filteredRecords = Object.entries(records).filter(([_, record]) => {
+                let matches = true;
+                if (dateFilter && record.date !== dateFilter) matches = false;
+                if (statusFilter && record.status !== statusFilter) matches = false;
+                if (employeeFilter && record.employeeId !== employeeFilter) matches = false;
+                return matches;
+            });
 
-            // Sort by timestamp (newest first)
             filteredRecords.sort(([, a], [, b]) => new Date(b.timestamp) - new Date(a.timestamp));
 
             const tableBody = document.getElementById('allAttendanceTableBody');
             tableBody.innerHTML = '';
 
             if (filteredRecords.length === 0) {
-                tableBody.innerHTML = `
-                    <tr>
-                        <td colspan="6" class="px-6 py-4 text-center text-gray-500">
-                            No matching attendance records found
-                        </td>
-                    </tr>
-                `;
+                tableBody.innerHTML = `<tr><td colspan="6" class="px-6 py-4 text-center text-gray-500">No matching attendance records found</td></tr>`;
                 return;
             }
 
             filteredRecords.forEach(([id, record]) => {
                 const row = document.createElement('tr');
-                const employeeName = record.employeeName || 'N/A';
-                const role = record.role || 'N/A';
-                const dateTime = record.timestamp
-                    ? `${formatDate(new Date(record.timestamp))} ${formatTime(new Date(record.timestamp))}`
-                    : 'Invalid Date';
-                const status = record.status || 'N/A';
-                const ipAddress = record.ipAddress || 'N/A';
-
                 row.innerHTML = `
-                    <td class="px-6 py-4">${employeeName}</td>
-                    <td class="px-6 py-4">${role}</td>
-                    <td class="px-6 py-4">${dateTime}</td>
-                    <td class="px-6 py-4">
-                        <span class="status-badge ${status.toLowerCase()}">${status}</span>
-                    </td>
-                    <td class="px-6 py-4">${ipAddress}</td>
-                    <td class="px-6 py-4">
-                        <button class="remove-btn-small" onclick="removeAttendanceRecord('${id}')">Remove</button>
-                    </td>
+                    <td class="px-6 py-4">${record.employeeName || 'N/A'}</td>
+                    <td class="px-6 py-4">${record.role || 'N/A'}</td>
+                    <td class="px-6 py-4">${record.timestamp ? `${formatDate(new Date(record.timestamp))} ${formatTime(new Date(record.timestamp))}` : 'Invalid Date'}</td>
+                    <td class="px-6 py-4"><span class="status-badge ${record.status?.toLowerCase() || 'unknown'}">${record.status || 'N/A'}</span></td>
+                    <td class="px-6 py-4">${record.ipAddress || 'N/A'}</td>
+                    <td class="px-6 py-4"><button class="remove-btn-small" onclick="removeAttendanceRecord('${id}')">Remove</button></td>
                 `;
                 tableBody.appendChild(row);
             });
         }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            updateAttendanceTable(); // Initial load
+
+            const dateFilter = document.getElementById('dateFilter');
+            const statusFilter = document.getElementById('statusFilter');
+            const employeeFilter = document.getElementById('attendanceEmployeeFilter');
+            const resetFilters = document.getElementById('resetFilters');
+
+            // Explicit filter triggers only
+            dateFilter?.addEventListener('change', filterAttendanceTable);
+            statusFilter?.addEventListener('change', filterAttendanceTable);
+            employeeFilter?.addEventListener('change', filterAttendanceTable);
+            resetFilters?.addEventListener('click', () => {
+                dateFilter.value = '';
+                statusFilter.value = '';
+                employeeFilter.value = '';
+                updateAttendanceTable();
+            });
+        });
 
         function resetAttendanceFilters() {
             document.getElementById('dateFilter').value = '';
