@@ -3734,16 +3734,15 @@
 
                 // Check for existing attendance record for today
                 const attendanceRef = database.ref('attendance');
-                const existingAttendanceSnapshot = await attendanceRef
+                const todayRecords = await attendanceRef
                     .orderByChild('date')
                     .equalTo(currentDate)
                     .once('value');
 
-                let existingRecord = null;
-                existingAttendanceSnapshot.forEach(child => {
-                    const record = child.val();
-                    if (record.employeeId === employeeId) {
-                        existingRecord = record;
+                let existingRecord = false;
+                todayRecords.forEach(record => {
+                    if (record.val().employeeId === employeeId) {
+                        existingRecord = true;
                     }
                 });
 
@@ -3758,20 +3757,10 @@
                 const ipData = await ipResponse.json();
                 const ipAddress = ipData.ip;
 
-                // Determine status based on time (9:30 AM cutoff)
+                // Calculate late status
                 const cutoffTime = new Date(now);
                 cutoffTime.setHours(9, 30, 0, 0);
-                const status = now > cutoffTime ? 'Late' : 'Punctual';
-
-                // Calculate late minutes and amount if late
-                let lateMinutes = 0;
-                let amount = 0;
-
-                if (status === 'Late') {
-                    lateMinutes = Math.floor((now - cutoffTime) / (1000 * 60));
-                    const lateInfo = calculateLateStatus(now.toISOString(), employeeData.role);
-                    amount = lateInfo.amount;
-                }
+                const lateInfo = calculateLateStatus(now.toISOString(), employeeData.role);
 
                 // Create new attendance record
                 const attendanceData = {
@@ -3781,20 +3770,17 @@
                     date: currentDate,
                     time: currentTime,
                     timestamp: now.toISOString(),
-                    status: status,
-                    lateMinutes: lateMinutes,
-                    amount: amount,
+                    status: lateInfo.status,
+                    lateMinutes: lateInfo.lateMinutes,
+                    amount: lateInfo.amount,
                     ipAddress: ipAddress
                 };
 
-                // Save to Firebase
+                // Save directly to attendance collection
                 await attendanceRef.push(attendanceData);
 
                 // Show success message
                 showScanResult('Attendance recorded successfully', true);
-
-                // Update the attendance table
-                updateAttendanceTable();
 
                 // Stop the scanner
                 stopScanner();
@@ -4842,54 +4828,25 @@
         function loadAllAttendanceRecords() {
             const attendanceRef = database.ref('attendance');
             const tableBody = document.getElementById('allAttendanceTableBody');
-            const dateFilter = document.getElementById('dateFilter');
-            const statusFilter = document.getElementById('statusFilter');
-            const employeeFilter = document.getElementById('employeeFilter');
+
+            if (!tableBody) return;
 
             attendanceRef.on('value', (snapshot) => {
                 const records = [];
-                snapshot.forEach(userSnapshot => {
-                    const userId = userSnapshot.key;
-                    userSnapshot.forEach(recordSnapshot => {
-                        const record = recordSnapshot.val();
-                        records.push({
-                            ...record,
-                            userId: userId,
-                            recordId: recordSnapshot.key // Add this to store the record ID
-                        });
+                snapshot.forEach(recordSnapshot => {
+                    records.push({
+                        id: recordSnapshot.key,
+                        ...recordSnapshot.val()
                     });
                 });
 
-                // Sort records by timestamp (most recent first)
+                // Sort records by timestamp (newest first)
                 records.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-
-                // Apply filters
-                let filteredRecords = records;
-
-                if (dateFilter.value) {
-                    filteredRecords = filteredRecords.filter(record => {
-                        const recordDate = new Date(record.timestamp).toISOString().split('T')[0];
-                        return recordDate === dateFilter.value;
-                    });
-                }
-
-                if (statusFilter.value) {
-                    filteredRecords = filteredRecords.filter(record => 
-                        record.status === statusFilter.value
-                    );
-                }
-
-                if (employeeFilter.value) {
-                    const searchTerm = employeeFilter.value.toLowerCase();
-                    filteredRecords = filteredRecords.filter(record =>
-                        record.employeeName.toLowerCase().includes(searchTerm)
-                    );
-                }
 
                 // Clear existing table
                 tableBody.innerHTML = '';
 
-                if (filteredRecords.length === 0) {
+                if (records.length === 0) {
                     tableBody.innerHTML = `
                         <tr>
                             <td colspan="6" class="px-6 py-4 text-center text-gray-500">
@@ -4900,40 +4857,25 @@
                     return;
                 }
 
-                // Populate table with filtered records
-                filteredRecords.forEach(record => {
-                    const row = document.createElement('tr');
+                // Populate table with records
+                records.forEach(record => {
                     const recordTime = new Date(record.timestamp);
+                    const formattedDateTime = `${formatDate(recordTime)} ${recordTime.toLocaleTimeString()}`;
                     
+                    const row = document.createElement('tr');
                     row.innerHTML = `
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm font-medium text-gray-900">
-                                ${record.employeeName || 'N/A'}
-                            </div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm text-gray-900">
-                                ${record.employeeRole || 'N/A'}
-                            </div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm text-gray-900">
-                                ${recordTime.toLocaleDateString()} ${recordTime.toLocaleTimeString()}
-                            </div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <span class="status-badge ${record.status === 'Punctual' ? 'punctual' : 'late'}">
+                        <td class="px-6 py-4">${record.employeeName || 'N/A'}</td>
+                        <td class="px-6 py-4">${record.role || 'N/A'}</td>
+                        <td class="px-6 py-4">${formattedDateTime}</td>
+                        <td class="px-6 py-4">
+                            <span class="status-badge ${record.status?.toLowerCase() === 'punctual' ? 'punctual' : 'late'}">
                                 ${record.status}
                                 ${record.amount > 0 ? `<span class="penalty-amount">(-$${record.amount})</span>` : ''}
                             </span>
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm text-gray-900">
-                                ${record.ipAddress || 'N/A'}
-                            </div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <button onclick="removeAttendanceRecord('${record.userId}', '${record.recordId}')" 
+                        <td class="px-6 py-4">${record.ipAddress || 'N/A'}</td>
+                        <td class="px-6 py-4">
+                            <button onclick="removeAttendanceRecord('${record.id}')" 
                                     class="remove-btn-small">
                                 Remove
                             </button>
