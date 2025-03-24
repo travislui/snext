@@ -9,6 +9,8 @@
     <script src='https://cdn.jsdelivr.net/npm/@fullcalendar/core@6.1.10/main.min.js'></script>
     <script src='https://cdn.jsdelivr.net/npm/@fullcalendar/daygrid@6.1.10/main.min.js'></script>
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
     
     <style>
         /* Responsive styles */
@@ -291,6 +293,11 @@
         /* Button variations */
         .remove-btn {
             background-color: #e74c3c;
+            padding: 4px 8px;  /* Reduced padding */
+            font-size: 12px;   /* Smaller font size */
+            border-radius: 4px;
+            min-height: unset; /* Remove minimum height if any */
+            width: auto;       /* Allow button to size to content */
         }
 
         .remove-btn:hover {
@@ -1448,6 +1455,21 @@
             background-color: #607D8B !important; /* Greyish-blue fallback */
             border-color: #607D8B !important;
             color: white !important;
+        }
+
+        .compensate-btn {
+            background-color: #3498db;
+            padding: 4px 8px;
+            font-size: 12px;
+            border-radius: 4px;
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .compensate-btn:hover {
+            background-color: #2980b9;
         }
 
         .filter-container {
@@ -5786,6 +5808,7 @@
                             <div class="button-stack">
                                 <button class="adjust-btn action-btn" onclick="toggleAdjustMode(this)">Adjust</button>
                                 <button class="remove-btn action-btn" onclick="removeAgent('${id}', this.parentElement.parentElement.parentElement)">Remove</button>
+                                <button class="compensate-btn action-btn" onclick="addCompensationLeave('${id}')">補假</button>
                             </div>
                         </td>
                     `;
@@ -6631,6 +6654,148 @@
                 });
             }
         });
+
+        async function addCompensationLeave(employeeId) {
+            try {
+                // Check if user is authenticated
+                const auth = firebase.auth();
+                const currentUser = auth.currentUser;
+                
+                if (!currentUser || !currentUser.email) {
+                    throw new Error('請先登入');
+                }
+
+                // Get employee data
+                const employeeSnapshot = await database.ref(`employees/${employeeId}`).once('value');
+                const employeeData = employeeSnapshot.val();
+
+                if (!employeeData) {
+                    throw new Error('Employee not found');
+                }
+
+                // Create custom dialog with adjusted size and styling
+                const leaveType = await Swal.fire({
+                    title: '選擇補假類型',
+                    html: `
+                        <div style="margin-bottom: 20px;">
+                            <p style="font-size: 14px;">Agent: ${employeeData.name}</p>
+                        </div>
+                        <select id="leave-type-select" class="swal2-select" style="
+                            width: 80%; 
+                            padding: 8px; 
+                            margin-bottom: 15px;
+                            font-size: 14px;
+                            border: 1px solid #ddd;
+                            border-radius: 4px;
+                        ">
+                            <option value="normal">Annual Leave (Normal)</option>
+                            <option value="golden">Annual Leave (黃金事假)</option>
+                        </select>
+                        <input type="number" id="leave-days" class="swal2-input" placeholder="輸入補假天數" min="1" step="1" style="
+                            width: 80%;
+                            padding: 8px;
+                            font-size: 14px;
+                            border: 1px solid #ddd;
+                            border-radius: 4px;
+                        ">
+                    `,
+                    showCancelButton: true,
+                    confirmButtonText: '確認',
+                    cancelButtonText: '取消',
+                    width: '400px',
+                    customClass: {
+                        container: 'custom-swal-container',
+                        popup: 'custom-swal-popup',
+                        header: 'custom-swal-header',
+                        title: 'custom-swal-title',
+                        closeButton: 'custom-swal-close-button',
+                        content: 'custom-swal-content',
+                        input: 'custom-swal-input',
+                        actions: 'custom-swal-actions',
+                        confirmButton: 'custom-swal-confirm-button',
+                        cancelButton: 'custom-swal-cancel-button'
+                    },
+                    preConfirm: () => {
+                        const type = document.getElementById('leave-type-select').value;
+                        const days = parseInt(document.getElementById('leave-days').value);
+                        if (!days || days < 1) {
+                            Swal.showValidationMessage('請輸入有效的天數');
+                            return false;
+                        }
+                        return { type, days };
+                    }
+                });
+
+                if (leaveType.isConfirmed) {
+                    const { type, days } = leaveType.value;
+                    const updates = {};
+
+                    // Calculate new remaining leaves
+                    if (type === 'normal') {
+                        if (employeeData.remainingNormalLeaves !== 999) {
+                            const newNormalLeaves = (employeeData.remainingNormalLeaves || 0) + days;
+                            updates[`employees/${employeeId}/remainingNormalLeaves`] = newNormalLeaves;
+                        }
+                    } else if (type === 'golden') {
+                        if (employeeData.remainingGoldenLeaves !== 999) {
+                            const newGoldenLeaves = (employeeData.remainingGoldenLeaves || 0) + days;
+                            updates[`employees/${employeeId}/remainingGoldenLeaves`] = newGoldenLeaves;
+                        }
+                        if (employeeData.remainingNormalLeaves !== 999) {
+                            const newNormalLeaves = (employeeData.remainingNormalLeaves || 0) + days;
+                            updates[`employees/${employeeId}/remainingNormalLeaves`] = newNormalLeaves;
+                        }
+                    }
+
+                    // Add compensation record
+                    const compensationRef = database.ref(`compensationRecords/${employeeId}`).push();
+                    const timestamp = new Date().toISOString();
+                    
+                    const compensationRecord = {
+                        type: type,
+                        days: days,
+                        timestamp: timestamp,
+                        addedBy: currentUser.email
+                    };
+
+                    updates[`compensationRecords/${employeeId}/${compensationRef.key}`] = compensationRecord;
+
+                    // Update the database
+                    if (Object.keys(updates).length > 0) {
+                        await database.ref().update(updates);
+
+                        // Show success message
+                        await Swal.fire({
+                            icon: 'success',
+                            title: '補假完成',
+                            text: `已成功新增 ${days} 天${type === 'normal' ? 'Annual Leave (Normal)' : 'Annual Leave (黃金事假)'}`,
+                            width: '400px',
+                            customClass: {
+                                popup: 'custom-swal-popup',
+                                title: 'custom-swal-title',
+                                confirmButton: 'custom-swal-confirm-button'
+                            }
+                        });
+
+                        // Refresh the employee table
+                        loadEmployees();
+                    }
+                }
+            } catch (error) {
+                console.error('Error adding compensation leave:', error);
+                await Swal.fire({
+                    icon: 'error',
+                    title: '錯誤',
+                    text: error.message,
+                    width: '400px',
+                    customClass: {
+                        popup: 'custom-swal-popup',
+                        title: 'custom-swal-title',
+                        confirmButton: 'custom-swal-confirm-button'
+                    }
+                });
+            }
+        }
 
         async function filterAttendanceTable() {
             const dateFilter = document.getElementById('dateFilter').value;
