@@ -3273,26 +3273,27 @@
             // Check Monday leaves for Annual Leaves
             if (leaveType.includes('Annual Leave')) {
                 const mondayCount = countMondaysInDateRange(leaveStartDate, leaveEndDate);
+                
                 if (mondayCount > 0) {
-                    // Get current Monday leave count
+                    // Get current employee data
                     const employeeRef = database.ref(`employees/${currentUser.id}`);
-                    const snapshot = await employeeRef.once('value');
-                    const currentMondayLeaves = snapshot.val()?.usedMondayLeaves || 0;
+                    const employeeSnapshot = await employeeRef.once('value');
+                    const employeeData = employeeSnapshot.val();
 
+                    const currentMondayLeaves = employeeData.usedMondayLeaves || 0;
+                    const newMondayTotal = currentMondayLeaves + mondayCount;
+                    
+                    // Check Monday limits and show alerts
                     if (currentMondayLeaves >= 3) {
-                        // Already at or over limit
-                        if (!confirm(`Warning: You have already used ${currentMondayLeaves} Monday leaves. You will be charged $100 for each additional Monday (${mondayCount} Mondays = $${mondayCount * 100}). Do you want to continue?`)) {
-                            return;
-                        }
-                    } else {
-                        const newTotal = currentMondayLeaves + mondayCount;
-                        if (newTotal > 3) {
-                            const extraMondays = newTotal - 3;
-                            if (!confirm(`Warning: This will exceed your 3-Monday limit. You will be charged $100 for each additional Monday (${extraMondays} Mondays = $${extraMondays * 100}). Do you want to continue?`)) {
-                                return;
-                            }
-                        }
+                        alert('You have already used 3 Monday leaves. Please apply for "活動請假" instead.');
+                        return; // Stop the application process
+                    } else if (newMondayTotal > 3) {
+                        alert(`This leave would exceed your 3-Monday limit. Please apply for "活動請假" for the additional ${newMondayTotal - 3} Monday(s).`);
+                        return; // Stop the application process
                     }
+
+                    // If within limits, update the Monday leave count
+                    updates.usedMondayLeaves = newMondayTotal;
                 }
             }
 
@@ -3428,66 +3429,30 @@
                 // Handle Annual Leave types
                 else if (leaveType.includes('Annual Leave')) {
                     const mondayCount = countMondaysInDateRange(leaveStartDate, leaveEndDate);
-                    
+    
                     if (mondayCount > 0) {
+                        // Get current employee data
+                        const employeeRef = database.ref(`employees/${currentUser.id}`);
+                        const employeeSnapshot = await employeeRef.once('value');
+                        const employeeData = employeeSnapshot.val();
+
                         const currentMondayLeaves = employeeData.usedMondayLeaves || 0;
                         const newMondayTotal = currentMondayLeaves + mondayCount;
                         
+                        // Check Monday limits and show alerts
                         if (currentMondayLeaves >= 3) {
-                            for (let i = 0; i < mondayCount; i++) {
-                                const penaltyData = {
-                                    employeeId: currentUser.id,
-                                    employeeName: currentUser.name,
-                                    employeeRole: currentUser.role,
-                                    date: formatDate(new Date()),
-                                    reason: 'Additional Monday Leave After Limit',
-                                    minutes: 0,
-                                    amount: 100,
-                                    baseAmount: 100,
-                                    deadline: formatDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)),
-                                    status: 'Not Submitted',
-                                    createdAt: new Date().toISOString(),
-                                    lastModified: new Date().toISOString()
-                                };
-                                await database.ref('penalties').push(penaltyData);
-                            }
-                            alert(`You have been charged $100 for each additional Monday (${mondayCount} Mondays). Total penalty: $${mondayCount * 100}`);
+                            alert('You have already used 3 Monday leaves. Please apply for "活動請假" instead.');
+                            return; // Stop the application process
                         } else if (newMondayTotal > 3) {
-                            const extraMondays = newMondayTotal - 3;
-                            for (let i = 0; i < extraMondays; i++) {
-                                const penaltyData = {
-                                    employeeId: currentUser.id,
-                                    employeeName: currentUser.name,
-                                    employeeRole: currentUser.role,
-                                    date: formatDate(new Date()),
-                                    reason: 'Exceeded Monday Leave Limit',
-                                    minutes: 0,
-                                    amount: 100,
-                                    baseAmount: 100,
-                                    deadline: formatDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)),
-                                    status: 'Not Submitted',
-                                    createdAt: new Date().toISOString(),
-                                    lastModified: new Date().toISOString()
-                                };
-                                await database.ref('penalties').push(penaltyData);
-                            }
-                            alert(`You have exceeded the 3-Monday limit. You will be charged $100 for each additional Monday (${extraMondays} Mondays). Total penalty: $${extraMondays * 100}`);
+                            alert(`This leave would exceed your 3-Monday limit. Please apply for "活動請假" for the additional ${newMondayTotal - 3} Monday(s).`);
+                            return; // Stop the application process
                         }
+
+                        // If within limits, update the Monday leave count
                         updates.usedMondayLeaves = newMondayTotal;
                     }
-
-                    // Update leave counts for Annual Leave types
-                    if (leaveType === 'Annual Leave (Normal)' && employeeData.remainingNormalLeaves !== 999) {
-                        updates.remainingNormalLeaves = employeeData.remainingNormalLeaves - leaveDays;
-                    } else if (leaveType === 'Annual Leave (黃金事假)') {
-                        if (employeeData.remainingGoldenLeaves !== 999) {
-                            updates.remainingGoldenLeaves = employeeData.remainingGoldenLeaves - leaveDays;
-                        }
-                        if (employeeData.remainingNormalLeaves !== 999) {
-                            updates.remainingNormalLeaves = employeeData.remainingNormalLeaves - leaveDays;
-                        }
-                    }
                 }
+
                 // Handle other leave types
                 else {
                     switch (leaveType) {
@@ -6196,45 +6161,15 @@
                         const currentMondayLeaves = employeeData.usedMondayLeaves || 0;
                         const newTotalMondays = currentMondayLeaves + mondayCount;
 
-                        let excessMondays = 0;
-                        if (newTotalMondays > 3) {
-                            excessMondays = newTotalMondays - Math.max(3, currentMondayLeaves);
-                        } else if (currentMondayLeaves >= 3) {
-                            excessMondays = mondayCount;
+                        if (currentMondayLeaves >= 3) {
+                            alert(`This agent has already used their 3 Monday leaves. Please use "活動請假" instead.`);
+                            return;
+                        } else if (newTotalMondays > 3) {
+                            alert(`This would exceed the agent's 3-Monday limit. Please use "活動請假" for the additional ${newTotalMondays - 3} Monday(s).`);
+                            return;
                         }
 
-                        if (excessMondays > 0) {
-                            // Add penalties for excess Mondays
-                            for (let i = 0; i < excessMondays; i++) {
-                                const penaltyData = {
-                                    employeeId: employeeId,
-                                    employeeName: employeeData.name,
-                                    employeeRole: employeeData.role,
-                                    date: formatDate(new Date()),
-                                    reason: 'Additional Monday Leave After Limit',
-                                    minutes: 0,
-                                    amount: 100,
-                                    baseAmount: 100,
-                                    deadline: formatDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)),
-                                    status: 'Not Submitted',
-                                    createdAt: new Date().toISOString(),
-                                    lastModified: new Date().toISOString(),
-                                    createdBy: 'admin'
-                                };
-                                await database.ref('penalties').push(penaltyData);
-                            }
-
-                            // Adjust leave days that count against quota
-                            adjustedLeaveDays = leaveDays - excessMondays;
-
-                            // Show appropriate message
-                            if (currentMondayLeaves >= 3) {
-                                alert(`This leave includes ${mondayCount} Monday(s). All will be penalized at $100 each as the 3-Monday limit is reached.`);
-                            } else {
-                                alert(`This leave includes ${mondayCount} Monday(s). ${excessMondays} will be penalized at $100 each as they exceed the 3-Monday limit.`);
-                            }
-                        }
-
+                        // If within limits, update the Monday leave count
                         await database.ref(`employees/${employeeId}`).update({
                             usedMondayLeaves: newTotalMondays
                         });
