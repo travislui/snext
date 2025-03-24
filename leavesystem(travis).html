@@ -3805,42 +3805,53 @@
         }
 
         async function updateAttendanceTable() {
-            try {
-                const tableBody = document.getElementById('allAttendanceTableBody');
-                if (!tableBody) return;
+            const attendanceRef = database.ref('attendance');
+            const snapshot = await attendanceRef.once('value');
+            const records = snapshot.val() || {};
 
-                const attendanceRef = database.ref('attendance');
-                const snapshot = await attendanceRef.once('value');
-                const attendanceRecords = snapshot.val() || {};
+            const tableBody = document.getElementById('allAttendanceTableBody');
+            tableBody.innerHTML = '';
 
-                // Clear existing rows
-                tableBody.innerHTML = '';
+            // Convert records to array and sort by timestamp (newest first)
+            const sortedRecords = Object.entries(records)
+                .sort(([, a], [, b]) => new Date(b.timestamp) - new Date(a.timestamp));
 
-                // Convert to array and sort by timestamp (newest first)
-                const recordsArray = Object.entries(attendanceRecords)
-                    .sort(([, a], [, b]) => new Date(b.timestamp) - new Date(a.timestamp));
-
-                // Populate table
-                recordsArray.forEach(([id, record]) => {
-                    const row = document.createElement('tr');
-                    row.innerHTML = `
-                        <td class="px-6 py-4">${record.employeeName}</td>
-                        <td class="px-6 py-4">${record.role}</td>
-                        <td class="px-6 py-4">${record.date} ${record.time}</td>
-                        <td class="px-6 py-4">
-                            <span class="status-badge ${record.status.toLowerCase()}">${record.status}</span>
+            if (sortedRecords.length === 0) {
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="px-6 py-4 text-center text-gray-500">
+                            No attendance records found
                         </td>
-                        <td class="px-6 py-4">${record.ipAddress}</td>
-                        <td class="px-6 py-4">
-                            <button class="remove-btn-small" onclick="removeAttendanceRecord('${id}')">Remove</button>
-                        </td>
-                    `;
-                    tableBody.appendChild(row);
-                });
-
-            } catch (error) {
-                console.error('Error updating attendance table:', error);
+                    </tr>
+                `;
+                return;
             }
+
+            sortedRecords.forEach(([id, record]) => {
+                const row = document.createElement('tr');
+                // Provide fallback values for missing fields
+                const employeeName = record.employeeName || 'N/A';
+                const role = record.role || 'N/A';
+                const dateTime = record.timestamp
+                    ? `${formatDate(new Date(record.timestamp))} ${formatTime(new Date(record.timestamp))}`
+                    : 'Invalid Date';
+                const status = record.status || 'N/A';
+                const ipAddress = record.ipAddress || 'N/A';
+
+                row.innerHTML = `
+                    <td class="px-6 py-4">${employeeName}</td>
+                    <td class="px-6 py-4">${role}</td>
+                    <td class="px-6 py-4">${dateTime}</td>
+                    <td class="px-6 py-4">
+                        <span class="status-badge ${status.toLowerCase()}">${status}</span>
+                    </td>
+                    <td class="px-6 py-4">${ipAddress}</td>
+                    <td class="px-6 py-4">
+                        <button class="remove-btn-small" onclick="removeAttendanceRecord('${id}')">Remove</button>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            });
         }
 
         async function removeAttendanceRecord(recordId) {
@@ -5392,73 +5403,57 @@
         let html5QrcodeScanner = null;
 
         function startScanning() {
-            if (html5QrcodeScanner) {
-                html5QrcodeScanner.clear();
-            }
+            const html5QrCode = new Html5Qrcode("reader");
+            const readerDiv = document.getElementById('reader');
+            readerDiv.style.display = 'block';
 
-            const reader = document.getElementById('reader');
-            reader.style.display = 'block';
-            reader.innerHTML = '';
+            html5QrCode.start(
+                { facingMode: "environment" },
+                { fps: 10, qrbox: { width: 250, height: 250 } },
+                async (decodedText, decodedResult) => {
+                    try {
+                        // Assuming QR code contains employeeId or some identifier
+                        const employeeId = decodedText; // Adjust based on QR content
+                        const employeeSnapshot = await database.ref(`employees/${employeeId}`).once('value');
+                        const employeeData = employeeSnapshot.val();
 
-            // Create scanner with specific camera settings
-            const html5Qrcode = new Html5Qrcode("reader");
-            
-            // Get back camera
-            Html5Qrcode.getCameras().then(devices => {
-                if (devices && devices.length) {
-                    // Try to get back camera
-                    const backCamera = devices.find(device => 
-                        device.label.toLowerCase().includes('back') ||
-                        device.label.toLowerCase().includes('rear'));
-                    
-                    // Use back camera if found, otherwise use the last camera in the list
-                    const cameraId = backCamera ? backCamera.id : devices[devices.length - 1].id;
-                    
-                    const config = {
-                        fps: 10,
-                        qrbox: { width: 700, height: 700 },
-                        aspectRatio: 1.0,
-                        showTorchButtonIfSupported: true,
-                    };
+                        if (!employeeData) throw new Error('Employee not found');
 
-                    html5Qrcode.start(
-                        cameraId, 
-                        config,
-                        onScanSuccess,
-                        onScanFailure
-                    )
-                    .catch(err => {
-                        console.error(`Unable to start scanning: ${err}`);
-                        alert("Unable to start camera. Please make sure you've granted camera permissions.");
-                    });
+                        const now = new Date();
+                        const attendanceData = {
+                            employeeId: employeeId,
+                            employeeName: employeeData.name,
+                            role: employeeData.role,
+                            date: formatDate(now),
+                            time: formatTime(now),
+                            timestamp: now.toISOString(),
+                            status: now.getHours() < 9 ? 'Punctual' : 'Late', // Example logic
+                            ipAddress: await fetch('https://api.ipify.org').then(res => res.text()),
+                        };
 
-                    // Store the instance for later cleanup
-                    html5QrcodeScanner = html5Qrcode;
+                        // Write to Firebase
+                        const attendanceRef = database.ref('attendance');
+                        await attendanceRef.push(attendanceData);
 
-                    // Modify the scanner interface to remove file upload elements
-                    setTimeout(() => {
-                        // Remove file upload related elements
-                        const selectElement = document.getElementById('reader').querySelector('select');
-                        if (selectElement) selectElement.style.display = 'none';
-                        
-                        const fileElements = document.getElementById('reader').querySelectorAll('[type="file"]');
-                        fileElements.forEach(el => el.parentElement.style.display = 'none');
-                        
-                        // Remove any text about file upload
-                        const textNodes = document.getElementById('reader').querySelectorAll('div');
-                        textNodes.forEach(node => {
-                            if (node.textContent.includes('file')) {
-                                node.style.display = 'none';
-                            }
-                        });
-                    }, 100);
+                        // Stop scanning
+                        html5QrCode.stop();
+                        readerDiv.style.display = 'none';
 
-                } else {
-                    alert("No cameras found on your device");
+                        // Show success message
+                        showSyncStatus('Attendance recorded successfully');
+
+                        // Refresh the table immediately
+                        updateAttendanceTable();
+
+                    } catch (error) {
+                        console.error('Error recording attendance:', error);
+                        showSyncStatus('Error recording attendance', 'error');
+                    }
+                },
+                (error) => {
+                    console.warn('QR scan error:', error);
                 }
-            }).catch(err => {
-                alert("Error accessing camera: " + err);
-            });
+            );
         }
 
         function onScanFailure(error) {
@@ -6539,19 +6534,19 @@
         });
 
         document.addEventListener('DOMContentLoaded', function() {
-            updateAttendanceTable();
+            updateAttendanceTable(); // Initial load
 
-            // Add filter listeners
             const dateFilter = document.getElementById('dateFilter');
             const statusFilter = document.getElementById('statusFilter');
             const employeeFilter = document.getElementById('attendanceEmployeeFilter');
             const resetFilters = document.getElementById('resetFilters');
 
+            // Only apply filters on explicit user input
             if (dateFilter) dateFilter.addEventListener('change', filterAttendanceTable);
             if (statusFilter) statusFilter.addEventListener('change', filterAttendanceTable);
             if (employeeFilter) employeeFilter.addEventListener('change', filterAttendanceTable);
             if (resetFilters) resetFilters.addEventListener('click', resetAttendanceFilters);
-        });        
+        });   
 
         document.addEventListener('DOMContentLoaded', function() {
             const toggleAttendanceButton = document.getElementById('toggleAttendanceRecords');
@@ -6748,32 +6743,53 @@
             const snapshot = await attendanceRef.once('value');
             let records = snapshot.val() || {};
 
-            // Apply filters
-            let filteredRecords = Object.entries(records).filter(([_, record]) => {
-                let matches = true;
-                if (dateFilter && record.date !== dateFilter) matches = false;
-                if (statusFilter && record.status !== statusFilter) matches = false;
-                if (employeeFilter && record.employeeId !== employeeFilter) matches = false;
-                return matches;
-            });
+            // Only apply filters if they are explicitly set
+            let filteredRecords = Object.entries(records);
+            if (dateFilter || statusFilter || employeeFilter) {
+                filteredRecords = filteredRecords.filter(([_, record]) => {
+                    let matches = true;
+                    if (dateFilter && record.date !== dateFilter) matches = false;
+                    if (statusFilter && record.status !== statusFilter) matches = false;
+                    if (employeeFilter && record.employeeId !== employeeFilter) matches = false;
+                    return matches;
+                });
+            }
 
-            // Sort by timestamp
+            // Sort by timestamp (newest first)
             filteredRecords.sort(([, a], [, b]) => new Date(b.timestamp) - new Date(a.timestamp));
 
-            // Update table
             const tableBody = document.getElementById('allAttendanceTableBody');
             tableBody.innerHTML = '';
 
+            if (filteredRecords.length === 0) {
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="px-6 py-4 text-center text-gray-500">
+                            No matching attendance records found
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
             filteredRecords.forEach(([id, record]) => {
                 const row = document.createElement('tr');
+                const employeeName = record.employeeName || 'N/A';
+                const role = record.role || 'N/A';
+                const dateTime = record.timestamp
+                    ? `${formatDate(new Date(record.timestamp))} ${formatTime(new Date(record.timestamp))}`
+                    : 'Invalid Date';
+                const status = record.status || 'N/A';
+                const ipAddress = record.ipAddress || 'N/A';
+
                 row.innerHTML = `
-                    <td class="px-6 py-4">${record.employeeName}</td>
-                    <td class="px-6 py-4">${record.role}</td>
-                    <td class="px-6 py-4">${record.date} ${record.time}</td>
+                    <td class="px-6 py-4">${employeeName}</td>
+                    <td class="px-6 py-4">${role}</td>
+                    <td class="px-6 py-4">${dateTime}</td>
                     <td class="px-6 py-4">
-                        <span class="status-badge ${record.status.toLowerCase()}">${record.status}</span>
+                        <span class="status-badge ${status.toLowerCase()}">${status}</span>
                     </td>
-                    <td class="px-6 py-4">${record.ipAddress}</td>
+                    <td class="px-6 py-4">${ipAddress}</td>
                     <td class="px-6 py-4">
                         <button class="remove-btn-small" onclick="removeAttendanceRecord('${id}')">Remove</button>
                     </td>
@@ -6786,7 +6802,7 @@
             document.getElementById('dateFilter').value = '';
             document.getElementById('statusFilter').value = '';
             document.getElementById('attendanceEmployeeFilter').value = '';
-            updateAttendanceTable();
+            updateAttendanceTable(); // Show all records
         }
 
         // Modify the initializeFilters function
