@@ -4160,7 +4160,7 @@
             }
 
             // Open new window with larger dimensions
-            qrWindow = window.open('', 'QRCodeWindow', 'width=600,height=800');
+            qrWindow = window.open('', 'QRCodeWindow', 'width=1500,height=800');
             qrWindow.document.write(createQRWindowContent());
         }
 
@@ -5395,7 +5395,7 @@
 
             await html5QrCode.start(
                 { facingMode: "environment" },
-                { fps: 10, qrbox: { width: 250, height: 250 } },
+                { fps: 10, qrbox: { width: 500, height: 500 } },
                 async (decodedText) => {
                     const employeeId = decodedText;
                     const employeeSnapshot = await database.ref(`employees/${employeeId}`).once('value');
