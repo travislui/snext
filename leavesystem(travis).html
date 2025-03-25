@@ -2668,7 +2668,6 @@
 
         // Update loadEmployeePenalties function
         async function loadEmployeePenalties(employeeId) {
-            console.log('Loading penalties for employee ID:', employeeId);
             if (!employeeId) {
                 console.error('No employee ID provided');
                 return;
@@ -2676,20 +2675,17 @@
 
             try {
                 const penaltiesRef = database.ref('penalties');
-                // Remove any existing listeners first
+                // Remove any existing listeners
                 penaltiesRef.off('value');
                 
                 // Set up a new real-time listener for penalties
                 penaltiesRef.on('value', (snapshot) => {
                     const allPenalties = snapshot.val() || {};
-                    console.log('All penalties:', allPenalties);
                     
                     // Filter penalties for this employee
                     const employeePenalties = Object.entries(allPenalties)
                         .filter(([_, penalty]) => penalty.employeeId === employeeId)
                         .reduce((acc, [key, value]) => ({...acc, [key]: value}), {});
-                    
-                    console.log('Filtered penalties for employee:', employeePenalties);
                     
                     // Update the employee's penalty table
                     updateEmployeePenaltyTable(employeePenalties);
@@ -3630,6 +3626,7 @@
             }
         }        
 
+        // Update the calculateLateStatus function to ensure consistent penalty amounts
         function calculateLateStatus(timestamp, role) {
             const recordTime = new Date(timestamp);
             
@@ -3684,9 +3681,12 @@
                 }
             }
 
+            // Round the amount to nearest integer
+            amount = Math.round(amount);
+
             return {
                 status: status,
-                amount: Math.round(amount), // Round to nearest integer
+                amount: amount,
                 lateMinutes: Math.max(0, lateMinutes) // Ensure non-negative
             };
         }
@@ -5524,8 +5524,33 @@
                                 ipAddress: ipData.ip
                             };
 
-                            // Save to Firebase
+                            // Save attendance record to Firebase
                             await database.ref('attendance').push(attendanceData);
+
+                            // If there's a penalty amount, create a penalty record
+                            if (lateInfo.amount > 0) {
+                                // Calculate deadline (7 days from now)
+                                const deadline = new Date(now);
+                                deadline.setDate(deadline.getDate() + 7);
+
+                                const penaltyData = {
+                                    employeeId: employeeData.id,
+                                    employeeName: employeeData.name,
+                                    employeeRole: employeeData.role,
+                                    date: formatDate(now),
+                                    reason: 'Meeting',
+                                    minutes: lateInfo.lateMinutes,
+                                    amount: lateInfo.amount,
+                                    baseAmount: lateInfo.amount,
+                                    deadline: formatDate(deadline),
+                                    status: 'Not Submitted',
+                                    createdAt: now.toISOString(),
+                                    lastModified: now.toISOString()
+                                };
+
+                                // Save penalty record to Firebase
+                                await database.ref('penalties').push(penaltyData);
+                            }
 
                             // Stop scanner and hide reader
                             await html5QrCode.stop();
@@ -5534,8 +5559,9 @@
                             // Show success animation
                             showScanResult('Attendance recorded successfully', true);
 
-                            // Update attendance tables
+                            // Update both attendance and penalty tables
                             await updateAttendanceTable();
+                            await loadEmployeePenalties(employeeData.id);
 
                         } catch (error) {
                             console.error('Error recording attendance:', error);
