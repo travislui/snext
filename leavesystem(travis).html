@@ -3637,51 +3637,69 @@
             };
         }
 
-        // Function to update the agent's attendance table
-        function updateAgentAttendanceTable(userId) {
+        function updateAttendanceTable() {
             const tableBody = document.getElementById('attendanceTableBody');
-            if (!tableBody) return;
+            if (!tableBody || !currentUser) return;
 
-            const attendanceRef = database.ref(`attendance/${userId}`);
+            // Get today's date in YYYY-MM-DD format
+            const today = new Date().toISOString().split('T')[0];
+
+            // Reference to the current user's attendance records
+            const attendanceRef = database.ref(`attendance/${currentUser.uid}`);
+            
+            // Remove any existing listeners
             attendanceRef.off('value');
             
+            // Set up a new listener
             attendanceRef.on('value', (snapshot) => {
-                tableBody.innerHTML = '';
+                tableBody.innerHTML = ''; // Clear existing records
                 
                 const records = snapshot.val() || {};
-                const sortedRecords = Object.entries(records)
-                    .sort(([, a], [, b]) => new Date(b.timestamp) - new Date(a.timestamp));
+                let todayRecord = null;
 
-                if (sortedRecords.length === 0) {
-                    tableBody.innerHTML = `
-                        <tr>
-                            <td colspan="3" class="px-6 py-4 text-center text-gray-500">
-                                No attendance records found
-                            </td>
-                        </tr>
-                    `;
-                    return;
-                }
+                // Find today's record
+                Object.entries(records).forEach(([recordId, record]) => {
+                    const recordDate = new Date(record.timestamp).toISOString().split('T')[0];
+                    if (recordDate === today) {
+                        todayRecord = record;
+                    }
+                });
 
-                sortedRecords.forEach(([id, record]) => {
-                    const recordTime = new Date(record.timestamp);
+                if (todayRecord) {
+                    const recordTime = new Date(todayRecord.timestamp);
+                    const formattedTime = recordTime.toLocaleTimeString();
+                    const formattedDate = recordTime.toLocaleDateString();
+
                     const row = document.createElement('tr');
                     row.innerHTML = `
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            ${record.employeeName}
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            ${formatDate(recordTime)} ${formatTime(recordTime)}
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm font-medium text-gray-900">
+                                ${currentUser.name}
+                            </div>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
-                            <span class="status-badge ${record.status.toLowerCase()}">
-                                ${record.status}
-                                ${record.amount > 0 ? ` (-$${record.amount})` : ''}
+                            <div class="text-sm text-gray-900">
+                                ${formattedDate} ${formattedTime}
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="status-badge ${todayRecord.status.toLowerCase()}">
+                                ${todayRecord.status}
+                                ${todayRecord.amount > 0 ? ` (-$${todayRecord.amount})` : ''}
                             </span>
                         </td>
                     `;
                     tableBody.appendChild(row);
-                });
+                } else {
+                    // Show "No record for today" message
+                    const noRecordRow = document.createElement('tr');
+                    noRecordRow.innerHTML = `
+                        <td colspan="3" class="px-6 py-4 text-center text-gray-500">
+                            No attendance record for today
+                        </td>
+                    `;
+                    tableBody.appendChild(noRecordRow);
+                }
             });
         }
 
@@ -3712,15 +3730,23 @@
                 // Get current date and time
                 const now = new Date();
                 const currentDate = formatDate(now);
+                const currentTime = now.toLocaleTimeString();
 
                 // Check for existing attendance record for today
-                const userAttendanceRef = database.ref(`attendance/${user.uid}`);
-                const todayRecords = await userAttendanceRef
+                const attendanceRef = database.ref('attendance');
+                const todayRecords = await attendanceRef
                     .orderByChild('date')
                     .equalTo(currentDate)
                     .once('value');
 
-                if (todayRecords.exists()) {
+                let existingRecord = false;
+                todayRecords.forEach(record => {
+                    if (record.val().employeeId === employeeId) {
+                        existingRecord = true;
+                    }
+                });
+
+                if (existingRecord) {
                     showScanResult('Attendance already recorded for today', false);
                     stopScanner();
                     return;
@@ -3732,6 +3758,8 @@
                 const ipAddress = ipData.ip;
 
                 // Calculate late status
+                const cutoffTime = new Date(now);
+                cutoffTime.setHours(9, 30, 0, 0);
                 const lateInfo = calculateLateStatus(now.toISOString(), employeeData.role);
 
                 // Create new attendance record
@@ -3740,7 +3768,7 @@
                     employeeName: employeeData.name,
                     role: employeeData.role,
                     date: currentDate,
-                    time: formatTime(now),
+                    time: currentTime,
                     timestamp: now.toISOString(),
                     status: lateInfo.status,
                     lateMinutes: lateInfo.lateMinutes,
@@ -3748,17 +3776,11 @@
                     ipAddress: ipAddress
                 };
 
-                // Save to attendance collection under user's UID
-                await userAttendanceRef.push(attendanceData);
+                // Save directly to attendance collection
+                await attendanceRef.push(attendanceData);
 
                 // Show success message
                 showScanResult('Attendance recorded successfully', true);
-
-                // Update both tables
-                if (isAdmin) {
-                    updateAdminAttendanceTable();
-                }
-                updateAgentAttendanceTable(user.uid);
 
                 // Stop the scanner
                 stopScanner();
@@ -3782,74 +3804,40 @@
             }
         }
 
-        function updateAdminAttendanceTable() {
-            const tableBody = document.getElementById('allAttendanceTableBody');
-            if (!tableBody) return;
+        async function updateAttendanceTable() {
+            try {
+                const attendanceRef = database.ref('attendance');
+                const snapshot = await attendanceRef.once('value');
+                const records = snapshot.val() || {};
+                console.log('Records fetched:', records);
 
-            const attendanceRef = database.ref('attendance');
-            attendanceRef.off('value');
-
-            attendanceRef.on('value', (snapshot) => {
+                const tableBody = document.getElementById('allAttendanceTableBody');
                 tableBody.innerHTML = '';
-                
-                const records = [];
-                snapshot.forEach(userSnapshot => {
-                    const userId = userSnapshot.key;
-                    userSnapshot.forEach(recordSnapshot => {
-                        records.push({
-                            id: recordSnapshot.key,
-                            userId: userId,
-                            ...recordSnapshot.val()
-                        });
-                    });
-                });
 
-                // Sort records by timestamp (newest first)
-                records.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+                const sortedRecords = Object.entries(records)
+                    .sort(([, a], [, b]) => new Date(b.timestamp) - new Date(a.timestamp));
 
-                if (records.length === 0) {
-                    tableBody.innerHTML = `
-                        <tr>
-                            <td colspan="6" class="px-6 py-4 text-center text-gray-500">
-                                No attendance records found
-                            </td>
-                        </tr>
-                    `;
+                if (sortedRecords.length === 0) {
+                    tableBody.innerHTML = `<tr><td colspan="6" class="px-6 py-4 text-center text-gray-500">No attendance records found</td></tr>`;
                     return;
                 }
 
-                records.forEach(record => {
-                    const recordTime = new Date(record.timestamp);
+                sortedRecords.forEach(([id, record]) => {
                     const row = document.createElement('tr');
                     row.innerHTML = `
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            ${record.employeeName || 'N/A'}
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            ${record.role || 'N/A'}
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            ${formatDate(recordTime)} ${formatTime(recordTime)}
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <span class="status-badge ${record.status?.toLowerCase() || 'unknown'}">
-                                ${record.status}
-                                ${record.amount > 0 ? ` (-$${record.amount})` : ''}
-                            </span>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            ${record.ipAddress || 'N/A'}
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <button onclick="removeAttendanceRecord('${record.userId}', '${record.id}')" 
-                                    class="remove-btn-small">
-                                Remove
-                            </button>
-                        </td>
+                        <td class="px-6 py-4">${record.employeeName || 'N/A'}</td>
+                        <td class="px-6 py-4">${record.role || 'N/A'}</td>
+                        <td class="px-6 py-4">${record.timestamp ? `${formatDate(new Date(record.timestamp))} ${formatTime(new Date(record.timestamp))}` : 'Invalid Date'}</td>
+                        <td class="px-6 py-4"><span class="status-badge ${record.status?.toLowerCase() || 'unknown'}">${record.status || 'N/A'}</span></td>
+                        <td class="px-6 py-4">${record.ipAddress || 'N/A'}</td>
+                        <td class="px-6 py-4"><button class="remove-btn-small" onclick="removeAttendanceRecord('${id}')">Remove</button></td>
                     `;
                     tableBody.appendChild(row);
                 });
-            });
+            } catch (error) {
+                console.error('Error updating attendance table:', error);
+                showSyncStatus('Error loading attendance records', 'error');
+            }
         }
 
         async function removeAttendanceRecord(recordId) {
@@ -4908,10 +4896,18 @@
                     throw new Error('Only administrators can remove attendance records');
                 }
 
-                if (confirm('Are you sure you want to remove this attendance record?')) {
-                    await database.ref(`attendance/${userId}/${recordId}`).remove();
-                    showSyncStatus('Attendance record removed successfully');
+                // Confirm deletion
+                if (!confirm('Are you sure you want to remove this attendance record?')) {
+                    return;
                 }
+
+                // Remove the record
+                await database.ref(`attendance/${userId}/${recordId}`).remove();
+
+                // Show success message
+                showSyncStatus('Attendance record removed successfully');
+
+                // Records will automatically update due to the real-time listener
             } catch (error) {
                 console.error('Error removing attendance record:', error);
                 alert('Error removing attendance record: ' + error.message);
@@ -6775,18 +6771,6 @@
                 employeeFilter.value = '';
                 updateAttendanceTable();
             });
-        });
-
-        // Add these calls to your initialization code
-        document.addEventListener('DOMContentLoaded', function() {
-            const user = auth.currentUser;
-            if (user) {
-                if (isAdmin) {
-                    updateAdminAttendanceTable();
-                } else {
-                    updateAgentAttendanceTable(user.uid);
-                }
-            }
         });
 
         function resetAttendanceFilters() {
