@@ -1082,6 +1082,11 @@
             font-weight: 700;
         }
 
+        .status-badge.unknown {
+            background-color: #6B7280;
+            color: white;
+        }
+
         /* For the penalty amount */
         .penalty-amount {
             color: #dc2626;
@@ -2588,6 +2593,16 @@
             }
         });
 
+        // Call this when the admin page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeAttendanceSystem();
+        });
+
+        // Call this when the page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeAttendanceTable();
+        });
+
         // Function to change admin password
         async function changeAdminPassword(currentPassword, newPassword) {
             try {
@@ -3402,6 +3417,15 @@
             return `${year}-${month}-${day}`;
         }
 
+        function formatTime(date) {
+            return new Date(date).toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: true
+            });
+        }
+
         async function processLeaveApplication(applyDate, leaveStartDate, leaveEndDate, leaveType, proofDataUrl) {
             try {
                 // Calculate leave days
@@ -3644,7 +3668,7 @@
                 status = 'Punctual';
                 amount = 0;
             } else {
-                if (lateMinutes >= 480) { // 8 hours or more (No Show)
+                if (lateMinutes >= 60) { // 1 hours or more (No Show)
                     status = 'No Show';
                     amount = 200;
                 } else if (lateMinutes <= 5) {
@@ -3732,7 +3756,7 @@
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="text-sm text-gray-900">
-                                    ${recordTime.toLocaleDateString()} ${recordTime.toLocaleTimeString()}
+                                    ${formatDate(recordTime)} ${formatTime(recordTime)}
                                 </div>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
@@ -3762,14 +3786,18 @@
                     adminTableBody.innerHTML = '';
 
                     // Fetch all attendance records
-                    const allRecordsSnapshot = await database.ref('attendance').once('value');
+                    const attendanceRef = database.ref('attendance');
+                    const snapshot = await attendanceRef.once('value');
                     const records = [];
-                    
-                    allRecordsSnapshot.forEach(child => {
-                        records.push({
-                            id: child.key,
-                            ...child.val()
-                        });
+
+                    snapshot.forEach((childSnapshot) => {
+                        const record = childSnapshot.val();
+                        if (record.employeeName && record.timestamp) { // Ensure we have valid data
+                            records.push({
+                                id: childSnapshot.key,
+                                ...record
+                            });
+                        }
                     });
 
                     // Sort records by timestamp (newest first)
@@ -3786,12 +3814,14 @@
                     } else {
                         records.forEach(record => {
                             const row = document.createElement('tr');
-                            const recordTime = new Date(record.timestamp);
+                            const recordDate = new Date(record.timestamp);
                             
                             row.innerHTML = `
                                 <td class="px-6 py-4">${record.employeeName || 'N/A'}</td>
                                 <td class="px-6 py-4">${record.role || 'N/A'}</td>
-                                <td class="px-6 py-4">${formatDate(recordTime)} ${formatTime(recordTime)}</td>
+                                <td class="px-6 py-4">
+                                    ${formatDate(recordDate)} ${formatTime(recordDate)}
+                                </td>
                                 <td class="px-6 py-4">
                                     <span class="status-badge ${record.status?.toLowerCase() || 'unknown'}">
                                         ${record.status || 'N/A'}
@@ -4370,16 +4400,6 @@
                 console.error('Error loading applications:', error);
                 showSyncStatus('Error loading applications', 'error');
             }
-        }
-
-        // Add this helper function to format time
-        function formatTime(date) {
-            return date.toLocaleTimeString('en-US', {
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-                hour12: false
-            });
         }
 
         // Add this new handler function
@@ -5516,7 +5536,7 @@
                                 employeeId: employeeData.id,
                                 employeeName: employeeData.name,
                                 role: employeeData.role,
-                                date: today,
+                                date: formatDate(now),
                                 time: formatTime(now),
                                 timestamp: now.toISOString(),
                                 status: lateInfo.status,
@@ -5525,8 +5545,9 @@
                                 ipAddress: ipData.ip
                             };
 
-                            // Save attendance record to Firebase
-                            await database.ref('attendance').push(attendanceData);
+                            // Save attendance record with a proper path
+                            const attendanceRef = database.ref('attendance');
+                            await attendanceRef.push(attendanceData);
 
                             // If there's a penalty amount, check for existing penalty record
                             if (lateInfo.amount > 0) {
@@ -6980,6 +7001,23 @@
 
             // Initialize employee select
             updateAllEmployeeSelects();
+        }
+
+        // Add this to your initialization code
+        function initializeAttendanceSystem() {
+            // Add real-time listener for attendance updates
+            const attendanceRef = database.ref('attendance');
+            attendanceRef.on('value', (snapshot) => {
+                updateAttendanceTable();
+            });
+        }
+
+        // Make sure to initialize the real-time listener
+        function initializeAttendanceTable() {
+            const attendanceRef = database.ref('attendance');
+            attendanceRef.on('value', () => {
+                updateAttendanceTable();
+            });
         }
 
         // Helper function to update the application table
