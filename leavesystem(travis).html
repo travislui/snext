@@ -2140,7 +2140,7 @@
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                     </tr>
                 </thead>
-                <tbody id="attendanceTableBody" class="bg-white divide-y divide-gray-200">
+                <tbody id="employee-attendance-table-body" class="bg-white divide-y divide-gray-200">
                     <!-- Records will be inserted here -->
                 </tbody>
             </table>
@@ -2300,6 +2300,7 @@
                             showAdminInterface();
                             loadEmployees();
                             loadAllApplications();
+                            loadEmployeeAttendance(user.uid); // Load attendance records
                             loadAllPenalties();
                             
                             // Show success message
@@ -5388,44 +5389,88 @@
         // Add this in your script section
         let html5QrcodeScanner = null;
 
-        async function startScanning() {
+        function startScanning() {
             const html5QrCode = new Html5Qrcode("reader");
             const readerDiv = document.getElementById('reader');
             readerDiv.style.display = 'block';
 
-            await html5QrCode.start(
+            html5QrCode.start(
                 { facingMode: "environment" },
-                { fps: 10, qrbox: { width: 250, height: 250 } },
-                async (decodedText) => {
-                    const employeeId = decodedText;
-                    const employeeSnapshot = await database.ref(`employees/${employeeId}`).once('value');
-                    const employeeData = employeeSnapshot.val();
-
-                    if (!employeeData) throw new Error('Employee not found');
-
-                    const now = new Date();
-                    const attendanceData = {
-                        employeeId: employeeId,
-                        employeeName: employeeData.name || 'Unknown',
-                        role: employeeData.role || 'Unknown',
-                        date: formatDate(now),
-                        time: formatTime(now),
-                        timestamp: now.toISOString(),
-                        status: now.getHours() < 9 ? 'Punctual' : 'Late',
-                        ipAddress: await fetch('https://api.ipify.org').then(res => res.text()).catch(() => 'N/A'),
-                    };
-
-                    const attendanceRef = database.ref('attendance');
-                    await attendanceRef.push(attendanceData);
-
-                    await html5QrCode.stop();
-                    readerDiv.style.display = 'none';
-
-                    showSyncStatus('Attendance recorded successfully');
-                    await updateAttendanceTable(); // Single source of truth
+                {
+                    fps: 10,
+                    qrbox: { width: 250, height: 250 }
                 },
-                (error) => console.warn('QR scan error:', error)
-            );
+                async (decodedText, decodedResult) => {
+                    try {
+                        // Parse QR code data (assuming it contains some identifier or timestamp)
+                        const qrData = JSON.parse(decodedText);
+                        const employeeId = auth.currentUser.uid; // Assuming agent is logged in
+                        const employeeSnapshot = await database.ref(`employees/${employeeId}`).once('value');
+                        const employeeData = employeeSnapshot.val();
+
+                        if (!employeeData) {
+                            throw new Error('Employee not found');
+                        }
+
+                        // Get IP address (you might already have this logic)
+                        const ipResponse = await fetch('https://api.ipify.org?format=json');
+                        const ipData = await ipResponse.json();
+                        const ipAddress = ipData.ip;
+
+                        // Determine status (example logic)
+                        const now = new Date();
+                        const status = now.getHours() < 9 ? 'Punctual' : 'Late'; // Example: before 9 AM is punctual
+
+                        // Save attendance record
+                        const attendanceData = {
+                            employeeId: employeeId,
+                            employeeName: employeeData.name,
+                            role: employeeData.role,
+                            timestamp: now.toISOString(),
+                            date: formatDate(now),
+                            status: status,
+                            ipAddress: ipAddress
+                        };
+
+                        const attendanceRef = database.ref('attendance');
+                        await attendanceRef.push(attendanceData);
+
+                        // Stop scanning
+                        html5QrCode.stop().then(() => {
+                            readerDiv.style.display = 'none';
+                            showScanResult('Attendance recorded successfully', 'success');
+                        });
+
+                        // Update both tables
+                        updateAttendanceTable(); // Admin table
+                        loadEmployeeAttendance(employeeId); // Agent table
+
+                    } catch (error) {
+                        console.error('Error processing QR code:', error);
+                        showScanResult('Error recording attendance: ' + error.message, 'error');
+                    }
+                },
+                (errorMessage) => {
+                    console.warn('QR scan error:', errorMessage);
+                }
+            ).catch(err => {
+                console.error('Unable to start scanning:', err);
+                showScanResult('Unable to start scanner', 'error');
+            });
+        }
+
+        // Helper function to show scan result
+        function showScanResult(message, type) {
+            const resultDiv = document.getElementById('scan-result');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = `
+                <div class="sync-status ${type === 'success' ? 'success' : 'error'}">
+                    ${message}
+                </div>
+            `;
+            setTimeout(() => {
+                resultDiv.style.display = 'none';
+            }, 3000);
         }
 
         function onScanFailure(error) {
@@ -6703,6 +6748,50 @@
                         confirmButton: 'custom-swal-confirm-button'
                     }
                 });
+            }
+        }
+
+        async function loadEmployeeAttendance(employeeId) {
+            try {
+                const attendanceRef = database.ref('attendance');
+                const snapshot = await attendanceRef.orderByChild('employeeId').equalTo(employeeId).once('value');
+                const records = snapshot.val() || {};
+
+                const tableBody = document.getElementById('employee-attendance-table-body');
+                if (!tableBody) {
+                    console.error('Employee attendance table body not found');
+                    return;
+                }
+
+                tableBody.innerHTML = ''; // Clear existing rows
+
+                if (Object.keys(records).length === 0) {
+                    tableBody.innerHTML = `
+                        <tr>
+                            <td colspan="5" class="px-6 py-4 text-center text-gray-500">
+                                No attendance records found
+                            </td>
+                        </tr>
+                    `;
+                    return;
+                }
+
+                // Sort by timestamp (newest first)
+                const sortedRecords = Object.entries(records).sort(([, a], [, b]) => new Date(b.timestamp) - new Date(a.timestamp));
+
+                sortedRecords.forEach(([id, record]) => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td class="px-6 py-4">${record.employeeName || 'N/A'}</td>
+                        <td class="px-6 py-4">${record.timestamp ? `${formatDate(new Date(record.timestamp))} ${formatTime(new Date(record.timestamp))}` : 'Invalid Date'}</td>
+                        <td class="px-6 py-4"><span class="status-badge ${record.status?.toLowerCase() || 'unknown'}">${record.status || 'N/A'}</span></td>
+                        <td class="px-6 py-4">${record.ipAddress || 'N/A'}</td>
+                    `;
+                    tableBody.appendChild(row);
+                });
+            } catch (error) {
+                console.error('Error loading employee attendance:', error);
+                showSyncStatus('Error loading attendance records', 'error');
             }
         }
 
