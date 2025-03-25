@@ -3637,70 +3637,129 @@
             };
         }
 
-        function updateAttendanceTable() {
-            const tableBody = document.getElementById('attendanceTableBody');
-            if (!tableBody || !currentUser) return;
+        async function updateAttendanceTable() {
+            try {
+                // Update agent's personal attendance table (today's record only)
+                const agentTableBody = document.getElementById('attendanceTableBody');
+                if (agentTableBody && currentUser) {
+                    // Get today's date in YYYY-MM-DD format
+                    const today = new Date().toISOString().split('T')[0];
+                    
+                    // Clear existing records
+                    agentTableBody.innerHTML = '';
 
-            // Get today's date in YYYY-MM-DD format
-            const today = new Date().toISOString().split('T')[0];
+                    // Fetch today's records for current user
+                    const attendanceRef = database.ref('attendance');
+                    const userSnapshot = await attendanceRef
+                        .orderByChild('employeeId')
+                        .equalTo(currentUser.id)
+                        .once('value');
 
-            // Reference to the current user's attendance records
-            const attendanceRef = database.ref(`attendance/${currentUser.uid}`);
-            
-            // Remove any existing listeners
-            attendanceRef.off('value');
-            
-            // Set up a new listener
-            attendanceRef.on('value', (snapshot) => {
-                tableBody.innerHTML = ''; // Clear existing records
-                
-                const records = snapshot.val() || {};
-                let todayRecord = null;
+                    const records = [];
+                    userSnapshot.forEach(child => {
+                        const record = child.val();
+                        const recordDate = new Date(record.timestamp).toISOString().split('T')[0];
+                        if (recordDate === today) {
+                            records.push(record);
+                        }
+                    });
 
-                // Find today's record
-                Object.entries(records).forEach(([recordId, record]) => {
-                    const recordDate = new Date(record.timestamp).toISOString().split('T')[0];
-                    if (recordDate === today) {
-                        todayRecord = record;
+                    if (records.length > 0) {
+                        // Show today's record
+                        const todayRecord = records[0]; // Take the first record if multiple exist
+                        const recordTime = new Date(todayRecord.timestamp);
+
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm font-medium text-gray-900">
+                                    ${currentUser.name}
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm text-gray-900">
+                                    ${recordTime.toLocaleDateString()} ${recordTime.toLocaleTimeString()}
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="status-badge ${todayRecord.status.toLowerCase()}">
+                                    ${todayRecord.status}
+                                    ${todayRecord.amount > 0 ? ` (-$${todayRecord.amount})` : ''}
+                                </span>
+                            </td>
+                        `;
+                        agentTableBody.appendChild(row);
+                    } else {
+                        // Show "No record for today" message
+                        agentTableBody.innerHTML = `
+                            <tr>
+                                <td colspan="3" class="px-6 py-4 text-center text-gray-500">
+                                    No attendance record for today
+                                </td>
+                            </tr>
+                        `;
                     }
-                });
-
-                if (todayRecord) {
-                    const recordTime = new Date(todayRecord.timestamp);
-                    const formattedTime = recordTime.toLocaleTimeString();
-                    const formattedDate = recordTime.toLocaleDateString();
-
-                    const row = document.createElement('tr');
-                    row.innerHTML = `
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm font-medium text-gray-900">
-                                ${currentUser.name}
-                            </div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm text-gray-900">
-                                ${formattedDate} ${formattedTime}
-                            </div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <span class="status-badge ${todayRecord.status.toLowerCase()}">
-                                ${todayRecord.status}
-                                ${todayRecord.amount > 0 ? ` (-$${todayRecord.amount})` : ''}
-                            </span>
-                        </td>
-                    `;
-                    tableBody.appendChild(row);
-                } else {
-                    // Show "No record for today" message
-                    const noRecordRow = document.createElement('tr');
-                    noRecordRow.innerHTML = `
-                        <td colspan="3" class="px-6 py-4 text-center text-gray-500">
-                            No attendance record for today
-                        </td>
-                    `;
-                    tableBody.appendChild(noRecordRow);
                 }
-            });
+
+                // Update admin's all attendance records table
+                const adminTableBody = document.getElementById('allAttendanceTableBody');
+                if (adminTableBody) {
+                    // Clear existing records
+                    adminTableBody.innerHTML = '';
+
+                    // Fetch all attendance records
+                    const allRecordsSnapshot = await database.ref('attendance').once('value');
+                    const records = [];
+                    
+                    allRecordsSnapshot.forEach(child => {
+                        records.push({
+                            id: child.key,
+                            ...child.val()
+                        });
+                    });
+
+                    // Sort records by timestamp (newest first)
+                    records.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+                    if (records.length === 0) {
+                        adminTableBody.innerHTML = `
+                            <tr>
+                                <td colspan="6" class="px-6 py-4 text-center text-gray-500">
+                                    No attendance records found
+                                </td>
+                            </tr>
+                        `;
+                    } else {
+                        records.forEach(record => {
+                            const row = document.createElement('tr');
+                            const recordTime = new Date(record.timestamp);
+                            
+                            row.innerHTML = `
+                                <td class="px-6 py-4">${record.employeeName || 'N/A'}</td>
+                                <td class="px-6 py-4">${record.role || 'N/A'}</td>
+                                <td class="px-6 py-4">${formatDate(recordTime)} ${formatTime(recordTime)}</td>
+                                <td class="px-6 py-4">
+                                    <span class="status-badge ${record.status?.toLowerCase() || 'unknown'}">
+                                        ${record.status || 'N/A'}
+                                        ${record.amount > 0 ? ` (-$${record.amount})` : ''}
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4">${record.ipAddress || 'N/A'}</td>
+                                <td class="px-6 py-4">
+                                    <button class="remove-btn-small" onclick="removeAttendanceRecord('${record.id}')">
+                                        Remove
+                                    </button>
+                                </td>
+                            `;
+                            adminTableBody.appendChild(row);
+                        });
+                    }
+                }
+
+            } catch (error) {
+                console.error('Error updating attendance tables:', error);
+                showSyncStatus('Error updating attendance records', 'error');
+            }
         }
 
         // Modify your onScanSuccess function to update the table
@@ -3801,42 +3860,6 @@
                     console.error('Error stopping scanner:', err);
                 });
                 html5QrcodeScanner = null;
-            }
-        }
-
-        async function updateAttendanceTable() {
-            try {
-                const attendanceRef = database.ref('attendance');
-                const snapshot = await attendanceRef.once('value');
-                const records = snapshot.val() || {};
-                console.log('Records fetched:', records);
-
-                const tableBody = document.getElementById('allAttendanceTableBody');
-                tableBody.innerHTML = '';
-
-                const sortedRecords = Object.entries(records)
-                    .sort(([, a], [, b]) => new Date(b.timestamp) - new Date(a.timestamp));
-
-                if (sortedRecords.length === 0) {
-                    tableBody.innerHTML = `<tr><td colspan="6" class="px-6 py-4 text-center text-gray-500">No attendance records found</td></tr>`;
-                    return;
-                }
-
-                sortedRecords.forEach(([id, record]) => {
-                    const row = document.createElement('tr');
-                    row.innerHTML = `
-                        <td class="px-6 py-4">${record.employeeName || 'N/A'}</td>
-                        <td class="px-6 py-4">${record.role || 'N/A'}</td>
-                        <td class="px-6 py-4">${record.timestamp ? `${formatDate(new Date(record.timestamp))} ${formatTime(new Date(record.timestamp))}` : 'Invalid Date'}</td>
-                        <td class="px-6 py-4"><span class="status-badge ${record.status?.toLowerCase() || 'unknown'}">${record.status || 'N/A'}</span></td>
-                        <td class="px-6 py-4">${record.ipAddress || 'N/A'}</td>
-                        <td class="px-6 py-4"><button class="remove-btn-small" onclick="removeAttendanceRecord('${id}')">Remove</button></td>
-                    `;
-                    tableBody.appendChild(row);
-                });
-            } catch (error) {
-                console.error('Error updating attendance table:', error);
-                showSyncStatus('Error loading attendance records', 'error');
             }
         }
 
@@ -4317,19 +4340,50 @@
             resultDiv.style.display = 'block';
             resultDiv.innerHTML = isSuccess
                 ? `
-                    <div class="success-checkmark">
-                        <div class="check-icon">
-                            <span class="icon-line line-tip"></span>
-                            <span class="icon-line line-long"></span>
-                            <div class="icon-circle"></div>
-                            <div class="icon-fix"></div>
+                    <div style="
+                        position: fixed;
+                        top: 50%;
+                        left: 50%;
+                        transform: translate(-50%, -50%);
+                        background: white;
+                        padding: 20px;
+                        border-radius: 10px;
+                        box-shadow: 0 0 10px rgba(0,0,0,0.2);
+                        text-align: center;
+                        z-index: 1000;
+                    ">
+                        <div class="success-checkmark">
+                            <div class="check-icon">
+                                <span class="icon-line line-tip"></span>
+                                <span class="icon-line line-long"></span>
+                                <div class="icon-circle"></div>
+                                <div class="icon-fix"></div>
+                            </div>
                         </div>
+                        <p style="margin-top: 20px; color: #4CAF50; font-weight: bold;">${message}</p>
                     </div>
-                    <p class="text-center mt-2">${message}</p>
                 `
-                : `<p class="text-center text-red-500">${message}</p>`;
+                : `
+                    <div style="
+                        position: fixed;
+                        top: 50%;
+                        left: 50%;
+                        transform: translate(-50%, -50%);
+                        background: white;
+                        padding: 20px;
+                        border-radius: 10px;
+                        box-shadow: 0 0 10px rgba(0,0,0,0.2);
+                        text-align: center;
+                        z-index: 1000;
+                    ">
+                        <p style="color: #f44336; font-weight: bold;">${message}</p>
+                    </div>
+                `;
+
+            // Hide the message after 3 seconds
             setTimeout(() => {
                 resultDiv.style.display = 'none';
+                resultDiv.innerHTML = '';
             }, 3000);
         }
 
@@ -5389,43 +5443,99 @@
         let html5QrcodeScanner = null;
 
         async function startScanning() {
-            const html5QrCode = new Html5Qrcode("reader");
-            const readerDiv = document.getElementById('reader');
-            readerDiv.style.display = 'block';
+            try {
+                const html5QrCode = new Html5Qrcode("reader");
+                const readerDiv = document.getElementById('reader');
+                readerDiv.style.display = 'block';
 
-            await html5QrCode.start(
-                { facingMode: "environment" },
-                { fps: 10, qrbox: { width: 500, height: 500 } },
-                async (decodedText) => {
-                    const employeeId = decodedText;
-                    const employeeSnapshot = await database.ref(`employees/${employeeId}`).once('value');
-                    const employeeData = employeeSnapshot.val();
+                const config = {
+                    fps: 10,
+                    qrbox: { width: 250, height: 250 },
+                    aspectRatio: 1.0
+                };
 
-                    if (!employeeData) throw new Error('Employee not found');
+                await html5QrCode.start(
+                    { facingMode: "environment" },
+                    config,
+                    async (decodedText) => {
+                        try {
+                            // Get current time
+                            const now = new Date();
+                            
+                            // Get user's IP address
+                            const ipResponse = await fetch('https://api.ipify.org?format=json');
+                            const ipData = await ipResponse.json();
+                            const ipAddress = ipData.ip;
 
-                    const now = new Date();
-                    const attendanceData = {
-                        employeeId: employeeId,
-                        employeeName: employeeData.name || 'Unknown',
-                        role: employeeData.role || 'Unknown',
-                        date: formatDate(now),
-                        time: formatTime(now),
-                        timestamp: now.toISOString(),
-                        status: now.getHours() < 9 ? 'Punctual' : 'Late',
-                        ipAddress: await fetch('https://api.ipify.org').then(res => res.text()).catch(() => 'N/A'),
-                    };
+                            // Get current user data
+                            const user = auth.currentUser;
+                            if (!user) throw new Error('User not authenticated');
 
-                    const attendanceRef = database.ref('attendance');
-                    await attendanceRef.push(attendanceData);
+                            // Get employee data
+                            const employeesRef = database.ref('employees');
+                            const employeeSnapshot = await employeesRef
+                                .orderByChild('uid')
+                                .equalTo(user.uid)
+                                .once('value');
 
-                    await html5QrCode.stop();
-                    readerDiv.style.display = 'none';
+                            let employeeData = null;
+                            employeeSnapshot.forEach((child) => {
+                                employeeData = { id: child.key, ...child.val() };
+                            });
 
-                    showSyncStatus('Attendance recorded successfully');
-                    await updateAttendanceTable(); // Single source of truth
-                },
-                (error) => console.warn('QR scan error:', error)
-            );
+                            if (!employeeData) throw new Error('Employee not found');
+
+                            // Calculate late status
+                            const lateInfo = calculateLateStatus(now.toISOString(), employeeData.role);
+
+                            // Create attendance record
+                            const attendanceData = {
+                                employeeId: employeeData.id,
+                                employeeName: employeeData.name,
+                                role: employeeData.role,
+                                date: formatDate(now),
+                                time: formatTime(now),
+                                timestamp: now.toISOString(),
+                                status: lateInfo.status,
+                                lateMinutes: lateInfo.lateMinutes,
+                                amount: lateInfo.amount,
+                                ipAddress: ipAddress
+                            };
+
+                            // Save to Firebase
+                            await database.ref('attendance').push(attendanceData);
+
+                            // Stop the scanner
+                            await html5QrCode.stop();
+                            readerDiv.style.display = 'none';
+
+                            // Show success animation
+                            showScanResult('Attendance recorded successfully', true);
+
+                            // Update tables
+                            updateAttendanceTable();
+                            if (typeof loadAllAttendanceRecords === 'function') {
+                                loadAllAttendanceRecords();
+                            }
+
+                        } catch (error) {
+                            console.error('Error processing scan:', error);
+                            showScanResult(error.message, false);
+                            await html5QrCode.stop();
+                            readerDiv.style.display = 'none';
+                        }
+                    },
+                    (error) => {
+                        // Handle scan errors
+                        if (error && !error.includes("No QR code found")) {
+                            console.warn(`QR scan error: ${error}`);
+                        }
+                    }
+                );
+            } catch (error) {
+                console.error('Error starting scanner:', error);
+                showScanResult('Error starting scanner: ' + error.message, false);
+            }
         }
 
         function onScanFailure(error) {
