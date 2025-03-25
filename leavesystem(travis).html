@@ -1389,6 +1389,61 @@
             background-color: var(--accent-color) !important;
         }
 
+        .success-animation {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.2);
+            z-index: 2000;
+        }
+
+        .checkmark {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            display: block;
+            stroke-width: 2;
+            stroke: #4CAF50;
+            stroke-miterlimit: 10;
+            box-shadow: inset 0px 0px 0px #4CAF50;
+            animation: fill .4s ease-in-out .4s forwards, scale .3s ease-in-out .9s both;
+            margin: 0 auto;
+        }
+
+        .checkmark__circle {
+            stroke-dasharray: 166;
+            stroke-dashoffset: 166;
+            stroke-width: 2;
+            stroke-miterlimit: 10;
+            stroke: #4CAF50;
+            fill: none;
+            animation: stroke 0.6s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+        }
+
+        .checkmark__check {
+            transform-origin: 50% 50%;
+            stroke-dasharray: 48;
+            stroke-dashoffset: 48;
+            animation: stroke 0.3s cubic-bezier(0.65, 0, 0.45, 1) 0.8s forwards;
+        }
+
+        @keyframes stroke {
+            100% { stroke-dashoffset: 0; }
+        }
+
+        @keyframes scale {
+            0%, 100% { transform: none; }
+            50% { transform: scale3d(1.1, 1.1, 1); }
+        }
+
+        @keyframes fill {
+            100% { box-shadow: inset 0px 0px 0px 30px #4CAF50; }
+        }
+
         #calendar-legend {
             margin-bottom: 1rem;
             padding: 0.5rem;
@@ -3577,7 +3632,6 @@
 
         function calculateLateStatus(timestamp, role) {
             const recordTime = new Date(timestamp);
-            const recordDate = recordTime.toLocaleDateString();
             
             // Create deadline time (9:30 AM) for the same day
             const deadline = new Date(recordTime);
@@ -3593,7 +3647,7 @@
                 status = 'Punctual';
                 amount = 0;
             } else {
-                if (lateMinutes >= 480) {
+                if (lateMinutes >= 480) { // 8 hours or more (No Show)
                     status = 'No Show';
                     amount = 200;
                 } else if (lateMinutes <= 5) {
@@ -3632,8 +3686,8 @@
 
             return {
                 status: status,
-                amount: amount,
-                lateMinutes: lateMinutes > 0 ? lateMinutes : 0
+                amount: Math.round(amount), // Round to nearest integer
+                lateMinutes: Math.max(0, lateMinutes) // Ensure non-negative
             };
         }
 
@@ -4338,49 +4392,29 @@
         function showScanResult(message, isSuccess) {
             const resultDiv = document.getElementById('scan-result');
             resultDiv.style.display = 'block';
-            resultDiv.innerHTML = isSuccess
-                ? `
-                    <div style="
-                        position: fixed;
-                        top: 50%;
-                        left: 50%;
-                        transform: translate(-50%, -50%);
-                        background: white;
-                        padding: 20px;
-                        border-radius: 10px;
-                        box-shadow: 0 0 10px rgba(0,0,0,0.2);
-                        text-align: center;
-                        z-index: 1000;
-                    ">
-                        <div class="success-checkmark">
-                            <div class="check-icon">
-                                <span class="icon-line line-tip"></span>
-                                <span class="icon-line line-long"></span>
-                                <div class="icon-circle"></div>
-                                <div class="icon-fix"></div>
-                            </div>
-                        </div>
-                        <p style="margin-top: 20px; color: #4CAF50; font-weight: bold;">${message}</p>
-                    </div>
-                `
-                : `
-                    <div style="
-                        position: fixed;
-                        top: 50%;
-                        left: 50%;
-                        transform: translate(-50%, -50%);
-                        background: white;
-                        padding: 20px;
-                        border-radius: 10px;
-                        box-shadow: 0 0 10px rgba(0,0,0,0.2);
-                        text-align: center;
-                        z-index: 1000;
-                    ">
-                        <p style="color: #f44336; font-weight: bold;">${message}</p>
+            
+            if (isSuccess) {
+                resultDiv.innerHTML = `
+                    <div class="success-animation">
+                        <svg class="checkmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52">
+                            <circle class="checkmark__circle" cx="26" cy="26" r="25" fill="none"/>
+                            <path class="checkmark__check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
+                        </svg>
+                        <p style="margin-top: 20px; color: #4CAF50; text-align: center; font-weight: bold;">
+                            ${message}
+                        </p>
                     </div>
                 `;
+            } else {
+                resultDiv.innerHTML = `
+                    <div class="success-animation">
+                        <p style="color: #f44336; text-align: center; font-weight: bold;">
+                            ${message}
+                        </p>
+                    </div>
+                `;
+            }
 
-            // Hide the message after 3 seconds
             setTimeout(() => {
                 resultDiv.style.display = 'none';
                 resultDiv.innerHTML = '';
@@ -5448,34 +5482,15 @@
                 const readerDiv = document.getElementById('reader');
                 readerDiv.style.display = 'block';
 
-                const config = {
-                    fps: 10,
-                    qrbox: { width: 250, height: 250 },
-                    aspectRatio: 1.0
-                };
-
                 await html5QrCode.start(
                     { facingMode: "environment" },
-                    config,
+                    { fps: 10, qrbox: { width: 250, height: 250 } },
                     async (decodedText) => {
                         try {
-                            // Get current time
-                            const now = new Date();
-                            
-                            // Get user's IP address
-                            const ipResponse = await fetch('https://api.ipify.org?format=json');
-                            const ipData = await ipResponse.json();
-                            const ipAddress = ipData.ip;
-
-                            // Get current user data
-                            const user = auth.currentUser;
-                            if (!user) throw new Error('User not authenticated');
-
-                            // Get employee data
-                            const employeesRef = database.ref('employees');
-                            const employeeSnapshot = await employeesRef
+                            // Get current user's employee data
+                            const employeeSnapshot = await database.ref('employees')
                                 .orderByChild('uid')
-                                .equalTo(user.uid)
+                                .equalTo(auth.currentUser.uid)
                                 .once('value');
 
                             let employeeData = null;
@@ -5483,7 +5498,14 @@
                                 employeeData = { id: child.key, ...child.val() };
                             });
 
-                            if (!employeeData) throw new Error('Employee not found');
+                            if (!employeeData) {
+                                throw new Error('Employee data not found');
+                            }
+
+                            // Get current time and IP
+                            const now = new Date();
+                            const ipResponse = await fetch('https://api.ipify.org?format=json');
+                            const ipData = await ipResponse.json();
 
                             // Calculate late status
                             const lateInfo = calculateLateStatus(now.toISOString(), employeeData.role);
@@ -5499,34 +5521,32 @@
                                 status: lateInfo.status,
                                 lateMinutes: lateInfo.lateMinutes,
                                 amount: lateInfo.amount,
-                                ipAddress: ipAddress
+                                ipAddress: ipData.ip
                             };
 
                             // Save to Firebase
                             await database.ref('attendance').push(attendanceData);
 
-                            // Stop the scanner
+                            // Stop scanner and hide reader
                             await html5QrCode.stop();
                             readerDiv.style.display = 'none';
 
                             // Show success animation
                             showScanResult('Attendance recorded successfully', true);
 
-                            // Update tables
-                            updateAttendanceTable();
-                            if (typeof loadAllAttendanceRecords === 'function') {
-                                loadAllAttendanceRecords();
-                            }
+                            // Update attendance tables
+                            await updateAttendanceTable();
 
                         } catch (error) {
-                            console.error('Error processing scan:', error);
+                            console.error('Error recording attendance:', error);
                             showScanResult(error.message, false);
+                            
+                            // Stop scanner and hide reader
                             await html5QrCode.stop();
                             readerDiv.style.display = 'none';
                         }
                     },
                     (error) => {
-                        // Handle scan errors
                         if (error && !error.includes("No QR code found")) {
                             console.warn(`QR scan error: ${error}`);
                         }
