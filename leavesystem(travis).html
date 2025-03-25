@@ -5484,7 +5484,7 @@
 
                 await html5QrCode.start(
                     { facingMode: "environment" },
-                    { fps: 10, qrbox: { width: 250, height: 250 } },
+                    { fps: 10, qrbox: { width: 700, height: 700 } },
                     async (decodedText) => {
                         try {
                             // Get current user's employee data
@@ -5504,6 +5504,7 @@
 
                             // Get current time and IP
                             const now = new Date();
+                            const today = formatDate(now);
                             const ipResponse = await fetch('https://api.ipify.org?format=json');
                             const ipData = await ipResponse.json();
 
@@ -5515,7 +5516,7 @@
                                 employeeId: employeeData.id,
                                 employeeName: employeeData.name,
                                 role: employeeData.role,
-                                date: formatDate(now),
+                                date: today,
                                 time: formatTime(now),
                                 timestamp: now.toISOString(),
                                 status: lateInfo.status,
@@ -5527,29 +5528,46 @@
                             // Save attendance record to Firebase
                             await database.ref('attendance').push(attendanceData);
 
-                            // If there's a penalty amount, create a penalty record
+                            // If there's a penalty amount, check for existing penalty record
                             if (lateInfo.amount > 0) {
-                                // Calculate deadline (7 days from now)
-                                const deadline = new Date(now);
-                                deadline.setDate(deadline.getDate() + 7);
+                                // Check for existing penalty record for today
+                                const penaltiesRef = database.ref('penalties');
+                                const existingPenaltySnapshot = await penaltiesRef
+                                    .orderByChild('employeeId')
+                                    .equalTo(employeeData.id)
+                                    .once('value');
 
-                                const penaltyData = {
-                                    employeeId: employeeData.id,
-                                    employeeName: employeeData.name,
-                                    employeeRole: employeeData.role,
-                                    date: formatDate(now),
-                                    reason: 'Meeting',
-                                    minutes: lateInfo.lateMinutes,
-                                    amount: lateInfo.amount,
-                                    baseAmount: lateInfo.amount,
-                                    deadline: formatDate(deadline),
-                                    status: 'Not Submitted',
-                                    createdAt: now.toISOString(),
-                                    lastModified: now.toISOString()
-                                };
+                                let existingPenaltyForToday = false;
+                                existingPenaltySnapshot.forEach(childSnapshot => {
+                                    const penalty = childSnapshot.val();
+                                    if (penalty.date === today) {
+                                        existingPenaltyForToday = true;
+                                    }
+                                });
 
-                                // Save penalty record to Firebase
-                                await database.ref('penalties').push(penaltyData);
+                                if (!existingPenaltyForToday) {
+                                    // Calculate deadline (7 days from now)
+                                    const deadline = new Date(now);
+                                    deadline.setDate(deadline.getDate() + 7);
+
+                                    const penaltyData = {
+                                        employeeId: employeeData.id,
+                                        employeeName: employeeData.name,
+                                        employeeRole: employeeData.role,
+                                        date: today,
+                                        reason: 'Meeting',
+                                        minutes: lateInfo.lateMinutes,
+                                        amount: lateInfo.amount,
+                                        baseAmount: lateInfo.amount,
+                                        deadline: formatDate(deadline),
+                                        status: 'Not Submitted',
+                                        createdAt: now.toISOString(),
+                                        lastModified: now.toISOString()
+                                    };
+
+                                    // Save penalty record to Firebase
+                                    await database.ref('penalties').push(penaltyData);
+                                }
                             }
 
                             // Stop scanner and hide reader
