@@ -3414,27 +3414,6 @@
             }
         });
 
-        function formatDate(date) {
-            // If date is a string, convert it to Date object
-            if (typeof date === 'string') {
-                date = new Date(date);
-            }
-            
-            const year = date.getFullYear();
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            const day = String(date.getDate()).padStart(2, '0');
-            return `${year}-${month}-${day}`;
-        }
-
-        function formatTime(date) {
-            return new Date(date).toLocaleTimeString('en-US', {
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-                hour12: true
-            });
-        }
-
         async function processLeaveApplication(applyDate, leaveStartDate, leaveEndDate, leaveType, proofDataUrl) {
             try {
                 // Calculate leave days
@@ -3735,120 +3714,128 @@
             };
         }
 
-        async function updateAttendanceTable() {
+        async function updateAttendanceTable(applyFilters = false) {
             try {
-                const adminTableBody = document.getElementById('allAttendanceTableBody');
-                if (adminTableBody) {
-                    adminTableBody.innerHTML = '';
+                const attendanceRef = database.ref('attendance');
+                const employeesRef = database.ref('employees');
 
-                    const attendanceRef = database.ref('attendance');
-                    const snapshot = await attendanceRef.once('value');
-                    let records = [];
+                const attendanceSnapshot = await attendanceRef.once('value');
+                const attendanceRecords = attendanceSnapshot.val() || {};
+                const employeesSnapshot = await employeesRef.once('value');
+                const employees = employeesSnapshot.val() || {};
 
-                    snapshot.forEach((childSnapshot) => {
-                        const data = childSnapshot.val();
-                        // Only add records with valid data
-                        if (data && data.timestamp) {
-                            records.push({
-                                id: childSnapshot.key,
-                                ...data
-                            });
-                        }
+                const tableBody = document.getElementById('allAttendanceTableBody');
+                if (!tableBody) return;
+
+                tableBody.innerHTML = '';
+
+                let records = Object.entries(attendanceRecords);
+
+                // Apply filters if requested
+                if (applyFilters) {
+                    const dateFilter = document.getElementById('dateFilter').value;
+                    const statusFilter = document.getElementById('statusFilter').value;
+                    const employeeFilter = document.getElementById('attendanceEmployeeFilter').value;
+
+                    records = records.filter(([_, record]) => {
+                        let matches = true;
+                        if (dateFilter && record.date !== dateFilter) matches = false;
+                        if (statusFilter && record.status !== statusFilter) matches = false;
+                        if (employeeFilter && record.employeeId !== employeeFilter) matches = false;
+                        return matches;
                     });
-
-                    // Sort by timestamp (newest first)
-                    records.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-
-                    if (records.length === 0) {
-                        adminTableBody.innerHTML = `
-                            <tr>
-                                <td colspan="6" class="text-center py-4 text-gray-500">
-                                    No attendance records found
-                                </td>
-                            </tr>
-                        `;
-                        return;
-                    }
-
-                    for (const [id, record] of Object.entries(records)) {
-                        const employeeSnapshot = await database.ref(`employees/${record.employeeId}`).once('value');
-                        const employeeData = employeeSnapshot.val();
-
-                        const employeeName = employeeData ? employeeData.name : 'N/A';
-                        const employeeRole = employeeData ? employeeData.role : 'N/A';
-
-                        records.forEach(record => {
-                            const row = document.createElement('tr');
-                            row.innerHTML = `
-                                <td class="px-6 py-4">${record.employeeName}</td>
-                                <td class="px-6 py-4">${record.role}</td>
-                                <td class="px-6 py-4">${formatDate(new Date(record.timestamp))} ${formatTime(new Date(record.timestamp))}</td>
-                                <td class="px-6 py-4">
-                                    <span class="status-badge ${record.status.toLowerCase()}">
-                                        ${record.status}
-                                        ${record.amount > 0 ? ` (-$${record.amount})` : ''}
-                                    </span>
-                                </td>
-                                <td class="px-6 py-4">${record.ipAddress}</td>
-                                <td class="px-6 py-4">
-                                    <button onclick="removeAttendanceRecord('${record.id}')" 
-                                            class="remove-btn-small">
-                                        Remove
-                                    </button>
-                                </td>
-                            `;
-                            adminTableBody.appendChild(row);
-                        });    
-                    }
                 }
 
-                // Update agent's personal table
-                const agentTableBody = document.getElementById('attendanceTableBody');
-                if (agentTableBody && currentUser) {
-                    const today = formatDate(new Date());
-                    agentTableBody.innerHTML = '';
+                // Sort by timestamp (newest first)
+                records.sort(([, a], [, b]) => new Date(b.timestamp) - new Date(a.timestamp));
 
-                    const attendanceRef = database.ref('attendance');
-                    const snapshot = await attendanceRef
-                        .orderByChild('employeeId')
-                        .equalTo(currentUser.id)
-                        .once('value');
-
-                    let todayRecord = null;
-                    snapshot.forEach(child => {
-                        const record = child.val();
-                        if (formatDate(new Date(record.timestamp)) === today) {
-                            todayRecord = record;
-                            return false; // Break the loop
-                        }
-                    });
-
-                    if (todayRecord) {
-                        const row = document.createElement('tr');
-                        row.innerHTML = `
-                            <td class="px-6 py-4">${currentUser.name}</td>
-                            <td class="px-6 py-4">${formatDate(new Date(todayRecord.timestamp))} ${formatTime(new Date(todayRecord.timestamp))}</td>
-                            <td class="px-6 py-4">
-                                <span class="status-badge ${todayRecord.status.toLowerCase()}">
-                                    ${todayRecord.status}
-                                    ${todayRecord.amount > 0 ? ` (-$${todayRecord.amount})` : ''}
-                                </span>
-                            </td>
-                        `;
-                        agentTableBody.appendChild(row);
-                    } else {
-                        agentTableBody.innerHTML = `
-                            <tr>
-                                <td colspan="3" class="text-center py-4 text-gray-500">
-                                    No attendance record for today
-                                </td>
-                            </tr>
-                        `;
-                    }
+                if (records.length === 0) {
+                    tableBody.innerHTML = `<tr><td colspan="6" class="px-6 py-4 text-center text-gray-500">No attendance records found</td></tr>`;
+                    return;
                 }
+
+                records.forEach(([id, record]) => {
+                    const employee = employees[record.employeeId] || {};
+                    const employeeName = record.employeeName || employee.name || 'Unknown Employee';
+                    const role = record.role || employee.role || 'Unknown Role';
+                    const timestamp = record.timestamp ? `${formatDate(record.timestamp)} ${formatTime(record.timestamp)}` : 'No Timestamp';
+
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td class="px-6 py-4">${employeeName}</td>
+                        <td class="px-6 py-4">${role}</td>
+                        <td class="px-6 py-4">${timestamp}</td>
+                        <td class="px-6 py-4"><span class="status-badge ${record.status?.toLowerCase() || 'unknown'}">${record.status || 'Not Recorded'}</span></td>
+                        <td class="px-6 py-4">${record.ipAddress || 'Not Available'}</td>
+                        <td class="px-6 py-4"><button class="remove-btn-small" onclick="removeAttendanceRecord('${id}')">Remove</button></td>
+                    `;
+                    tableBody.appendChild(row);
+                });
             } catch (error) {
-                console.error('Error updating attendance tables:', error);
-                showSyncStatus('Error updating attendance records', 'error');
+                console.error('Error updating attendance table:', error);
+                const tableBody = document.getElementById('allAttendanceTableBody');
+                if (tableBody) {
+                    tableBody.innerHTML = `<tr><td colspan="6" class="px-6 py-4 text-center text-red-500">Error loading records</td></tr>`;
+                }
+            }
+        }
+
+        function formatDate(date) {
+            // If date is a string, convert it to Date object
+            if (typeof date === 'string') {
+                date = new Date(date);
+            }
+            
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        function formatTime(date) {
+            return new Date(date).toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: true
+            });
+        }
+
+        async function recordAttendance(employeeId) {
+            try {
+                const timestamp = new Date().toISOString();
+                const ipAddress = await fetch('https://api.ipify.org?format=json')
+                    .then(res => res.json())
+                    .then(data => data.ip)
+                    .catch(() => 'Unknown IP');
+
+                // Fetch employee details from `employees` node
+                const employeeRef = database.ref(`employees/${employeeId}`);
+                const employeeSnapshot = await employeeRef.once('value');
+                const employee = employeeSnapshot.val() || {};
+
+                // Determine status (adjust logic as needed)
+                const status = new Date().getHours() < 9 ? 'Punctual' : 'Late';
+                const lateMinutes = status === 'Late' ? Math.max(0, (new Date().getHours() - 9) * 60 + new Date().getMinutes()) : 0;
+
+                const attendanceData = {
+                    employeeId: employeeId,
+                    employeeName: employee.name || 'Unknown Employee',
+                    role: employee.role || 'Unknown Role',
+                    timestamp: timestamp,
+                    date: formatDate(timestamp),
+                    time: formatTime(timestamp),
+                    ipAddress: ipAddress,
+                    status: status,
+                    lateMinutes: lateMinutes,
+                    amount: 400 // Adjust this based on your logic (e.g., fixed value or dynamic)
+                };
+
+                // Push new record to `attendance` with a unique key
+                const newAttendanceRef = await database.ref('attendance').push(attendanceData);
+                console.log('New attendance record added with ID:', newAttendanceRef.key);
+            } catch (error) {
+                console.error('Error recording attendance:', error);
             }
         }
 
@@ -7151,7 +7138,22 @@
         function initializeAttendanceTable() {
             const attendanceRef = database.ref('attendance');
             attendanceRef.on('value', () => {
-                updateAttendanceTable();
+                updateAttendanceTable(true); // Respect filters on real-time update
+            });
+        }
+
+        async function updateEmployeeFilter() {
+            const employeesRef = database.ref('employees');
+            const snapshot = await employeesRef.once('value');
+            const employees = snapshot.val() || {};
+            const employeeFilter = document.getElementById('attendanceEmployeeFilter');
+
+            employeeFilter.innerHTML = '<option value="">All Agents</option>';
+            Object.entries(employees).forEach(([id, employee]) => {
+                const option = document.createElement('option');
+                option.value = id;
+                option.textContent = employee.name || 'Unknown Employee';
+                employeeFilter.appendChild(option);
             });
         }
 
