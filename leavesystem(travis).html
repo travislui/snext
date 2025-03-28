@@ -10,6 +10,7 @@
     <script src='https://cdn.jsdelivr.net/npm/@fullcalendar/daygrid@6.1.10/main.min.js'></script>
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
     
     <style>
         /* Responsive styles */
@@ -2612,6 +2613,11 @@
             initializeAttendanceSystem();
         });
 
+        // Call this when the page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeAttendanceTable();
+        });
+
         // Function to change admin password
         async function changeAdminPassword(currentPassword, newPassword) {
             try {
@@ -3414,6 +3420,27 @@
             }
         });
 
+        function formatDate(date) {
+            // If date is a string, convert it to Date object
+            if (typeof date === 'string') {
+                date = new Date(date);
+            }
+            
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        function formatTime(date) {
+            return new Date(date).toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: true
+            });
+        }
+
         async function processLeaveApplication(applyDate, leaveStartDate, leaveEndDate, leaveType, proofDataUrl) {
             try {
                 // Calculate leave days
@@ -3714,128 +3741,134 @@
             };
         }
 
-        async function updateAttendanceTable(applyFilters = false) {
+        async function updateAttendanceTable() {
             try {
-                const attendanceRef = database.ref('attendance');
-                const employeesRef = database.ref('employees');
+                // Update agent's personal attendance table (today's record only)
+                const agentTableBody = document.getElementById('attendanceTableBody');
+                if (agentTableBody && currentUser) {
+                    // Get today's date in YYYY-MM-DD format
+                    const today = new Date().toISOString().split('T')[0];
+                    
+                    // Clear existing records
+                    agentTableBody.innerHTML = '';
 
-                const attendanceSnapshot = await attendanceRef.once('value');
-                const attendanceRecords = attendanceSnapshot.val() || {};
-                const employeesSnapshot = await employeesRef.once('value');
-                const employees = employeesSnapshot.val() || {};
+                    // Fetch today's records for current user
+                    const attendanceRef = database.ref('attendance');
+                    const userSnapshot = await attendanceRef
+                        .orderByChild('employeeId')
+                        .equalTo(currentUser.id)
+                        .once('value');
 
-                const tableBody = document.getElementById('allAttendanceTableBody');
-                if (!tableBody) return;
-
-                tableBody.innerHTML = '';
-
-                let records = Object.entries(attendanceRecords);
-
-                // Apply filters if requested
-                if (applyFilters) {
-                    const dateFilter = document.getElementById('dateFilter').value;
-                    const statusFilter = document.getElementById('statusFilter').value;
-                    const employeeFilter = document.getElementById('attendanceEmployeeFilter').value;
-
-                    records = records.filter(([_, record]) => {
-                        let matches = true;
-                        if (dateFilter && record.date !== dateFilter) matches = false;
-                        if (statusFilter && record.status !== statusFilter) matches = false;
-                        if (employeeFilter && record.employeeId !== employeeFilter) matches = false;
-                        return matches;
+                    const records = [];
+                    userSnapshot.forEach(child => {
+                        const record = child.val();
+                        const recordDate = new Date(record.timestamp).toISOString().split('T')[0];
+                        if (recordDate === today) {
+                            records.push(record);
+                        }
                     });
+
+                    if (records.length > 0) {
+                        // Show today's record
+                        const todayRecord = records[0]; // Take the first record if multiple exist
+                        const recordTime = new Date(todayRecord.timestamp);
+
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm font-medium text-gray-900">
+                                    ${currentUser.name}
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm text-gray-900">
+                                    ${formatDate(recordTime)} ${formatTime(recordTime)}
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="status-badge ${todayRecord.status.toLowerCase()}">
+                                    ${todayRecord.status}
+                                    ${todayRecord.amount > 0 ? ` (-$${todayRecord.amount})` : ''}
+                                </span>
+                            </td>
+                        `;
+                        agentTableBody.appendChild(row);
+                    } else {
+                        // Show "No record for today" message
+                        agentTableBody.innerHTML = `
+                            <tr>
+                                <td colspan="3" class="px-6 py-4 text-center text-gray-500">
+                                    No attendance record for today
+                                </td>
+                            </tr>
+                        `;
+                    }
                 }
 
-                // Sort by timestamp (newest first)
-                records.sort(([, a], [, b]) => new Date(b.timestamp) - new Date(a.timestamp));
+                // Update admin's all attendance records table
+                const adminTableBody = document.getElementById('allAttendanceTableBody');
+                if (adminTableBody) {
+                    // Clear existing records
+                    adminTableBody.innerHTML = '';
 
-                if (records.length === 0) {
-                    tableBody.innerHTML = `<tr><td colspan="6" class="px-6 py-4 text-center text-gray-500">No attendance records found</td></tr>`;
-                    return;
+                    // Fetch all attendance records
+                    const attendanceRef = database.ref('attendance');
+                    const snapshot = await attendanceRef.once('value');
+                    const records = [];
+
+                    snapshot.forEach((childSnapshot) => {
+                        const record = childSnapshot.val();
+                        if (record.employeeName && record.timestamp) { // Ensure we have valid data
+                            records.push({
+                                id: childSnapshot.key,
+                                ...record
+                            });
+                        }
+                    });
+
+                    // Sort records by timestamp (newest first)
+                    records.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+                    if (records.length === 0) {
+                        adminTableBody.innerHTML = `
+                            <tr>
+                                <td colspan="6" class="px-6 py-4 text-center text-gray-500">
+                                    No attendance records found
+                                </td>
+                            </tr>
+                        `;
+                    } else {
+                        records.forEach(record => {
+                            const row = document.createElement('tr');
+                            const recordDate = new Date(record.timestamp);
+                            
+                            row.innerHTML = `
+                                <td class="px-6 py-4">${record.employeeName || 'N/A'}</td>
+                                <td class="px-6 py-4">${record.role || 'N/A'}</td>
+                                <td class="px-6 py-4">
+                                    ${formatDate(recordDate)} ${formatTime(recordDate)}
+                                </td>
+                                <td class="px-6 py-4">
+                                    <span class="status-badge ${record.status?.toLowerCase() || 'unknown'}">
+                                        ${record.status || 'N/A'}
+                                        ${record.amount > 0 ? ` (-$${record.amount})` : ''}
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4">${record.ipAddress || 'N/A'}</td>
+                                <td class="px-6 py-4">
+                                    <button class="remove-btn-small" onclick="removeAttendanceRecord('${record.id}')">
+                                        Remove
+                                    </button>
+                                </td>
+                            `;
+                            adminTableBody.appendChild(row);
+                        });
+                    }
                 }
 
-                records.forEach(([id, record]) => {
-                    const employee = employees[record.employeeId] || {};
-                    const employeeName = record.employeeName || employee.name || 'Unknown Employee';
-                    const role = record.role || employee.role || 'Unknown Role';
-                    const timestamp = record.timestamp ? `${formatDate(record.timestamp)} ${formatTime(record.timestamp)}` : 'No Timestamp';
-
-                    const row = document.createElement('tr');
-                    row.innerHTML = `
-                        <td class="px-6 py-4">${employeeName}</td>
-                        <td class="px-6 py-4">${role}</td>
-                        <td class="px-6 py-4">${timestamp}</td>
-                        <td class="px-6 py-4"><span class="status-badge ${record.status?.toLowerCase() || 'unknown'}">${record.status || 'Not Recorded'}</span></td>
-                        <td class="px-6 py-4">${record.ipAddress || 'Not Available'}</td>
-                        <td class="px-6 py-4"><button class="remove-btn-small" onclick="removeAttendanceRecord('${id}')">Remove</button></td>
-                    `;
-                    tableBody.appendChild(row);
-                });
             } catch (error) {
-                console.error('Error updating attendance table:', error);
-                const tableBody = document.getElementById('allAttendanceTableBody');
-                if (tableBody) {
-                    tableBody.innerHTML = `<tr><td colspan="6" class="px-6 py-4 text-center text-red-500">Error loading records</td></tr>`;
-                }
-            }
-        }
-
-        function formatDate(date) {
-            // If date is a string, convert it to Date object
-            if (typeof date === 'string') {
-                date = new Date(date);
-            }
-            
-            const year = date.getFullYear();
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            const day = String(date.getDate()).padStart(2, '0');
-            return `${year}-${month}-${day}`;
-        }
-
-        function formatTime(date) {
-            return new Date(date).toLocaleTimeString('en-US', {
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-                hour12: true
-            });
-        }
-
-        async function recordAttendance(employeeId) {
-            try {
-                const timestamp = new Date().toISOString();
-                const ipAddress = await fetch('https://api.ipify.org?format=json')
-                    .then(res => res.json())
-                    .then(data => data.ip)
-                    .catch(() => 'Unknown IP');
-
-                // Fetch employee details from `employees` node
-                const employeeRef = database.ref(`employees/${employeeId}`);
-                const employeeSnapshot = await employeeRef.once('value');
-                const employee = employeeSnapshot.val() || {};
-
-                // Determine status (adjust logic as needed)
-                const status = new Date().getHours() < 9 ? 'Punctual' : 'Late';
-                const lateMinutes = status === 'Late' ? Math.max(0, (new Date().getHours() - 9) * 60 + new Date().getMinutes()) : 0;
-
-                const attendanceData = {
-                    employeeId: employeeId,
-                    employeeName: employee.name || 'Unknown Employee',
-                    role: employee.role || 'Unknown Role',
-                    timestamp: timestamp,
-                    date: formatDate(timestamp),
-                    time: formatTime(timestamp),
-                    ipAddress: ipAddress,
-                    status: status,
-                    lateMinutes: lateMinutes,
-                    amount: 400 // Adjust this based on your logic (e.g., fixed value or dynamic)
-                };
-
-                // Push new record to `attendance` with a unique key
-                const newAttendanceRef = await database.ref('attendance').push(attendanceData);
-                console.log('New attendance record added with ID:', newAttendanceRef.key);
-            } catch (error) {
-                console.error('Error recording attendance:', error);
+                console.error('Error updating attendance tables:', error);
+                showSyncStatus('Error updating attendance records', 'error');
             }
         }
 
@@ -3970,6 +4003,16 @@
                 return null;
             }
         }
+
+        // Add this to your initialization code (where you check user authentication)
+        document.addEventListener('DOMContentLoaded', function() {
+            firebase.auth().onAuthStateChanged(function(user) {
+                if (user) {
+                    // Initialize the attendance table
+                    updateAttendanceTable();
+                }
+            });
+        });
 
         // Helper function to update employee table
         function updateEmployeeTable() {
@@ -4226,7 +4269,7 @@
                         updateTime();
                         
                         // Update QR code every 7 seconds
-                        setInterval(updateQRCode, 7200000);
+                        setInterval(updateQRCode, 7000);
                         
                         // Update time every second
                         setInterval(updateTime, 1000);
@@ -5487,12 +5530,11 @@
 
                 await html5QrCode.start(
                     { facingMode: "environment" },
-                    { fps: 10, qrbox: { width: 250, height: 250 } },
+                    { fps: 10, qrbox: { width: 700, height: 700 } },
                     async (decodedText) => {
                         try {
-                            // Get employee data first
-                            const employeesRef = database.ref('employees');
-                            const employeeSnapshot = await employeesRef
+                            // Get current user's employee data
+                            const employeeSnapshot = await database.ref('employees')
                                 .orderByChild('uid')
                                 .equalTo(auth.currentUser.uid)
                                 .once('value');
@@ -5508,17 +5550,18 @@
 
                             // Get current time and IP
                             const now = new Date();
+                            const today = formatDate(now);
                             const ipResponse = await fetch('https://api.ipify.org?format=json');
                             const ipData = await ipResponse.json();
 
                             // Calculate late status
                             const lateInfo = calculateLateStatus(now.toISOString(), employeeData.role);
 
-                            // Create attendance record with COMPLETE employee data
+                            // Create attendance record
                             const attendanceData = {
                                 employeeId: employeeData.id,
-                                employeeName: employeeData.name || 'Unknown',
-                                role: employeeData.role || 'Unknown',
+                                employeeName: employeeData.name,
+                                role: employeeData.role,
                                 date: formatDate(now),
                                 time: formatTime(now),
                                 timestamp: now.toISOString(),
@@ -5528,48 +5571,68 @@
                                 ipAddress: ipData.ip
                             };
 
-                            console.log('Saving attendance record:', attendanceData); // Debug log
+                            // Save attendance record with a proper path
+                            const attendanceRef = database.ref('attendance');
+                            await attendanceRef.push(attendanceData);
 
-                            // Save attendance record
-                            const newAttendanceRef = database.ref('attendance').push();
-                            await newAttendanceRef.set(attendanceData);
-
-                            // If late, create penalty record
+                            // If there's a penalty amount, check for existing penalty record
                             if (lateInfo.amount > 0) {
-                                const deadline = new Date(now);
-                                deadline.setDate(deadline.getDate() + 7);
+                                // Check for existing penalty record for today
+                                const penaltiesRef = database.ref('penalties');
+                                const existingPenaltySnapshot = await penaltiesRef
+                                    .orderByChild('employeeId')
+                                    .equalTo(employeeData.id)
+                                    .once('value');
 
-                                const penaltyData = {
-                                    employeeId: employeeData.id,
-                                    employeeName: employeeData.name,
-                                    employeeRole: employeeData.role,
-                                    date: formatDate(now),
-                                    reason: 'Meeting',
-                                    minutes: lateInfo.lateMinutes,
-                                    amount: lateInfo.amount,
-                                    baseAmount: lateInfo.amount,
-                                    deadline: formatDate(deadline),
-                                    status: 'Not Submitted',
-                                    createdAt: now.toISOString(),
-                                    lastModified: now.toISOString()
-                                };
+                                let existingPenaltyForToday = false;
+                                existingPenaltySnapshot.forEach(childSnapshot => {
+                                    const penalty = childSnapshot.val();
+                                    if (penalty.date === today) {
+                                        existingPenaltyForToday = true;
+                                    }
+                                });
 
-                                await database.ref('penalties').push(penaltyData);
+                                if (!existingPenaltyForToday) {
+                                    // Calculate deadline (7 days from now)
+                                    const deadline = new Date(now);
+                                    deadline.setDate(deadline.getDate() + 7);
+
+                                    const penaltyData = {
+                                        employeeId: employeeData.id,
+                                        employeeName: employeeData.name,
+                                        employeeRole: employeeData.role,
+                                        date: today,
+                                        reason: 'Meeting',
+                                        minutes: lateInfo.lateMinutes,
+                                        amount: lateInfo.amount,
+                                        baseAmount: lateInfo.amount,
+                                        deadline: formatDate(deadline),
+                                        status: 'Not Submitted',
+                                        createdAt: now.toISOString(),
+                                        lastModified: now.toISOString()
+                                    };
+
+                                    // Save penalty record to Firebase
+                                    await database.ref('penalties').push(penaltyData);
+                                }
                             }
 
                             // Stop scanner and hide reader
                             await html5QrCode.stop();
                             readerDiv.style.display = 'none';
 
-                            // Show success message
+                            // Show success animation
                             showScanResult('Attendance recorded successfully', true);
 
-                            // Update tables
-                            updateAttendanceTable();
+                            // Update both attendance and penalty tables
+                            await updateAttendanceTable();
+                            await loadEmployeePenalties(employeeData.id);
 
                         } catch (error) {
                             console.error('Error recording attendance:', error);
                             showScanResult(error.message, false);
+                            
+                            // Stop scanner and hide reader
                             await html5QrCode.stop();
                             readerDiv.style.display = 'none';
                         }
@@ -7138,22 +7201,7 @@
         function initializeAttendanceTable() {
             const attendanceRef = database.ref('attendance');
             attendanceRef.on('value', () => {
-                updateAttendanceTable(true); // Respect filters on real-time update
-            });
-        }
-
-        async function updateEmployeeFilter() {
-            const employeesRef = database.ref('employees');
-            const snapshot = await employeesRef.once('value');
-            const employees = snapshot.val() || {};
-            const employeeFilter = document.getElementById('attendanceEmployeeFilter');
-
-            employeeFilter.innerHTML = '<option value="">All Agents</option>';
-            Object.entries(employees).forEach(([id, employee]) => {
-                const option = document.createElement('option');
-                option.value = id;
-                option.textContent = employee.name || 'Unknown Employee';
-                employeeFilter.appendChild(option);
+                updateAttendanceTable();
             });
         }
 
