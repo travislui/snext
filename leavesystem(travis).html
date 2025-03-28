@@ -2372,15 +2372,10 @@
                                 lastLogin: new Date().toISOString()
                             });
 
-                            // Show admin interface and load all data
                             showAdminInterface();
                             loadEmployees();
                             loadAllApplications();
                             loadAllPenalties();
-                            
-                            // Explicitly load and initialize attendance records
-                            await updateAttendanceTable(); // Initial fetch
-                            initializeAttendanceTable();   // Set up real-time listener
                             
                             // Show success message
                             showSyncStatus('Admin login successful');
@@ -2400,7 +2395,6 @@
                         }
                     }
                 } else {
-                    // Employee login logic (unchanged for brevity)
                     try {
                         console.log("Attempting employee login for:", username);
                         
