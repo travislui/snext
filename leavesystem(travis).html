@@ -1532,6 +1532,21 @@
             background-color: #2980b9;
         }
 
+        .reduce-btn {
+            background-color: #fff600;
+            padding: 4px 8px;
+            font-size: 12px;
+            border-radius: 4px;
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .reduce-btn:hover {
+            background-color: #fff000 ;
+        }
+
         .filter-container {
             background-color: #f8f9fa;
             padding: 1rem;
@@ -5924,6 +5939,7 @@
                                 <button class="adjust-btn action-btn" onclick="toggleAdjustMode(this)">Adjust</button>
                                 <button class="remove-btn action-btn" onclick="removeAgent('${id}', this.parentElement.parentElement.parentElement)">Remove</button>
                                 <button class="compensate-btn action-btn" onclick="addCompensationLeave('${id}')">補假</button>
+                                <button class="reduce-btn action-btn" onclick="reduceLeave('${id}')">扣假</button>
                             </div>
                         </td>
                     `;
@@ -6898,6 +6914,164 @@
                 }
             } catch (error) {
                 console.error('Error adding compensation leave:', error);
+                await Swal.fire({
+                    icon: 'error',
+                    title: '錯誤',
+                    text: error.message,
+                    width: '400px',
+                    customClass: {
+                        popup: 'custom-swal-popup',
+                        title: 'custom-swal-title',
+                        confirmButton: 'custom-swal-confirm-button'
+                    }
+                });
+            }
+        }
+
+        async function reduceLeave(employeeId) {
+            try {
+                // Check if user is authenticated
+                const auth = firebase.auth();
+                const currentUser = auth.currentUser;
+                
+                if (!currentUser || !currentUser.email) {
+                    throw new Error('請先登入');
+                }
+
+                // Get employee data
+                const employeeSnapshot = await database.ref(`employees/${employeeId}`).once('value');
+                const employeeData = employeeSnapshot.val();
+
+                if (!employeeData) {
+                    throw new Error('Employee not found');
+                }
+
+                // Create custom dialog with adjusted size and styling
+                const leaveType = await Swal.fire({
+                    title: '扣減假期',
+                    html: `
+                        <div style="margin-bottom: 20px;">
+                            <p style="font-size: 14px;">Agent: ${employeeData.name}</p>
+                        </div>
+                        <select id="leave-type-select" class="swal2-select" style="
+                            width: 80%; 
+                            padding: 8px; 
+                            margin-bottom: 15px;
+                            font-size: 14px;
+                            border: 1px solid #ddd;
+                            border-radius: 4px;
+                        ">
+                            <option value="normal">Annual Leave (Normal)</option>
+                            <option value="golden">Annual Leave (黃金事假)</option>
+                        </select>
+                        <input type="number" id="leave-days" class="swal2-input" placeholder="輸入扣減天數" min="0.5" step="0.5" style="
+                            width: 80%;
+                            padding: 8px;
+                            font-size: 14px;
+                            border: 1px solid #ddd;
+                            border-radius: 4px;
+                        ">
+                        <textarea id="leave-reason" class="swal2-textarea" placeholder="扣減原因" style="
+                            width: 80%;
+                            margin-top: 15px;
+                            padding: 8px;
+                            font-size: 14px;
+                            border: 1px solid #ddd;
+                            border-radius: 4px;
+                            resize: vertical;
+                        "></textarea>
+                    `,
+                    showCancelButton: true,
+                    confirmButtonText: '確認',
+                    cancelButtonText: '取消',
+                    width: '400px',
+                    customClass: {
+                        container: 'custom-swal-container',
+                        popup: 'custom-swal-popup',
+                        header: 'custom-swal-header',
+                        title: 'custom-swal-title',
+                        closeButton: 'custom-swal-close-button',
+                        content: 'custom-swal-content',
+                        input: 'custom-swal-input',
+                        actions: 'custom-swal-actions',
+                        confirmButton: 'custom-swal-confirm-button',
+                        cancelButton: 'custom-swal-cancel-button'
+                    },
+                    preConfirm: () => {
+                        const type = document.getElementById('leave-type-select').value;
+                        const days = parseFloat(document.getElementById('leave-days').value);
+                        const reason = document.getElementById('leave-reason').value.trim();
+
+                        if (!days || days < 0.5) {
+                            Swal.showValidationMessage('請輸入有效的天數 (最少0.5天)');
+                            return false;
+                        }
+                        if (!reason) {
+                            Swal.showValidationMessage('請輸入扣減原因');
+                            return false;
+                        }
+                        return { type, days, reason };
+                    }
+                });
+
+                if (leaveType.isConfirmed) {
+                    const { type, days, reason } = leaveType.value;
+                    const updates = {};
+
+                    // Calculate new remaining leaves
+                    if (type === 'normal') {
+                        if (employeeData.remainingNormalLeaves !== 999) {
+                            const newNormalLeaves = Math.max(0, (employeeData.remainingNormalLeaves || 0) - days);
+                            updates[`employees/${employeeId}/remainingNormalLeaves`] = newNormalLeaves;
+                        }
+                    } else if (type === 'golden') {
+                        if (employeeData.remainingGoldenLeaves !== 999) {
+                            const newGoldenLeaves = Math.max(0, (employeeData.remainingGoldenLeaves || 0) - days);
+                            updates[`employees/${employeeId}/remainingGoldenLeaves`] = newGoldenLeaves;
+                        }
+                        if (employeeData.remainingNormalLeaves !== 999) {
+                            const newNormalLeaves = Math.max(0, (employeeData.remainingNormalLeaves || 0) - days);
+                            updates[`employees/${employeeId}/remainingNormalLeaves`] = newNormalLeaves;
+                        }
+                    }
+
+                    // Add reduction record
+                    const reductionRef = database.ref(`leaveReductionRecords/${employeeId}`).push();
+                    const timestamp = new Date().toISOString();
+                    
+                    const reductionRecord = {
+                        type: type,
+                        days: days,
+                        reason: reason,
+                        timestamp: timestamp,
+                        reducedBy: currentUser.email
+                    };
+
+                    updates[`leaveReductionRecords/${employeeId}/${reductionRef.key}`] = reductionRecord;
+
+                    // Update the database
+                    if (Object.keys(updates).length > 0) {
+                        await database.ref().update(updates);
+
+                        // Show success message
+                        await Swal.fire({
+                            icon: 'success',
+                            title: '扣減完成',
+                            text: `已成功扣減 ${days} 天${type === 'normal' ? 'Annual Leave (Normal)' : 'Annual Leave (黃金事假)'}`,
+                            width: '400px',
+                            customClass: {
+                                popup: 'custom-swal-popup',
+                                title: 'custom-swal-title',
+                                confirmButton: 'custom-swal-confirm-button'
+                            }
+                        });
+
+                        // Refresh the employee table
+                        loadEmployees();
+                    }
+                }
+            } catch (error) {
+                console.error('Error reducing leave:', error);
                 await Swal.fire({
                     icon: 'error',
                     title: '錯誤',
