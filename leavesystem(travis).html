@@ -3797,6 +3797,68 @@
             }
         }
 
+        // Function to load all attendance records
+        function loadAllAttendanceRecords() {
+            const attendanceRef = database.ref('attendance');
+            const tableBody = document.getElementById('allAttendanceTableBody');
+
+            if (!tableBody) return;
+
+            attendanceRef.on('value', (snapshot) => {
+                const records = [];
+                snapshot.forEach(recordSnapshot => {
+                    records.push({
+                        id: recordSnapshot.key,
+                        ...recordSnapshot.val()
+                    });
+                });
+
+                // Sort records by timestamp (newest first)
+                records.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+                // Clear existing table
+                tableBody.innerHTML = '';
+
+                if (records.length === 0) {
+                    tableBody.innerHTML = `
+                        <tr>
+                            <td colspan="6" class="px-6 py-4 text-center text-gray-500">
+                                No attendance records found
+                            </td>
+                        </tr>
+                    `;
+                    return;
+                }
+
+                // Populate table with records
+                records.forEach(record => {
+                    const recordTime = new Date(record.timestamp);
+                    const formattedDateTime = `${formatDate(recordTime)} ${recordTime.toLocaleTimeString()}`;
+                    
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td class="px-6 py-4">${record.employeeName || 'N/A'}</td>
+                        <td class="px-6 py-4">${record.role || 'N/A'}</td>
+                        <td class="px-6 py-4">${formattedDateTime}</td>
+                        <td class="px-6 py-4">
+                            <span class="status-badge ${record.status?.toLowerCase() === 'punctual' ? 'punctual' : 'late'}">
+                                ${record.status}
+                                ${record.amount > 0 ? `<span class="penalty-amount">(-$${record.amount})</span>` : ''}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4">${record.ipAddress || 'N/A'}</td>
+                        <td class="px-6 py-4">
+                            <button onclick="removeAttendanceRecord('${record.id}')" 
+                                    class="remove-btn-small">
+                                Remove
+                            </button>
+                        </td>
+                    `;
+                    tableBody.appendChild(row);
+                });
+            });
+        }
+
         // Modify your onScanSuccess function to update the table
         async function onScanSuccess(decodedText, decodedResult) {
             try {
@@ -4878,68 +4940,6 @@
                 console.error('Error exporting applications:', error);
                 alert('Error exporting applications: ' + error.message);
             }
-        }
-
-        // Function to load all attendance records
-        function loadAllAttendanceRecords() {
-            const attendanceRef = database.ref('attendance');
-            const tableBody = document.getElementById('allAttendanceTableBody');
-
-            if (!tableBody) return;
-
-            attendanceRef.on('value', (snapshot) => {
-                const records = [];
-                snapshot.forEach(recordSnapshot => {
-                    records.push({
-                        id: recordSnapshot.key,
-                        ...recordSnapshot.val()
-                    });
-                });
-
-                // Sort records by timestamp (newest first)
-                records.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-
-                // Clear existing table
-                tableBody.innerHTML = '';
-
-                if (records.length === 0) {
-                    tableBody.innerHTML = `
-                        <tr>
-                            <td colspan="6" class="px-6 py-4 text-center text-gray-500">
-                                No attendance records found
-                            </td>
-                        </tr>
-                    `;
-                    return;
-                }
-
-                // Populate table with records
-                records.forEach(record => {
-                    const recordTime = new Date(record.timestamp);
-                    const formattedDateTime = `${formatDate(recordTime)} ${recordTime.toLocaleTimeString()}`;
-                    
-                    const row = document.createElement('tr');
-                    row.innerHTML = `
-                        <td class="px-6 py-4">${record.employeeName || 'N/A'}</td>
-                        <td class="px-6 py-4">${record.role || 'N/A'}</td>
-                        <td class="px-6 py-4">${formattedDateTime}</td>
-                        <td class="px-6 py-4">
-                            <span class="status-badge ${record.status?.toLowerCase() === 'punctual' ? 'punctual' : 'late'}">
-                                ${record.status}
-                                ${record.amount > 0 ? `<span class="penalty-amount">(-$${record.amount})</span>` : ''}
-                            </span>
-                        </td>
-                        <td class="px-6 py-4">${record.ipAddress || 'N/A'}</td>
-                        <td class="px-6 py-4">
-                            <button onclick="removeAttendanceRecord('${record.id}')" 
-                                    class="remove-btn-small">
-                                Remove
-                            </button>
-                        </td>
-                    `;
-                    tableBody.appendChild(row);
-                });
-            });
         }
 
         async function removeAttendanceRecord(userId, recordId) {
