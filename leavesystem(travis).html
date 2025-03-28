@@ -3779,28 +3779,36 @@
                         return;
                     }
 
-                    records.forEach(record => {
-                        const row = document.createElement('tr');
-                        row.innerHTML = `
-                            <td class="px-6 py-4">${record.employeeName}</td>
-                            <td class="px-6 py-4">${record.role}</td>
-                            <td class="px-6 py-4">${formatDate(new Date(record.timestamp))} ${formatTime(new Date(record.timestamp))}</td>
-                            <td class="px-6 py-4">
-                                <span class="status-badge ${record.status.toLowerCase()}">
-                                    ${record.status}
-                                    ${record.amount > 0 ? ` (-$${record.amount})` : ''}
-                                </span>
-                            </td>
-                            <td class="px-6 py-4">${record.ipAddress}</td>
-                            <td class="px-6 py-4">
-                                <button onclick="removeAttendanceRecord('${record.id}')" 
-                                        class="remove-btn-small">
-                                    Remove
-                                </button>
-                            </td>
-                        `;
-                        adminTableBody.appendChild(row);
-                    });
+                    for (const [id, record] of Object.entries(records)) {
+                        const employeeSnapshot = await database.ref(`employees/${record.employeeId}`).once('value');
+                        const employeeData = employeeSnapshot.val();
+
+                        const employeeName = employeeData ? employeeData.name : 'N/A';
+                        const employeeRole = employeeData ? employeeData.role : 'N/A';
+
+                        records.forEach(record => {
+                            const row = document.createElement('tr');
+                            row.innerHTML = `
+                                <td class="px-6 py-4">${record.employeeName}</td>
+                                <td class="px-6 py-4">${record.role}</td>
+                                <td class="px-6 py-4">${formatDate(new Date(record.timestamp))} ${formatTime(new Date(record.timestamp))}</td>
+                                <td class="px-6 py-4">
+                                    <span class="status-badge ${record.status.toLowerCase()}">
+                                        ${record.status}
+                                        ${record.amount > 0 ? ` (-$${record.amount})` : ''}
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4">${record.ipAddress}</td>
+                                <td class="px-6 py-4">
+                                    <button onclick="removeAttendanceRecord('${record.id}')" 
+                                            class="remove-btn-small">
+                                        Remove
+                                    </button>
+                                </td>
+                            `;
+                            adminTableBody.appendChild(row);
+                        });    
+                    }
                 }
 
                 // Update agent's personal table
