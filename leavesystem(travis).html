@@ -10,7 +10,6 @@
     <script src='https://cdn.jsdelivr.net/npm/@fullcalendar/daygrid@6.1.10/main.min.js'></script>
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-
     
     <style>
         /* Responsive styles */
@@ -5530,7 +5529,7 @@
 
                 await html5QrCode.start(
                     { facingMode: "environment" },
-                    { fps: 10, qrbox: { width: 700, height: 700 } },
+                    { fps: 10, qrbox: { width: 250, height: 250 } },
                     async (decodedText) => {
                         try {
                             // Get current user's employee data
@@ -5562,7 +5561,7 @@
                                 employeeId: employeeData.id,
                                 employeeName: employeeData.name,
                                 role: employeeData.role,
-                                date: formatDate(now),
+                                date: today,
                                 time: formatTime(now),
                                 timestamp: now.toISOString(),
                                 status: lateInfo.status,
@@ -5571,9 +5570,8 @@
                                 ipAddress: ipData.ip
                             };
 
-                            // Save attendance record with a proper path
-                            const attendanceRef = database.ref('attendance');
-                            await attendanceRef.push(attendanceData);
+                            // Save attendance record to Firebase
+                            await database.ref('attendance').push(attendanceData);
 
                             // If there's a penalty amount, check for existing penalty record
                             if (lateInfo.amount > 0) {
