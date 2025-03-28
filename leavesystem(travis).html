@@ -329,12 +329,16 @@
             height: 100%;
             background-color: rgba(0, 0, 0, 0.7);
             z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s ease-in-out;
+            /* Ensure modal is centered */
             display: flex;
             justify-content: center;
             align-items: center;
         }
 
         #proof-modal.show {
+            opacity: 1;
         }
 
         .status-approved {
@@ -484,11 +488,16 @@
             max-width: 700px;
             border-radius: 8px;
             position: relative;
+            /* Center the modal and handle overflow */
             max-height: 90vh;
             overflow-y: auto;
+            /* Add some animation */
+            transform: translateY(-20px);
+            transition: transform 0.3s ease-in-out;
         }
 
         #proof-modal.show .proof-modal-content {
+            transform: translateY(0);
         }
 
         .close-modal-btn {
@@ -3539,6 +3548,17 @@
                         // If within limits, update the Monday leave count
                         updates.usedMondayLeaves = newMondayTotal;
                     }
+                    // Update leave counts for Annual Leave types
+                    if (leaveType === 'Annual Leave (Normal)' && employeeData.remainingNormalLeaves !== 999) {
+                        updates.remainingNormalLeaves = employeeData.remainingNormalLeaves - leaveDays;
+                    } else if (leaveType === 'Annual Leave (黃金事假)') {
+                        if (employeeData.remainingGoldenLeaves !== 999) {
+                            updates.remainingGoldenLeaves = employeeData.remainingGoldenLeaves - leaveDays;
+                        }
+                        if (employeeData.remainingNormalLeaves !== 999) {
+                            updates.remainingNormalLeaves = employeeData.remainingNormalLeaves - leaveDays;
+                        }
+                    }
                 }
 
                 // Handle other leave types
@@ -4799,17 +4819,37 @@
             const modal = document.getElementById('proof-modal');
             const proofContent = document.getElementById('proof-content');
             
-            database.ref('applications/' + applicationId).once('value').then((snapshot) => {
-                const application = snapshot.val();
-                if (application && application.proof) {
-                    proofContent.innerHTML = `<img src="${application.proof}" alt="Proof" style="max-width: 100%; max-height: 70vh;">`;
-                    modal.style.display = 'flex'; // Show immediately
-                    // Remove the setTimeout and class addition
-                    // setTimeout(() => modal.classList.add('show'), 10);
-                } else {
-                    alert('No proof submitted for this application.');
-                }
+            // Show loading state
+            proofContent.innerHTML = '<div style="text-align: center; padding: 20px;">Loading proof...</div>';
+            modal.style.display = 'flex'; // Changed from 'block' to 'flex'
+            
+            // Add animation
+            requestAnimationFrame(() => {
+                modal.classList.add('show');
             });
+
+            // Fetch the proof from Firebase
+            database.ref(`applications/${applicationId}/proof`).once('value')
+                .then((snapshot) => {
+                    const proofData = snapshot.val();
+                    if (proofData) {
+                        const img = new Image();
+                        img.onload = function() {
+                            proofContent.innerHTML = `
+                                <img src="${proofData}" 
+                                    alt="Submitted Proof"
+                                    style="max-width: 100%; max-height: 70vh; object-fit: contain;">
+                            `;
+                        };
+                        img.src = proofData;
+                    } else {
+                        proofContent.innerHTML = '<div style="text-align: center; padding: 20px;">No proof available</div>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading proof:', error);
+                    proofContent.innerHTML = '<div style="text-align: center; padding: 20px; color: red;">Error loading proof</div>';
+                });
         }
 
         // Add this function to synchronize all employee select dropdowns
