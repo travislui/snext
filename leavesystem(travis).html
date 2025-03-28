@@ -2612,15 +2612,6 @@
             initializeAttendanceSystem();
         });
 
-        document.addEventListener('DOMContentLoaded', () => {
-            const attendanceRef = database.ref('attendance');
-            attendanceRef.on('value', () => {
-                updateAttendanceTable();
-            });
-        });
-
-
-
         // Function to change admin password
         async function changeAdminPassword(currentPassword, newPassword) {
             try {
@@ -3992,16 +3983,6 @@
                 return null;
             }
         }
-
-        // Add this to your initialization code (where you check user authentication)
-        document.addEventListener('DOMContentLoaded', function() {
-            firebase.auth().onAuthStateChanged(function(user) {
-                if (user) {
-                    // Initialize the attendance table
-                    updateAttendanceTable();
-                }
-            });
-        });
 
         // Helper function to update employee table
         function updateEmployeeTable() {
