@@ -3743,132 +3743,57 @@
 
         async function updateAttendanceTable() {
             try {
-                // Update agent's personal attendance table (today's record only)
-                const agentTableBody = document.getElementById('attendanceTableBody');
-                if (agentTableBody && currentUser) {
-                    // Get today's date in YYYY-MM-DD format
-                    const today = new Date().toISOString().split('T')[0];
-                    
-                    // Clear existing records
-                    agentTableBody.innerHTML = '';
+                const attendanceRef = database.ref('attendance');
+                const snapshot = await attendanceRef.once('value');
+                const records = snapshot.val() || {};
 
-                    // Fetch today's records for current user
-                    const attendanceRef = database.ref('attendance');
-                    const userSnapshot = await attendanceRef
-                        .orderByChild('employeeId')
-                        .equalTo(currentUser.id)
-                        .once('value');
-
-                    const records = [];
-                    userSnapshot.forEach(child => {
-                        const record = child.val();
-                        const recordDate = new Date(record.timestamp).toISOString().split('T')[0];
-                        if (recordDate === today) {
-                            records.push(record);
-                        }
-                    });
-
-                    if (records.length > 0) {
-                        // Show today's record
-                        const todayRecord = records[0]; // Take the first record if multiple exist
-                        const recordTime = new Date(todayRecord.timestamp);
-
-                        const row = document.createElement('tr');
-                        row.innerHTML = `
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <div class="text-sm font-medium text-gray-900">
-                                    ${currentUser.name}
-                                </div>
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <div class="text-sm text-gray-900">
-                                    ${formatDate(recordTime)} ${formatTime(recordTime)}
-                                </div>
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <span class="status-badge ${todayRecord.status.toLowerCase()}">
-                                    ${todayRecord.status}
-                                    ${todayRecord.amount > 0 ? ` (-$${todayRecord.amount})` : ''}
-                                </span>
-                            </td>
-                        `;
-                        agentTableBody.appendChild(row);
-                    } else {
-                        // Show "No record for today" message
-                        agentTableBody.innerHTML = `
-                            <tr>
-                                <td colspan="3" class="px-6 py-4 text-center text-gray-500">
-                                    No attendance record for today
-                                </td>
-                            </tr>
-                        `;
-                    }
+                const tableBody = document.getElementById('allAttendanceTableBody');
+                if (!tableBody) {
+                    console.error('Attendance table body not found');
+                    return;
                 }
 
-                // Update admin's all attendance records table
-                const adminTableBody = document.getElementById('allAttendanceTableBody');
-                if (adminTableBody) {
-                    // Clear existing records
-                    adminTableBody.innerHTML = '';
+                tableBody.innerHTML = ''; // Clear existing rows
 
-                    // Fetch all attendance records
-                    const attendanceRef = database.ref('attendance');
-                    const snapshot = await attendanceRef.once('value');
-                    const records = [];
-
-                    snapshot.forEach((childSnapshot) => {
-                        const record = childSnapshot.val();
-                        if (record.employeeName && record.timestamp) { // Ensure we have valid data
-                            records.push({
-                                id: childSnapshot.key,
-                                ...record
-                            });
-                        }
-                    });
-
-                    // Sort records by timestamp (newest first)
-                    records.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-
-                    if (records.length === 0) {
-                        adminTableBody.innerHTML = `
-                            <tr>
-                                <td colspan="6" class="px-6 py-4 text-center text-gray-500">
-                                    No attendance records found
-                                </td>
-                            </tr>
-                        `;
-                    } else {
-                        records.forEach(record => {
-                            const row = document.createElement('tr');
-                            const recordDate = new Date(record.timestamp);
-                            
-                            row.innerHTML = `
-                                <td class="px-6 py-4">${record.employeeName || 'N/A'}</td>
-                                <td class="px-6 py-4">${record.role || 'N/A'}</td>
-                                <td class="px-6 py-4">
-                                    ${formatDate(recordDate)} ${formatTime(recordDate)}
-                                </td>
-                                <td class="px-6 py-4">
-                                    <span class="status-badge ${record.status?.toLowerCase() || 'unknown'}">
-                                        ${record.status || 'N/A'}
-                                        ${record.amount > 0 ? ` (-$${record.amount})` : ''}
-                                    </span>
-                                </td>
-                                <td class="px-6 py-4">${record.ipAddress || 'N/A'}</td>
-                                <td class="px-6 py-4">
-                                    <button class="remove-btn-small" onclick="removeAttendanceRecord('${record.id}')">
-                                        Remove
-                                    </button>
-                                </td>
-                            `;
-                            adminTableBody.appendChild(row);
-                        });
-                    }
+                if (Object.keys(records).length === 0) {
+                    tableBody.innerHTML = `<tr><td colspan="6" class="px-6 py-4 text-center text-gray-500">No attendance records found</td></tr>`;
+                    return;
                 }
 
+                // Sort records by timestamp (newest first)
+                const sortedRecords = Object.entries(records).sort(([, a], [, b]) => 
+                    new Date(b.timestamp || 0) - new Date(a.timestamp || 0)
+                );
+
+                sortedRecords.forEach(([id, record]) => {
+                    const timestamp = record.timestamp ? new Date(record.timestamp) : null;
+                    const dateTimeDisplay = timestamp 
+                        ? `${formatDate(timestamp)} ${formatTime(timestamp)}` 
+                        : 'Invalid Date';
+
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td class="px-6 py-4">${record.employeeName || 'Unknown'}</td>
+                        <td class="px-6 py-4">${record.role || 'Unknown'}</td>
+                        <td class="px-6 py-4">${dateTimeDisplay}</td>
+                        <td class="px-6 py-4">
+                            <span class="status-badge ${record.status?.toLowerCase() || 'unknown'}">
+                                ${record.status || 'Unknown'}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4">${record.ipAddress || 'Unknown'}</td>
+                        <td class="px-6 py-4">
+                            <button class="remove-btn-small" onclick="removeAttendanceRecord('${id}')">Remove</button>
+                        </td>
+                    `;
+                    tableBody.appendChild(row);
+                });
             } catch (error) {
-                console.error('Error updating attendance tables:', error);
-                showSyncStatus('Error updating attendance records', 'error');
+                console.error('Error updating attendance table:', error);
+                const tableBody = document.getElementById('allAttendanceTableBody');
+                if (tableBody) {
+                    tableBody.innerHTML = `<tr><td colspan="6" class="px-6 py-4 text-center text-red-500">Error loading records: ${error.message}</td></tr>`;
+                }
             }
         }
 
@@ -4269,7 +4194,7 @@
                         updateTime();
                         
                         // Update QR code every 7 seconds
-                        setInterval(updateQRCode, 7000);
+                        setInterval(updateQRCode, 720000000);
                         
                         // Update time every second
                         setInterval(updateTime, 1000);
@@ -7200,8 +7125,16 @@
         // Make sure to initialize the real-time listener
         function initializeAttendanceTable() {
             const attendanceRef = database.ref('attendance');
-            attendanceRef.on('value', () => {
+            
+            // Initial load
+            updateAttendanceTable();
+
+            // Real-time listener
+            attendanceRef.on('value', (snapshot) => {
+                console.log('Attendance data updated:', snapshot.val());
                 updateAttendanceTable();
+            }, (error) => {
+                console.error('Error in attendance listener:', error);
             });
         }
 
