@@ -4250,10 +4250,10 @@
                         updateTime();
                         
                         // Update QR code every 7 seconds
-                        setInterval(updateQRCode, 7000000000000000000000000000000000000000000000000000);
+                        setInterval(updateQRCode, 7);
                         
                         // Update time every second
-                        setInterval(updateTime, 10000000000000000000000000000000000000000000);
+                        setInterval(updateTime, 1000);
 
                         // Prevent window from being closed accidentally
                         window.onbeforeunload = function(e) {
