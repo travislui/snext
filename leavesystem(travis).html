@@ -2372,15 +2372,10 @@
                                 lastLogin: new Date().toISOString()
                             });
 
-                            // Show admin interface and load all data
                             showAdminInterface();
                             loadEmployees();
                             loadAllApplications();
                             loadAllPenalties();
-                            
-                            // Explicitly load and initialize attendance records
-                            await updateAttendanceTable(); // Initial fetch
-                            initializeAttendanceTable();   // Set up real-time listener
                             
                             // Show success message
                             showSyncStatus('Admin login successful');
@@ -2400,7 +2395,6 @@
                         }
                     }
                 } else {
-                    // Employee login logic (unchanged for brevity)
                     try {
                         console.log("Attempting employee login for:", username);
                         
@@ -2612,19 +2606,6 @@
             if (loginForm) {
                 loginForm.addEventListener('submit', handleLogin);
             }
-        });
-
-        document.getElementById('logout-btn').addEventListener('click', async () => {
-            if (attendanceListener) {
-                database.ref('attendance').off('value', attendanceListener);
-                attendanceListener = null;
-            }
-            await auth.signOut();
-            currentUser = null;
-            isAdmin = false;
-            document.getElementById('admin-page').style.display = 'none';
-            document.getElementById('home-page').style.display = 'block';
-            showSyncStatus('Logged out successfully');
         });
 
         // Call this when the admin page loads
