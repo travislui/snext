@@ -3345,6 +3345,9 @@
             const leaveEndDate = new Date(document.getElementById('leave-end-date').value);
             const leaveType = document.getElementById('leave-type').value;
 
+            // Add this line at the beginning
+            const updates = {};
+
             if (leaveType === 'Annual Leave (Normal)') {
                 // Calculate the minimum allowed Leave Start Date (2 days after Apply Date)
                 const minLeaveStartDate = new Date(applyDate);
