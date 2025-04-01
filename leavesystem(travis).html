@@ -3851,21 +3851,29 @@
                     const attendanceRef = database.ref('attendance');
                     const snapshot = await attendanceRef.once('value');
                     
-                    // Use a Map to prevent duplicates by ID
+                    // Use a Map with composite key to track unique records
+                    // Create key using employeeId + date to handle duplicates
                     const uniqueRecords = new Map();
 
-                    snapshot.forEach((childSnapshot) => {
+                    snapshot.forEach(childSnapshot => {
                         const record = childSnapshot.val();
                         if (record && record.employeeName && record.timestamp) {
-                            // Use the record ID as the key to prevent duplicates
-                            uniqueRecords.set(childSnapshot.key, {
-                                id: childSnapshot.key,
-                                ...record
-                            });
+                            // Create a composite key using employeeId and the date part of timestamp
+                            const recordDate = new Date(record.timestamp).toISOString().split('T')[0];
+                            const compositeKey = `${record.employeeId || record.employeeName}_${recordDate}`;
+                            
+                            // For records on the same day, keep only the earliest one
+                            if (!uniqueRecords.has(compositeKey) || 
+                                new Date(record.timestamp) < new Date(uniqueRecords.get(compositeKey).timestamp)) {
+                                uniqueRecords.set(compositeKey, {
+                                    id: childSnapshot.key,
+                                    ...record
+                                });
+                            }
                         }
                     });
 
-                    // Convert Map values to array
+                    // Convert to array
                     const records = Array.from(uniqueRecords.values());
 
                     // Sort records by timestamp (newest first)
