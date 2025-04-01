@@ -3778,24 +3778,34 @@
                     const attendanceRef = database.ref('attendance');
                     const snapshot = await attendanceRef.once('value');
                     
-                    // Filter records for the current user and today
+                    // Get a Set of already processed record IDs to prevent duplicates
+                    const processedRecordIds = new Set();
                     const records = [];
+                    
                     snapshot.forEach(childSnapshot => {
                         const record = childSnapshot.val();
-                        if (record.employeeId === currentUser.id) {
+                        // Only include records for the current user and from today
+                        if (record && record.employeeId === currentUser.id) {
                             const recordDate = new Date(record.timestamp).toISOString().split('T')[0];
                             if (recordDate === today) {
-                                records.push({
-                                    id: childSnapshot.key,
-                                    ...record
-                                });
+                                // Use record ID to prevent duplicates
+                                const recordId = childSnapshot.key;
+                                if (!processedRecordIds.has(recordId)) {
+                                    processedRecordIds.add(recordId);
+                                    records.push({
+                                        id: recordId,
+                                        ...record
+                                    });
+                                }
                             }
                         }
                     });
 
                     if (records.length > 0) {
-                        // Sort by time and take the first record (earliest check-in)
+                        // Sort by time (earliest first)
                         records.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+                        
+                        // Only show the first record for the day
                         const todayRecord = records[0];
                         const recordTime = new Date(todayRecord.timestamp);
 
@@ -3840,17 +3850,23 @@
                     // Fetch all attendance records
                     const attendanceRef = database.ref('attendance');
                     const snapshot = await attendanceRef.once('value');
-                    const records = [];
+                    
+                    // Use a Map to prevent duplicates by ID
+                    const uniqueRecords = new Map();
 
                     snapshot.forEach((childSnapshot) => {
                         const record = childSnapshot.val();
-                        if (record && record.employeeName && record.timestamp) { // Ensure we have valid data
-                            records.push({
+                        if (record && record.employeeName && record.timestamp) {
+                            // Use the record ID as the key to prevent duplicates
+                            uniqueRecords.set(childSnapshot.key, {
                                 id: childSnapshot.key,
                                 ...record
                             });
                         }
                     });
+
+                    // Convert Map values to array
+                    const records = Array.from(uniqueRecords.values());
 
                     // Sort records by timestamp (newest first)
                     records.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
@@ -3957,6 +3973,8 @@
                 const todaySnapshot = await attendanceRef.once('value');
                 
                 let existingRecord = false;
+                
+                // Check if there's already a record for this employee on this date
                 todaySnapshot.forEach(childSnapshot => {
                     const record = childSnapshot.val();
                     if (record.employeeId === employeeId) {
@@ -3973,11 +3991,12 @@
                     return;
                 }
 
-                // Continue with attendance recording...
+                // Get user's IP address
                 const ipResponse = await fetch('https://api.ipify.org?format=json');
                 const ipData = await ipResponse.json();
                 const ipAddress = ipData.ip;
 
+                // Calculate late status
                 const lateInfo = calculateLateStatus(now.toISOString(), employeeData.role);
 
                 // Create attendance record
@@ -3986,7 +4005,7 @@
                     employeeName: employeeData.name,
                     role: employeeData.role,
                     date: currentDate,
-                    time: now.toLocaleTimeString(),
+                    time: formatTime(now),
                     timestamp: now.toISOString(),
                     status: lateInfo.status,
                     lateMinutes: lateInfo.lateMinutes,
@@ -3994,8 +4013,8 @@
                     ipAddress: ipAddress
                 };
 
-                // Save to Firebase with a unique key
-                await attendanceRef.push(attendanceData);
+                // Save to Firebase
+                const newRecord = await attendanceRef.push(attendanceData);
 
                 // Show success message
                 showScanResult('Attendance recorded successfully', true);
@@ -4003,8 +4022,10 @@
                 // Stop the scanner
                 stopScanner();
                 
-                // Update the tables - but give time for database to update
+                // Important: Manually update the UI once without relying on listeners
+                // This avoids duplicate rendering
                 setTimeout(() => {
+                    // Force a manual update of the attendance table to show the new record
                     updateAttendanceTable();
                 }, 1000);
 
@@ -4895,21 +4916,26 @@
                     </tr>
                 `;
                 
-                // Get a fresh reference to the attendance data and use .get() to bypass cache
+                // Get a fresh reference to the attendance data
                 const attendanceRef = database.ref('attendance');
                 const snapshot = await attendanceRef.get();
                 
-                // Process the records
-                const records = [];
+                // Use a Map to track unique records by ID
+                const uniqueRecords = new Map();
+                
                 snapshot.forEach(childSnapshot => {
                     const record = childSnapshot.val();
                     if (record && record.employeeName && record.timestamp) {
-                        records.push({
+                        // Store in map using record ID as key to prevent duplicates
+                        uniqueRecords.set(childSnapshot.key, {
                             id: childSnapshot.key,
                             ...record
                         });
                     }
                 });
+                
+                // Convert map to array
+                const records = Array.from(uniqueRecords.values());
                 
                 // Clear loading state
                 tableBody.innerHTML = '';
@@ -4955,7 +4981,7 @@
                     );
                 }
                 
-                // Populate table with filtered records (without duplicates)
+                // Populate table with filtered records
                 filteredRecords.forEach(record => {
                     const row = document.createElement('tr');
                     const recordTime = new Date(record.timestamp);
@@ -5158,14 +5184,22 @@
 
             if (!tableBody) return;
 
-            attendanceRef.on('value', (snapshot) => {
-                const records = [];
-                snapshot.forEach(recordSnapshot => {
-                    records.push({
-                        id: recordSnapshot.key,
-                        ...recordSnapshot.val()
-                    });
+            attendanceRef.once('value', (snapshot) => {
+                // Use a Map to prevent duplicates by ID
+                const uniqueRecords = new Map();
+                
+                snapshot.forEach(childSnapshot => {
+                    const record = childSnapshot.val();
+                    if (record && record.employeeName && record.timestamp) {
+                        uniqueRecords.set(childSnapshot.key, {
+                            id: childSnapshot.key,
+                            ...record
+                        });
+                    }
                 });
+                
+                // Convert Map to array
+                const records = Array.from(uniqueRecords.values());
 
                 // Sort records by timestamp (newest first)
                 records.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
@@ -5184,16 +5218,41 @@
                     return;
                 }
 
+                // Apply filters
+                const dateFilter = document.getElementById('dateFilter')?.value;
+                const statusFilter = document.getElementById('statusFilter')?.value;
+                const employeeFilter = document.getElementById('attendanceEmployeeFilter')?.value;
+                
+                let filteredRecords = records;
+                
+                if (dateFilter) {
+                    filteredRecords = filteredRecords.filter(record => {
+                        const recordDate = new Date(record.timestamp).toISOString().split('T')[0];
+                        return recordDate === dateFilter;
+                    });
+                }
+                
+                if (statusFilter) {
+                    filteredRecords = filteredRecords.filter(record => 
+                        record.status === statusFilter
+                    );
+                }
+                
+                if (employeeFilter) {
+                    filteredRecords = filteredRecords.filter(record => 
+                        record.employeeId === employeeFilter
+                    );
+                }
+
                 // Populate table with records
-                records.forEach(record => {
+                filteredRecords.forEach(record => {
                     const recordTime = new Date(record.timestamp);
-                    const formattedDateTime = `${formatDate(recordTime)} ${recordTime.toLocaleTimeString()}`;
                     
                     const row = document.createElement('tr');
                     row.innerHTML = `
                         <td class="px-6 py-4">${record.employeeName || 'N/A'}</td>
                         <td class="px-6 py-4">${record.role || 'N/A'}</td>
-                        <td class="px-6 py-4">${formattedDateTime}</td>
+                        <td class="px-6 py-4">${formatDate(recordTime)} ${formatTime(recordTime)}</td>
                         <td class="px-6 py-4">
                             <span class="status-badge ${record.status?.toLowerCase() === 'punctual' ? 'punctual' : 'late'}">
                                 ${record.status}
@@ -7353,8 +7412,8 @@
             });
         }
 
-        let attendanceListener = null;
         // Make sure to initialize the real-time listener
+        let attendanceListener = null;
         function initializeAttendanceTable() {
             const attendanceRef = database.ref('attendance');
             
@@ -7364,12 +7423,21 @@
                 attendanceListener = null;
             }
             
-            // Attach new listener
-            attendanceListener = attendanceRef.on('value', () => {
-                // When data changes, call updateAttendanceTable once
-                updateAttendanceTable();
-            });
+            // Create a new listener function 
+            attendanceListener = function(snapshot) {
+                // Using a timeout to debounce multiple rapid updates
+                if (window.attendanceUpdateTimeout) {
+                    clearTimeout(window.attendanceUpdateTimeout);
+                }
+                
+                window.attendanceUpdateTimeout = setTimeout(() => {
+                    console.log('Attendance data changed, updating UI...');
+                    updateAttendanceTable();
+                }, 500); // 500ms debounce
+            };
             
+            // Attach the listener
+            attendanceRef.on('value', attendanceListener);
             console.log('Attendance listener initialized');
         }
 
