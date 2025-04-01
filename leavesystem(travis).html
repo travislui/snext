@@ -3851,13 +3851,14 @@
                     const attendanceRef = database.ref('attendance');
                     const snapshot = await attendanceRef.once('value');
                     
-                    // Use a Map to prevent duplicates by ID
+                    // Create a Map using record ID as the key to ensure uniqueness
                     const uniqueRecords = new Map();
 
-                    snapshot.forEach((childSnapshot) => {
+                    snapshot.forEach(childSnapshot => {
                         const record = childSnapshot.val();
+                        // Only include records with complete required data
                         if (record && record.employeeName && record.timestamp) {
-                            // Use the record ID as the key to prevent duplicates
+                            // Store with the unique Firebase key to prevent duplicates
                             uniqueRecords.set(childSnapshot.key, {
                                 id: childSnapshot.key,
                                 ...record
@@ -3865,7 +3866,7 @@
                         }
                     });
 
-                    // Convert Map values to array
+                    // Convert Map values to array (this ensures one entry per unique ID)
                     const records = Array.from(uniqueRecords.values());
 
                     // Sort records by timestamp (newest first)
