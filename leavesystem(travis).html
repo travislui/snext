@@ -2372,10 +2372,15 @@
                                 lastLogin: new Date().toISOString()
                             });
 
+                            // Show admin interface and load all data
                             showAdminInterface();
                             loadEmployees();
                             loadAllApplications();
                             loadAllPenalties();
+                            
+                            // Explicitly load and initialize attendance records
+                            await updateAttendanceTable(); // Initial fetch
+                            initializeAttendanceTable();   // Set up real-time listener
                             
                             // Show success message
                             showSyncStatus('Admin login successful');
@@ -2395,6 +2400,7 @@
                         }
                     }
                 } else {
+                    // Employee login logic (unchanged for brevity)
                     try {
                         console.log("Attempting employee login for:", username);
                         
@@ -2606,6 +2612,19 @@
             if (loginForm) {
                 loginForm.addEventListener('submit', handleLogin);
             }
+        });
+
+        document.getElementById('logout-btn').addEventListener('click', async () => {
+            if (attendanceListener) {
+                database.ref('attendance').off('value', attendanceListener);
+                attendanceListener = null;
+            }
+            await auth.signOut();
+            currentUser = null;
+            isAdmin = false;
+            document.getElementById('admin-page').style.display = 'none';
+            document.getElementById('home-page').style.display = 'block';
+            showSyncStatus('Logged out successfully');
         });
 
         // Call this when the admin page loads
@@ -4783,7 +4802,18 @@
             loadAllApplications();
             updateAllEmployeeSelects();
             initializeFilters(); // Initialize the simplified filter
+
+            // Explicitly fetch the latest attendance data directly from Firebase
+            fetchLatestAttendanceData().then(() => {
+                console.log('Latest attendance data fetched successfully');
+            }).catch(error => {
+                console.error('Error fetching latest attendance data:', error);
+                showSyncStatus('Error loading attendance data', 'error');
+            });            
             
+            // Then set up real-time listeners for ongoing updates
+            initializeAttendanceTable();
+
             // Add event listeners for logout buttons
             document.getElementById('logout-btn').addEventListener('click', logout);
             document.getElementById('export-applications-btn').addEventListener('click', exportApplicationsToExcel);
@@ -4810,6 +4840,140 @@
             // Initialize attendance records table and filters
             loadAllAttendanceRecords();
             setupAttendanceFilters();
+
+            // Show success message
+            showSyncStatus('Admin interface loaded with latest data');            
+        }
+
+        //Directly fetch the latest attendance data from Firebase
+        async function fetchLatestAttendanceData() {
+            try {
+                const tableBody = document.getElementById('allAttendanceTableBody');
+                if (!tableBody) return;
+                
+                // Show loading state
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="px-6 py-4 text-center">
+                            <div class="flex justify-center items-center">
+                                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                                <span class="ml-2">Loading latest attendance data...</span>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+                
+                // Get a fresh reference to the attendance data
+                const attendanceRef = database.ref('attendance');
+                
+                // Use .get() instead of .once() to ensure we get the latest data
+                // bypass any local caching
+                const snapshot = await attendanceRef.get();
+                
+                // Process the records
+                const records = [];
+                snapshot.forEach(childSnapshot => {
+                    const record = childSnapshot.val();
+                    if (record.employeeName && record.timestamp) {
+                        records.push({
+                            id: childSnapshot.key,
+                            ...record
+                        });
+                    }
+                });
+                
+                // Clear loading state
+                tableBody.innerHTML = '';
+                
+                // Handle empty records case
+                if (records.length === 0) {
+                    tableBody.innerHTML = `
+                        <tr>
+                            <td colspan="6" class="px-6 py-4 text-center text-gray-500">
+                                No attendance records found
+                            </td>
+                        </tr>
+                    `;
+                    return;
+                }
+                
+                // Sort records by timestamp (newest first)
+                records.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+                
+                // Apply any filters from filter inputs (if present)
+                const dateFilter = document.getElementById('dateFilter')?.value;
+                const statusFilter = document.getElementById('statusFilter')?.value;
+                const employeeFilter = document.getElementById('attendanceEmployeeFilter')?.value;
+                
+                let filteredRecords = records;
+                
+                if (dateFilter) {
+                    filteredRecords = filteredRecords.filter(record => {
+                        const recordDate = new Date(record.timestamp).toISOString().split('T')[0];
+                        return recordDate === dateFilter;
+                    });
+                }
+                
+                if (statusFilter) {
+                    filteredRecords = filteredRecords.filter(record => 
+                        record.status === statusFilter
+                    );
+                }
+                
+                if (employeeFilter) {
+                    filteredRecords = filteredRecords.filter(record => 
+                        record.employeeId === employeeFilter
+                    );
+                }
+                
+                // Populate table with filtered records
+                filteredRecords.forEach(record => {
+                    const row = document.createElement('tr');
+                    const recordTime = new Date(record.timestamp);
+                    
+                    row.innerHTML = `
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm font-medium text-gray-900">
+                                ${record.employeeName || 'N/A'}
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-900">
+                                ${record.role || 'N/A'}
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-900">
+                                ${formatDate(recordTime)} ${formatTime(recordTime)}
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="status-badge ${record.status?.toLowerCase() === 'punctual' ? 'punctual' : 'late'}">
+                                ${record.status}
+                                ${record.amount > 0 ? `<span class="penalty-amount">(-$${record.amount})</span>` : ''}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-900">
+                                ${record.ipAddress || 'N/A'}
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <button onclick="removeAttendanceRecord('${record.id}')" 
+                                    class="remove-btn-small">
+                                Remove
+                            </button>
+                        </td>
+                    `;
+                    tableBody.appendChild(row);
+                });
+                
+                console.log(`Loaded ${filteredRecords.length} attendance records successfully`);
+                
+            } catch (error) {
+                console.error('Error fetching latest attendance data:', error);
+                throw error; // Re-throw to be caught by the caller
+            }
         }
 
         // Handle agent filter changes
@@ -7200,10 +7364,18 @@
             });
         }
 
+        let attendanceListener = null;
         // Make sure to initialize the real-time listener
         function initializeAttendanceTable() {
             const attendanceRef = database.ref('attendance');
-            attendanceRef.on('value', () => {
+            
+            // Detach existing listener if it exists
+            if (attendanceListener) {
+                attendanceRef.off('value', attendanceListener);
+            }
+            
+            // Attach new listener
+            attendanceListener = attendanceRef.on('value', () => {
                 updateAttendanceTable();
             });
         }
