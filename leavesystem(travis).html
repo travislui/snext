@@ -4065,8 +4065,31 @@
                 if (!adminSnapshot.val()) throw new Error('Only admins can remove records');
 
                 if (confirm('Are you sure you want to remove this attendance record?')) {
-                    await database.ref(`attendance/${recordId}`).remove();
-                    updateAttendanceTable();
+                    console.log('Attempting to remove record with ID:', recordId);
+                    
+                    // First, get a reference to the record to ensure it exists
+                    const recordRef = database.ref(`attendance/${recordId}`);
+                    const snapshot = await recordRef.once('value');
+                    
+                    if (!snapshot.exists()) {
+                        throw new Error('Record not found in database');
+                    }
+                    
+                    // Delete the record
+                    await recordRef.remove();
+                    console.log('Record removed successfully from Firebase');
+                    
+                    // Force UI update - disconnect and reconnect the listener
+                    if (attendanceListener) {
+                        database.ref('attendance').off('value', attendanceListener);
+                    }
+                    
+                    // Manually refresh the data
+                    await updateAttendanceTable();
+                    
+                    // Reattach the listener
+                    initializeAttendanceTable();
+                    
                     showSyncStatus('Attendance record removed successfully');
                 }
             } catch (error) {
