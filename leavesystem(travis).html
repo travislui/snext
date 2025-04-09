@@ -4044,18 +4044,6 @@
             }
         }
 
-        function stopScanner() {
-            if (html5QrcodeScanner) {
-                html5QrcodeScanner.stop().then(() => {
-                    html5QrcodeScanner.clear();
-                    document.getElementById('reader').style.display = 'none';
-                }).catch(err => {
-                    console.error('Error stopping scanner:', err);
-                });
-                html5QrcodeScanner = null;
-            }
-        }
-
         async function removeAttendanceRecord(recordId) {
             try {
                 const user = auth.currentUser;
@@ -5832,7 +5820,13 @@
 
         async function startScanning() {
             try {
+                if (html5QrcodeScanner) {
+                    await html5QrcodeScanner.stop();
+                    html5QrcodeScanner = null;
+                }
+
                 const html5QrCode = new Html5Qrcode("reader");
+                html5QrcodeScanner = html5QrCode; // Store the scanner instance
                 const readerDiv = document.getElementById('reader');
                 readerDiv.style.display = 'block';
 
@@ -5841,6 +5835,13 @@
                     { fps: 10, qrbox: { width: 600, height: 600 } },
                     async (decodedText) => {
                         try {
+                            // Immediately stop the scanner once a QR code is detected
+                            await html5QrCode.stop();
+                            html5QrcodeScanner = null;
+                            readerDiv.style.display = 'none';
+                            
+                            console.log("QR code detected, scanner stopped");
+
                             // Get current user's employee data
                             const employeeSnapshot = await database.ref('employees')
                                 .orderByChild('uid')
@@ -5879,7 +5880,7 @@
                                 ipAddress: ipData.ip
                             };
 
-                            // Save attendance record with a proper path
+                            // Save attendance record
                             const attendanceRef = database.ref('attendance');
                             await attendanceRef.push(attendanceData);
 
@@ -5925,10 +5926,6 @@
                                 }
                             }
 
-                            // Stop scanner and hide reader
-                            await html5QrCode.stop();
-                            readerDiv.style.display = 'none';
-
                             // Show success animation
                             const resultDiv = document.getElementById('scan-result');
                             resultDiv.style.display = 'block';
@@ -5956,6 +5953,13 @@
                         } catch (error) {
                             console.error('Error recording attendance:', error);
                             
+                            // Stop the scanner if it's still running
+                            if (html5QrcodeScanner) {
+                                await html5QrcodeScanner.stop();
+                                html5QrcodeScanner = null;
+                                readerDiv.style.display = 'none';
+                            }
+                            
                             // Show error message
                             const resultDiv = document.getElementById('scan-result');
                             resultDiv.style.display = 'block';
@@ -5971,10 +5975,6 @@
                             setTimeout(() => {
                                 resultDiv.style.display = 'none';
                             }, 3000);
-                            
-                            // Stop scanner and hide reader
-                            await html5QrCode.stop();
-                            readerDiv.style.display = 'none';
                         }
                     },
                     (error) => {
@@ -6001,6 +6001,20 @@
                 setTimeout(() => {
                     resultDiv.style.display = 'none';
                 }, 3000);
+            }
+        }
+
+        // Helper function to stop the scanner
+        function stopScanner() {
+            if (html5QrcodeScanner) {
+                html5QrcodeScanner.stop().then(() => {
+                    const readerDiv = document.getElementById('reader');
+                    if (readerDiv) readerDiv.style.display = 'none';
+                    html5QrcodeScanner = null;
+                    console.log('Scanner stopped successfully');
+                }).catch(err => {
+                    console.error('Error stopping scanner:', err);
+                });
             }
         }
 
