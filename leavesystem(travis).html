@@ -5930,7 +5930,24 @@
                             readerDiv.style.display = 'none';
 
                             // Show success animation
-                            showScanResult('Attendance recorded successfully', true);
+                            const resultDiv = document.getElementById('scan-result');
+                            resultDiv.style.display = 'block';
+                            
+                            resultDiv.innerHTML = `
+                                <div class="success-animation">
+                                    <svg class="checkmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52">
+                                        <circle class="checkmark__circle" cx="26" cy="26" r="25" fill="none"/>
+                                        <path class="checkmark__check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
+                                    </svg>
+                                    <p style="margin-top: 20px; color: #4CAF50; text-align: center; font-weight: bold;">
+                                        Attendance recorded successfully
+                                    </p>
+                                </div>
+                            `;
+
+                            setTimeout(() => {
+                                resultDiv.style.display = 'none';
+                            }, 3000);
 
                             // Update both attendance and penalty tables
                             await updateAttendanceTable();
@@ -5938,7 +5955,22 @@
 
                         } catch (error) {
                             console.error('Error recording attendance:', error);
-                            showScanResult(error.message, false);
+                            
+                            // Show error message
+                            const resultDiv = document.getElementById('scan-result');
+                            resultDiv.style.display = 'block';
+                            
+                            resultDiv.innerHTML = `
+                                <div class="success-animation">
+                                    <p style="color: #f44336; text-align: center; font-weight: bold;">
+                                        Error: ${error.message}
+                                    </p>
+                                </div>
+                            `;
+
+                            setTimeout(() => {
+                                resultDiv.style.display = 'none';
+                            }, 3000);
                             
                             // Stop scanner and hide reader
                             await html5QrCode.stop();
@@ -5953,7 +5985,22 @@
                 );
             } catch (error) {
                 console.error('Error starting scanner:', error);
-                showScanResult('Error starting scanner: ' + error.message, false);
+                
+                // Show error message
+                const resultDiv = document.getElementById('scan-result');
+                resultDiv.style.display = 'block';
+                
+                resultDiv.innerHTML = `
+                    <div class="success-animation">
+                        <p style="color: #f44336; text-align: center; font-weight: bold;">
+                            Error starting scanner: ${error.message}
+                        </p>
+                    </div>
+                `;
+
+                setTimeout(() => {
+                    resultDiv.style.display = 'none';
+                }, 3000);
             }
         }
 
