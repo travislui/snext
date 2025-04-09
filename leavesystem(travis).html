@@ -4067,33 +4067,55 @@
                 if (confirm('Are you sure you want to remove this attendance record?')) {
                     console.log('Attempting to remove record with ID:', recordId);
                     
-                    // First, get a reference to the record to ensure it exists
+                    // First, get the specific record to identify the employee and timestamp
                     const recordRef = database.ref(`attendance/${recordId}`);
-                    const snapshot = await recordRef.once('value');
+                    const recordSnapshot = await recordRef.once('value');
                     
-                    if (!snapshot.exists()) {
+                    if (!recordSnapshot.exists()) {
                         throw new Error('Record not found in database');
                     }
                     
-                    // Delete the record
-                    await recordRef.remove();
-                    console.log('Record removed successfully from Firebase');
+                    const record = recordSnapshot.val();
+                    const employeeName = record.employeeName;
+                    const timestamp = record.timestamp;
                     
-                    // Force UI update - disconnect and reconnect the listener
-                    if (attendanceListener) {
-                        database.ref('attendance').off('value', attendanceListener);
+                    console.log(`Finding all attendance records for ${employeeName} at ${timestamp}`);
+                    
+                    // Find all attendance records for this employee with the exact same timestamp
+                    const attendanceRef = database.ref('attendance');
+                    const allRecordsSnapshot = await attendanceRef.once('value');
+                    
+                    // Create a batch update to remove all matching records
+                    const updates = {};
+                    
+                    allRecordsSnapshot.forEach(childSnapshot => {
+                        const childRecord = childSnapshot.val();
+                        if (childRecord && 
+                            childRecord.employeeName === employeeName && 
+                            childRecord.timestamp === timestamp) {
+                            
+                            // Mark this record for deletion
+                            updates[`attendance/${childSnapshot.key}`] = null;
+                            console.log(`Marking record ${childSnapshot.key} for deletion`);
+                        }
+                    });
+                    
+                    // Apply all deletions in one batch update
+                    if (Object.keys(updates).length > 0) {
+                        await database.ref().update(updates);
+                        console.log(`Removed ${Object.keys(updates).length} records successfully`);
+                        
+                        // Force UI update
+                        await updateAttendanceTable();
+                        
+                        showSyncStatus(`Attendance record removed successfully`);
+                    } else {
+                        console.log('No matching records found to remove');
+                        throw new Error('No matching records found to remove');
                     }
-                    
-                    // Manually refresh the data
-                    await updateAttendanceTable();
-                    
-                    // Reattach the listener
-                    initializeAttendanceTable();
-                    
-                    showSyncStatus('Attendance record removed successfully');
                 }
             } catch (error) {
-                console.error('Error removing attendance record:', error);
+                console.error('Error removing attendance records:', error);
                 alert('Error: ' + error.message);
             }
         }
