@@ -5938,9 +5938,32 @@
                     throw new Error('Employee data not found');
                 }
 
-                // Get current time and IP
+                // Get current time and date
                 const now = new Date();
                 const today = formatDate(now);
+
+                // IMPORTANT: Check if the agent already has an attendance record for today
+                const attendanceRef = database.ref('attendance');
+                const existingRecordSnapshot = await attendanceRef
+                    .orderByChild('date')
+                    .equalTo(today)
+                    .once('value');
+                
+                let existingRecord = false;
+                existingRecordSnapshot.forEach(childSnapshot => {
+                    const record = childSnapshot.val();
+                    // Check if this record belongs to the current employee
+                    if (record.employeeId === employeeData.id) {
+                        existingRecord = true;
+                    }
+                });
+
+                // If an attendance record already exists for today, don't create a new one
+                if (existingRecord) {
+                    throw new Error('You have already recorded your attendance for today');
+                }
+
+                // Get IP address
                 const ipResponse = await fetch('https://api.ipify.org?format=json');
                 const ipData = await ipResponse.json();
 
@@ -5952,7 +5975,7 @@
                     employeeId: employeeData.id,
                     employeeName: employeeData.name,
                     role: employeeData.role,
-                    date: formatDate(now),
+                    date: today,
                     time: formatTime(now),
                     timestamp: now.toISOString(),
                     status: lateInfo.status,
@@ -5961,11 +5984,10 @@
                     ipAddress: ipData.ip
                 };
 
-                // Save attendance record
-                const attendanceRef = database.ref('attendance');
+                // Save attendance record to Firebase
                 await attendanceRef.push(attendanceData);
 
-                // If there's a penalty amount, check for existing penalty record
+                // If there's a penalty amount, add a penalty record
                 if (lateInfo.amount > 0) {
                     // Check for existing penalty record for today
                     const penaltiesRef = database.ref('penalties');
