@@ -1394,6 +1394,23 @@
             background-color: var(--accent-color) !important;
         }
 
+        #penaltyListContainer.collapsed {
+            max-height: 0;
+            overflow: hidden;
+            opacity: 0;
+            margin: 0;
+            padding: 0;
+            border: none;
+            transition: all 0.3s ease;
+        }
+
+        #penaltyListContainer.expanded {
+            max-height: 2000px;
+            opacity: 1;
+            margin-bottom: 20px;
+            transition: all 0.3s ease;
+        }
+
         .success-animation {
             position: fixed;
             top: 50%;
@@ -2061,11 +2078,16 @@
         <!-- Section 4: 賀金 Info -->
         <div class="container">
             <h3>賀金 Info</h3>
-            <div class="export-buttons" style="margin-top: 20px;">
+            <div class="export-buttons" style="margin-top: 20px; margin-bottom: 10px;">
                 <button id="export-penalties-btn" class="export-btn">Export Penalties to Excel</button>
             </div>
+            <div style="margin-bottom: 10px;">
+                <button id="togglePenaltyList" class="collapse-btn">
+                    <span class="collapse-icon">▼</span> Collapse 賀金 Info
+                </button>
+            </div>
         
-            <div class="table-container">
+            <div id="penaltyListContainer" class="table-container expanded">
                 <table id="penalty-table">
                     <thead>
                         <tr>
@@ -6957,6 +6979,51 @@
                     localStorage.setItem('agentListCollapsed', 'true');
                 }
             });
+        });
+
+        //Handle the toggling 賀金table
+        document.addEventListener('DOMContentLoaded', function() {
+            const togglePenaltyButton = document.getElementById('togglePenaltyList');
+            const penaltyContainer = document.getElementById('penaltyListContainer');
+            
+            if (togglePenaltyButton && penaltyContainer) {
+                // Load saved state
+                const isCollapsed = localStorage.getItem('penaltyListCollapsed') === 'true';
+                
+                // Set initial state
+                if (isCollapsed) {
+                    penaltyContainer.classList.add('collapsed');
+                    penaltyContainer.classList.remove('expanded');
+                    togglePenaltyButton.classList.add('collapsed');
+                    togglePenaltyButton.innerHTML = '<span class="collapse-icon">▼</span> Expand 賀金 Info';
+                } else {
+                    penaltyContainer.classList.add('expanded');
+                    penaltyContainer.classList.remove('collapsed');
+                    togglePenaltyButton.classList.remove('collapsed');
+                    togglePenaltyButton.innerHTML = '<span class="collapse-icon">▼</span> Collapse 賀金 Info';
+                }
+
+                // Add click handler
+                togglePenaltyButton.addEventListener('click', function() {
+                    const isCurrentlyCollapsed = penaltyContainer.classList.contains('collapsed');
+                    
+                    if (isCurrentlyCollapsed) {
+                        // Expand
+                        penaltyContainer.classList.remove('collapsed');
+                        penaltyContainer.classList.add('expanded');
+                        togglePenaltyButton.classList.remove('collapsed');
+                        togglePenaltyButton.innerHTML = '<span class="collapse-icon">▼</span> Collapse 賀金 Info';
+                        localStorage.setItem('penaltyListCollapsed', 'false');
+                    } else {
+                        // Collapse
+                        penaltyContainer.classList.remove('expanded');
+                        penaltyContainer.classList.add('collapsed');
+                        togglePenaltyButton.classList.add('collapsed');
+                        togglePenaltyButton.innerHTML = '<span class="collapse-icon">▼</span> Expand 賀金 Info';
+                        localStorage.setItem('penaltyListCollapsed', 'true');
+                    }
+                });
+            }
         });
 
         document.addEventListener('DOMContentLoaded', function() {
