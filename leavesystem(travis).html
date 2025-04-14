@@ -3702,9 +3702,17 @@
         function calculateLateStatus(timestamp, role) {
             const recordTime = new Date(timestamp);
             
-            // Create deadline time (9:30 AM) for the same day
+            // Create deadline time based on day of week and role
             const deadline = new Date(recordTime);
-            deadline.setHours(9, 30, 0, 0);
+            const isMonday = recordTime.getDay() === 1; // 0 is Sunday, 1 is Monday
+            
+            // Set different deadline for non-Agents on Mondays (9:20 AM)
+            // Standard deadline for everyone else (9:30 AM)
+            if (isMonday && role !== 'Agent') {
+                deadline.setHours(9, 20, 0, 0); // 9:20 AM for non-Agents on Monday
+            } else {
+                deadline.setHours(9, 30, 0, 0); // 9:30 AM for all other cases
+            }
             
             // Calculate minutes late
             const lateMinutes = Math.floor((recordTime - deadline) / (1000 * 60));
@@ -3759,7 +3767,8 @@
             return {
                 status: status,
                 amount: amount,
-                lateMinutes: Math.max(0, lateMinutes) // Ensure non-negative
+                lateMinutes: Math.max(0, lateMinutes), // Ensure non-negative
+                deadline: deadline.toTimeString().substring(0, 5) // Add deadline time for display/debugging
             };
         }
 
