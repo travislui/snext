@@ -1771,6 +1771,23 @@
             transform: translateX(5px);
         }
 
+        .year-filter-btn {
+            transition: all 0.2s ease-in-out;
+        }
+
+        .year-filter-btn.active {
+            background-color: var(--accent-color);
+            transform: translateY(-1px);
+        }
+
+        .year-filter-btn:hover {
+            transform: translateY(-1px);
+        }
+
+        .year-filter-btn:active {
+            transform: translateY(1px);
+        }
+
     </style>
 </head>
 
@@ -1972,6 +1989,14 @@
                             Reset Filter
                         </button>
                     </div>
+                </div>
+            </div>
+
+            <div class="year-filter-container p-4 bg-white shadow-sm rounded-lg mb-4">
+                <div class="flex items-center gap-4">
+                    <span class="text-sm font-medium text-gray-700">Filter by Year:</span>
+                    <button id="filter-year-2025" class="year-filter-btn bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded">2025</button>
+                    <button id="filter-year-2026" class="year-filter-btn bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded">2026</button>
                 </div>
             </div>
 
@@ -2324,6 +2349,7 @@
         let isAdmin = false;
         let employeeData = {};
         let penaltyData = {};
+        let selectedYear = null;
 
         // Event Listeners
         document.getElementById('login-form').addEventListener('submit', handleLogin);
@@ -6729,7 +6755,7 @@
                         employeeId: employeeId,
                         employeeName: employeeData.name,
                         employeeRole: employeeData.role,
-                        date: formatDate(new Date(applyDate)),
+                        date: formatDate(new Date(leaveStartDate)),
                         reason: '活動請假',
                         minutes: 0,
                         amount: amount,
