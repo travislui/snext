@@ -3253,7 +3253,7 @@
                 const daysPassed = Math.floor((currentDate - penaltyDate) / (1000 * 60 * 60 * 24));
 
                 // Double the amount if past deadline
-                const finalAmount = daysPassed > 7 ? amount * 2 : amount;
+                const finalAmount = daysPassed > 8 ? amount * 2 : amount;
 
                 const newPenalty = {
                     employeeId: employeeId,  // Make sure this is the correct Firebase key
@@ -3265,7 +3265,7 @@
                     baseAmount: amount,
                     amount: finalAmount,
                     deadline: deadline,
-                    isOverdue: daysPassed > 7,
+                    isOverdue: daysPassed > 8,
                     status: 'Not Submitted',
                     createdAt: new Date().toISOString(),
                     lastModified: new Date().toISOString(),
