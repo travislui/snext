@@ -4520,7 +4520,7 @@
                 const applicationsRef = database.ref('applications');
                 applicationsRef.on('value', (snapshot) => {
                     const applications = snapshot.val() || {};
-
+                    const selectedYear = window.getSelectedYear ? window.getSelectedYear() : null; // Get selected year
                     // Update calendar regardless of filter
                     updateCalendarEvents(applications);
 
@@ -4537,6 +4537,12 @@
                         );
                     }
 
+                    if (selectedYear) {
+                        filteredApplications = filteredApplications.filter(([, app]) => 
+                            new Date(app.applyDate).getFullYear().toString() === selectedYear
+                        );
+                    }
+                    
                     // Sort applications by date (newest first)
                     const sortedApplications = filteredApplications
                         .sort(([, a], [, b]) => new Date(b.applyDate) - new Date(a.applyDate));
@@ -7666,6 +7672,59 @@
             });
         });
 
+        document.addEventListener('DOMContentLoaded', function() {
+            const filter2025Btn = document.getElementById('filter-year-2025');
+            const filter2026Btn = document.getElementById('filter-year-2026');
+            let selectedYear = null; // Store the currently selected year
+
+            // Function to update button styles
+            function updateYearButtonStyles(activeBtn) {
+                [filter2025Btn, filter2026Btn].forEach(btn => {
+                    btn.classList.remove('active');
+                    btn.style.backgroundColor = '#6b7280'; // Default color
+                });
+                if (activeBtn) {
+                    activeBtn.classList.add('active');
+                    activeBtn.style.backgroundColor = 'var(--accent-color)'; // Active color
+                }
+            }
+
+            // 2025 button click handler
+            if (filter2025Btn) {
+                filter2025Btn.addEventListener('click', function() {
+                    if (selectedYear === '2025') {
+                        selectedYear = null; // Deselect if clicked again
+                        updateYearButtonStyles(null);
+                    } else {
+                        selectedYear = '2025';
+                        updateYearButtonStyles(filter2025Btn);
+                    }
+                    const employeeFilter = document.getElementById('application-employee-filter');
+                    loadAllApplications(employeeFilter ? employeeFilter.value : null);
+                });
+            }
+
+            // 2026 button click handler
+            if (filter2026Btn) {
+                filter2026Btn.addEventListener('click', function() {
+                    if (selectedYear === '2026') {
+                        selectedYear = null; // Deselect if clicked again
+                        updateYearButtonStyles(null);
+                    } else {
+                        selectedYear = '2026';
+                        updateYearButtonStyles(filter2026Btn);
+                    }
+                    const employeeFilter = document.getElementById('application-employee-filter');
+                    loadAllApplications(employeeFilter ? employeeFilter.value : null);
+                });
+            }
+
+            // Expose selectedYear to loadAllApplications
+            window.getSelectedYear = function() {
+                return selectedYear;
+            };
+        });
+
         function resetAttendanceFilters() {
             document.getElementById('dateFilter').value = '';
             document.getElementById('statusFilter').value = '';
@@ -7688,7 +7747,15 @@
             resetFilters.addEventListener('click', function() {
                 // Set filter back to "All Agents" (empty value)
                 applicationFilter.value = '';
-                
+                // Also reset year filter
+                const filter2025Btn = document.getElementById('filter-year-2025');
+                const filter2026Btn = document.getElementById('filter-year-2026');
+                [filter2025Btn, filter2026Btn].forEach(btn => {
+                    btn.classList.remove('active');
+                    btn.style.backgroundColor = '#6b7280';
+                });
+                window.getSelectedYear = () => null; // Clear selected year
+
                 // Load all applications
                 loadAllApplications();
                 
