@@ -3244,7 +3244,7 @@
 
                 // Calculate deadline (7 days from penalty date)
                 const deadlineDate = new Date(date);
-                deadlineDate.setDate(deadlineDate.getDate() + 7);
+                deadlineDate.setDate(deadlineDate.getDate() + 6);
                 const deadline = deadlineDate.toISOString().split('T')[0];
 
                 // Calculate current date
@@ -3587,7 +3587,7 @@
 
                     // Calculate deadline (7 days from application date)
                     const deadlineDate = new Date(applyDate);
-                    deadlineDate.setDate(deadlineDate.getDate() + 7);
+                    deadlineDate.setDate(deadlineDate.getDate() + 6);
                     
                     // Create penalty record
                     const penaltyData = {
@@ -6082,7 +6082,7 @@
                     if (!existingPenaltyForToday) {
                         // Calculate deadline (7 days from now)
                         const deadline = new Date(now);
-                        deadline.setDate(deadline.getDate() + 7);
+                        deadline.setDate(deadline.getDate() + 6);
 
                         const penaltyData = {
                             employeeId: employeeData.id,
