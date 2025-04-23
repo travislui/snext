@@ -4542,7 +4542,7 @@
                             new Date(app.applyDate).getFullYear().toString() === selectedYear
                         );
                     }
-                    
+
                     // Sort applications by date (newest first)
                     const sortedApplications = filteredApplications
                         .sort(([, a], [, b]) => new Date(b.applyDate) - new Date(a.applyDate));
@@ -6798,7 +6798,7 @@
                         minutes: 0,
                         amount: amount,
                         baseAmount: amount,
-                        deadline: formatDate(new Date(new Date(leaveStartDate).getTime() + 7 * 24 * 60 * 60 * 1000)),
+                        deadline: formatDate(new Date(new Date(leaveStartDate).getTime() + 6 * 24 * 60 * 60 * 1000)),
                         status: 'Not Submitted',
                         createdAt: new Date().toISOString(),
                         lastModified: new Date().toISOString(),
