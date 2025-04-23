@@ -1998,6 +1998,7 @@
                     <button id="filter-year-2025" class="year-filter-btn bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded">2025</button>
                     <button id="filter-year-2026" class="year-filter-btn bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded">2026</button>
                 </div>
+                <div style="height: 2rem;"></div> <!-- Spacer div -->
             </div>
 
             <div style="margin-bottom: 10px;">
@@ -4601,6 +4602,26 @@
             }
         }
 
+        // Initialize year filter buttons
+        document.addEventListener('DOMContentLoaded', function() {
+            const year2026Btn = document.getElementById('filter-year-2026');
+            const year2025Btn = document.getElementById('filter-year-2025');
+
+            if (year2026Btn) {
+                year2026Btn.addEventListener('click', function() {
+                    selectedYear = selectedYear === '2026' ? null : '2026';
+                    loadAllApplications(document.getElementById('application-employee-filter').value);
+                });
+            }
+
+            if (year2025Btn) {
+                year2025Btn.addEventListener('click', function() {
+                    selectedYear = selectedYear === '2025' ? null : '2025';
+                    loadAllApplications(document.getElementById('application-employee-filter').value);
+                });
+            }
+        });
+
         // Add this new handler function
         function handleRemoveSingleApplication(event, ...args) {
             event.preventDefault();
@@ -6085,6 +6106,17 @@
             } catch (error) {
                 console.error("Error processing attendance record:", error);
                 throw error;
+            }
+        }
+
+        // Function to update year button states
+        function updateYearButtonStates() {
+            const year2026Btn = document.getElementById('filter-year-2026');
+            const year2025Btn = document.getElementById('filter-year-2025');
+
+            if (year2026Btn && year2025Btn) {
+                year2026Btn.classList.toggle('active', selectedYear === '2026');
+                year2025Btn.classList.toggle('active', selectedYear === '2025');
             }
         }
 
