@@ -1788,6 +1788,14 @@
             transform: translateY(1px);
         }
 
+        #employee-table th:nth-child(3) { /* Role column */
+            width: 70px; /* Set desired width for Role */
+        }
+
+        #employee-table th:nth-child(4) { /* Clubs & Awards column */
+            width: 120px; /* Set desired width for Clubs & Awards */
+        }
+
     </style>
 </head>
 
@@ -1843,6 +1851,7 @@
                     <option value="Belong">Belong</option>
                     <option value="Ride">Ride</option>
                     <option value="Ark">Ark</option>
+                    <option value="Giant">Giant</option>
                 </select>
                 <label for="emp-team-leader">
                     <input type="checkbox" id="emp-team-leader"> Team Leader?????????
@@ -6461,7 +6470,7 @@
                         <span class="display-text">${emp.mdrt}</span>
                     `;
 
-                    const teamOptions = ['', 'Honour', 'Bee', 'Novas', 'Define', 'Belong', 'Ride', 'Ark'];
+                    const teamOptions = ['', 'Honour', 'Bee', 'Novas', 'Define', 'Belong', 'Ride', 'Ark', 'Giant'];
                     const teamSelect = `
                         <select class="edit-select" style="display: none;" 
                                 onchange="updateEmployeeField('${id}', 'team', this.value)">
