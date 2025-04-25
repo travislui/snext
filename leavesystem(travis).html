@@ -6461,24 +6461,21 @@
                         <span class="display-text">${emp.mdrt}</span>
                     `;
 
+                    const teamOptions = ['', 'Honour', 'Bee', 'Novas', 'Define', 'Belong', 'Ride', 'Ark'];
                     const teamSelect = `
                         <select class="edit-select" style="display: none;" 
                                 onchange="updateEmployeeField('${id}', 'team', this.value)">
-                            ${['', 'Honour', 'Bee', 'Novas', 'Define', 'Belong', 'Ride', 'Ark']
+                            ${teamOptions
                                 .map(team => `<option value="${team}" ${emp.team === team ? 'selected' : ''}>${team || 'None'}</option>`)
                                 .join('')}
                         </select>
                         <span class="display-text">${emp.team || 'N/A'}</span>
                     `;
 
-                    const teamLeaderSelect = `
-                        <select class="edit-select" style="display: none;" 
-                                onchange="updateEmployeeField('${id}', 'isTeamLeader', this.value)">
-                            ${['No', 'Yes']
-                                .map(status => `<option value="${status === 'Yes'}" ${emp.isTeamLeader === (status === 'Yes') ? 'selected' : ''}>${status}</option>`)
-                                .join('')}
-                        </select>
-                        <span class="display-text">${emp.isTeamLeader ? 'Yes' : 'No'}</span>
+                    const teamLeaderCheckbox = `
+                        <input type="checkbox" class="edit-checkbox" style="display: none;" 
+                            ${emp.teamLeader ? 'checked' : ''}>
+                        <span class="display-text">${emp.teamLeader ? 'Yes' : 'No'}</span>
                     `;
 
                     row.innerHTML = `
@@ -6490,8 +6487,8 @@
                         <td class="editable-cell">${mdrtSelect}</td>
                         <td>${normalLeavesDisplay}</td>
                         <td>${goldenLeavesDisplay}</td>
-                        <td>${teamSelect}</td>
-                        <td>${teamLeaderSelect}</td>
+                        <td class="editable-cell">${teamSelect}</td>
+                        <td class="editable-cell">${teamLeaderCheckbox}</td>
                         <td class="action-column">
                             <div class="button-stack">
                                 <button class="adjust-btn action-btn" onclick="toggleAdjustMode(this)">Adjust</button>
