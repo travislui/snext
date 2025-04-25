@@ -6490,17 +6490,8 @@
                         <td class="editable-cell">${mdrtSelect}</td>
                         <td>${normalLeavesDisplay}</td>
                         <td>${goldenLeavesDisplay}</td>
-                        <td class="editable-cell">
-                            <span class="display-text">${teamSelect || ''}</span>
-                            <select class="edit-select" style="display: none;">
-                                <option value="">Select Team</option>
-                                ${teamOptions.map(team => `<option value="${team}" ${teamSelect === team ? 'selected' : ''}>${team}</option>`).join('')}
-                            </select>
-                        </td>
-                        <td class="editable-cell">
-                            <span class="display-text">${employee.teamLeaderSelect ? 'Yes' : 'No'}</span>
-                            <input type="checkbox" class="edit-checkbox" style="display: none;" ${employee.teamLeaderSelect ? 'checked' : ''}>
-                        </td>
+                        <td>${teamSelect}</td>
+                        <td>${teamLeaderSelect}</td>
                         <td class="action-column">
                             <div class="button-stack">
                                 <button class="adjust-btn action-btn" onclick="toggleAdjustMode(this)">Adjust</button>
