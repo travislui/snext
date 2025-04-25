@@ -1695,6 +1695,16 @@
             background-color: rgba(52, 152, 219, 0.05);
         }
 
+        #employee-table th:nth-child(3), #employee-table td:nth-child(3) { /* Role column */
+            width: 70px !important; /* Adjust as needed */
+            min-width: 70px !important; /* Ensure minimum width */
+        }
+
+        #employee-table th:nth-child(4), #employee-table td:nth-child(4) { /* Clubs & Awards column */
+            width: 100px !important; /* Adjust as needed */
+            min-width: 100px !important; /* Ensure minimum width */
+        }
+
         #agentListContainer::-webkit-scrollbar {
             width: 8px;
             height: 8px;
@@ -1786,14 +1796,6 @@
 
         .year-filter-btn:active {
             transform: translateY(1px);
-        }
-
-        #employee-table th:nth-child(3) { /* Role column */
-            width: 70px; /* Set desired width for Role */
-        }
-
-        #employee-table th:nth-child(4) { /* Clubs & Awards column */
-            width: 120px; /* Set desired width for Clubs & Awards */
         }
 
     </style>
@@ -2206,8 +2208,8 @@
     <p><strong>Code:</strong> <span id="employee-code"></span></p>
     <p><strong>Role:</strong> <span id="employee-role"></span></p>
     <p><strong>Clubs & Awards:</strong> <span id="employee-mdrt"></span></p>
-    <p><strong>Team:</strong> <span id="employee-team"></span></p>
-    <p><strong>Team Leader:</strong> <span id="employee-team-leader"></span></p>
+    <p><strong>Team:</strong> <span id="emp-team"></span></p>
+    <p><strong>Team Leader:</strong> <span id="emp-team-leader"></span></p>
     <p><strong>Annual Leaves (Normal):</strong> <span id="employee-leave-normal"></span></p>
     <p><strong>Annual Leaves (黃金事假):</strong> <span id="employee-leave-golden"></span></p>
     <p><strong>Remaining Annual Leaves (Normal):</strong> <span id="remaining-leave-normal"></span></p>
