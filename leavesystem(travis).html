@@ -1833,6 +1833,20 @@
                     <option value="mdrt">MDRT</option>
                     <option value="cot or above">COT or above</option>
                 </select>
+                <label for="emp-team">Team:</label>
+                <select id="emp-team" required>
+                    <option value="">Select Team</option>
+                    <option value="Honour">Honour</option>
+                    <option value="Bee">Bee</option>
+                    <option value="Novas">Novas</option>
+                    <option value="Define">Define</option>
+                    <option value="Belong">Belong</option>
+                    <option value="Ride">Ride</option>
+                    <option value="Ark">Ark</option>
+                </select>
+                <label for="emp-team-leader">
+                    <input type="checkbox" id="emp-team-leader"> Team Leader?????????
+                </label>
                 <button type="button" id="add-employee-btn" class="add-btn">Add Agent</button>
             </form>
     
@@ -1914,6 +1928,8 @@
                             <th>Clubs & Awards</th>
                             <th>Remaining Annual Leaves (Normal)</th>
                             <th>Remaining Annual Leaves (黃金事假)</th>
+                            <th>Team</th>
+                            <th>Team Leader</th>
                             <th>Action</th>
                         </tr>
                     </thead>
@@ -2181,6 +2197,8 @@
     <p><strong>Code:</strong> <span id="employee-code"></span></p>
     <p><strong>Role:</strong> <span id="employee-role"></span></p>
     <p><strong>Clubs & Awards:</strong> <span id="employee-mdrt"></span></p>
+    <p><strong>Team:</strong> <span id="employee-team"></span></p>
+    <p><strong>Team Leader:</strong> <span id="employee-team-leader"></span></p>
     <p><strong>Annual Leaves (Normal):</strong> <span id="employee-leave-normal"></span></p>
     <p><strong>Annual Leaves (黃金事假):</strong> <span id="employee-leave-golden"></span></p>
     <p><strong>Remaining Annual Leaves (Normal):</strong> <span id="remaining-leave-normal"></span></p>
@@ -3067,9 +3085,11 @@
                 const code = document.getElementById('emp-code').value;
                 const role = document.getElementById('emp-role').value;
                 const mdrt = document.getElementById('emp-mdrt').value;
+                const team = document.getElementById('emp-team').value;
+                const isTeamLeader = document.getElementById('emp-team-leader').checked;
 
                 // Validation
-                if (!name || !code || !role || !mdrt) {
+                if (!name || !code || !role || !mdrt || !team) {
                     throw new Error('Please fill in all fields');
                 }
 
@@ -3111,6 +3131,8 @@
                     code: code,
                     role: role,
                     mdrt: mdrt,
+                    team: team,
+                    isTeamLeader: isTeamLeader,
                     normalLeaves: normalLeaves,
                     goldenLeaves: goldenLeaves,
                     remainingNormalLeaves: normalLeaves,
@@ -6439,6 +6461,26 @@
                         <span class="display-text">${emp.mdrt}</span>
                     `;
 
+                    const teamSelect = `
+                        <select class="edit-select" style="display: none;" 
+                                onchange="updateEmployeeField('${id}', 'team', this.value)">
+                            ${['', 'Honour', 'Bee', 'Novas', 'Define', 'Belong', 'Ride', 'Ark']
+                                .map(team => `<option value="${team}" ${emp.team === team ? 'selected' : ''}>${team || 'None'}</option>`)
+                                .join('')}
+                        </select>
+                        <span class="display-text">${emp.team || 'N/A'}</span>
+                    `;
+
+                    const teamLeaderSelect = `
+                        <select class="edit-select" style="display: none;" 
+                                onchange="updateEmployeeField('${id}', 'isTeamLeader', this.value)">
+                            ${['No', 'Yes']
+                                .map(status => `<option value="${status === 'Yes'}" ${emp.isTeamLeader === (status === 'Yes') ? 'selected' : ''}>${status}</option>`)
+                                .join('')}
+                        </select>
+                        <span class="display-text">${emp.isTeamLeader ? 'Yes' : 'No'}</span>
+                    `;
+
                     row.innerHTML = `
                         <td class="drag-handle">
                             <div class="drag-handle-inner">${emp.name}</div>
@@ -6448,6 +6490,17 @@
                         <td class="editable-cell">${mdrtSelect}</td>
                         <td>${normalLeavesDisplay}</td>
                         <td>${goldenLeavesDisplay}</td>
+                        <td class="editable-cell">
+                            <span class="display-text">${teamSelect || ''}</span>
+                            <select class="edit-select" style="display: none;">
+                                <option value="">Select Team</option>
+                                ${teamOptions.map(team => `<option value="${team}" ${teamSelect === team ? 'selected' : ''}>${team}</option>`).join('')}
+                            </select>
+                        </td>
+                        <td class="editable-cell">
+                            <span class="display-text">${employee.teamLeaderSelect ? 'Yes' : 'No'}</span>
+                            <input type="checkbox" class="edit-checkbox" style="display: none;" ${employee.teamLeaderSelect ? 'checked' : ''}>
+                        </td>
                         <td class="action-column">
                             <div class="button-stack">
                                 <button class="adjust-btn action-btn" onclick="toggleAdjustMode(this)">Adjust</button>
