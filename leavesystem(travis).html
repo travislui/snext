@@ -415,16 +415,74 @@
         }
 
         /* Employee information section */
-        #employee-page p {
-            padding: 8px;
-            margin: 5px 0;
-            border-bottom: 1px solid var(--border-color);
+        .employee-info-boxes {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr); /* 3 boxes per row */
+            gap: 20px;
+            margin-top: 20px;
         }
 
-        #employee-page p strong {
-            color: var(--primary-color);
-            width: 200px;
-            display: inline-block;
+        /* Individual square box styling */
+        .info-box {
+            background: #ffffff;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 150px; /* Ensures the box is square */
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .info-box:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Text inside the box */
+        .info-box strong {
+            font-size: 1rem;
+            color: #0056b3;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        .info-box p {
+            font-size: 1rem;
+            color: #555;
+            margin: 0;
+        }
+
+
+        /* Special note styling */
+        .note {
+            background: #fff5e6;
+            border: 1px solid #ffcc80;
+            color: #d48806;
+            font-weight: 500;
+            text-align: center;
+            margin-top: 20px;
+            padding: 10px;
+        }
+
+        /* Scanner and message sections */
+        .scanner-section,
+        .scan-result {
+            width: 100%;
+            margin: 20px 0;
+            padding: 20px;
+            text-align: center;
+            background: #f0f0f0;
+            border: 1px dashed #ccc;
+            border-radius: 8px;
+        }
+
+        .hidden {
+            display: none;
         }
 
         /* Logout button */
@@ -2199,26 +2257,64 @@
     </div>
     
     <!-- Add this div for the scanner -->
-    <div id="reader" class="mt-4" style="display: none;"></div>
+    <div id="reader" class="scanner-section hidden"></div>
     
     <!-- Add this for success/failure messages -->
-    <div id="scan-result" class="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" style="display: none;"></div>
+    <div id="scan-result" class="scan-result hidden"></div>
 
-    <p><strong>Name:</strong> <span id="employee-name"></span></p>
-    <p><strong>Code:</strong> <span id="employee-code"></span></p>
-    <p><strong>Role:</strong> <span id="employee-role"></span></p>
-    <p><strong>Clubs & Awards:</strong> <span id="employee-mdrt"></span></p>
-    <p><strong>Team:</strong> <span id="emp-team"></span></p>
-    <p><strong>Team Leader:</strong> <span id="emp-team-leader"></span></p>
-    <p><strong>Annual Leaves (Normal):</strong> <span id="employee-leave-normal"></span></p>
-    <p><strong>Annual Leaves (黃金事假):</strong> <span id="employee-leave-golden"></span></p>
-    <p><strong>Remaining Annual Leaves (Normal):</strong> <span id="remaining-leave-normal"></span></p>
-    <p><strong>Remaining Annual Leaves (黃金事假):</strong> <span id="remaining-leave-golden"></span></p>
-    <p><strong>Used Sick Leave Days:</strong> <span id="used-sick-leave">0</span></p>
-    <p><strong>Used 不可抗力因素 Days:</strong> <span id="used-force-majeure">0</span></p>
-    <p><strong>Used 離港 Days:</strong> <span id="used-overseas">0</span></p>
-    <p><strong>Applied Leaves for 區會 (Monday):</strong> <span id="used-monday-leaves">0</span></p>
-    <p><strong>備註：Annual Leaves (黃金事假)包含於Annual Leaves (Normal)之內</span></p>
+    <!-- Employee Information Table -->
+    <div class="employee-info-boxes">
+        <div class="info-box">
+            <strong>Name</strong>
+            <p id="employee-name"></p>
+        </div>
+        <div class="info-box">
+            <strong>Code</strong>
+            <p id="employee-code"></p>
+        </div>
+        <div class="info-box">
+            <strong>Role</strong>
+            <p id="employee-role"></p>
+        </div>
+        <div class="info-box">
+            <strong>Clubs & Awards</strong>
+            <p id="employee-mdrt"></p>
+        </div>
+        <div class="info-box">
+            <strong>Annual Leaves (Normal)</strong>
+            <p id="employee-leave-normal"></p>
+        </div>
+        <div class="info-box">
+            <strong>Annual Leaves (黃金事假)</strong>
+            <p id="employee-leave-golden"></p>
+        </div>
+        <div class="info-box">
+            <strong>Remaining Annual Leaves (Normal)</strong>
+            <p id="remaining-leave-normal"></p>
+        </div>
+        <div class="info-box">
+            <strong>Remaining Annual Leaves (黃金事假)</strong>
+            <p id="remaining-leave-golden"></p>
+        </div>
+        <div class="info-box">
+            <strong>Used Sick Leave Days</strong>
+            <p id="used-sick-leave">0</p>
+        </div>
+        <div class="info-box">
+            <strong>Used 不可抗力因素 Days</strong>
+            <p id="used-force-majeure">0</p>
+        </div>
+        <div class="info-box">
+            <strong>Used 離港 Days</strong>
+            <p id="used-overseas">0</p>
+        </div>
+        <div class="info-box">
+            <strong>Applied Leaves for 區會 (Monday)</strong>
+            <p id="used-monday-leaves">0</p>
+        </div>
+    </div>
+    <!-- Note -->
+    <p class="note">備註：Annual Leaves (黃金事假)包含於Annual Leaves (Normal)之內</p>    
 
     <!-- Update the leave application form -->
     <h3>Apply for Leave</h3>
@@ -5774,12 +5870,16 @@
         // Function to load employee data
         function loadEmployeeData(employee) {
             console.log("Loading employee data:", employee);
+            console.log("Team:", employee.team);
+            console.log("Is Team Leader:", employee.isTeamLeader);
             try {
                 if (employee) {
                     document.getElementById('employee-name').textContent = employee.name || 'N/A';
                     document.getElementById('employee-code').textContent = employee.code || 'N/A';
                     document.getElementById('employee-role').textContent = employee.role || 'N/A';
                     document.getElementById('employee-mdrt').textContent = employee.mdrt || 'N/A';
+                    document.getElementById('emp-team').textContent = employee.team || 'N/A';
+                    document.getElementById('emp-team-leader').textContent = employee.isTeamLeader ? 'Yes' : 'No';
                     
                     // Format leave displays
                     const normalLeaves = employee.normalLeaves === 999 ? "∞" : (employee.normalLeaves || '0');
@@ -6485,8 +6585,9 @@
 
                     const teamLeaderCheckbox = `
                         <input type="checkbox" class="edit-checkbox" style="display: none;" 
-                            ${emp.teamLeader ? 'checked' : ''}>
-                        <span class="display-text">${emp.teamLeader ? 'Yes' : 'No'}</span>
+                            ${emp.isTeamLeader ? 'checked' : ''} 
+                            onchange="updateEmployeeField('${id}', 'isTeamLeader', this.checked)">
+                        <span class="display-text">${emp.isTeamLeader ? 'Yes' : 'No'}</span>
                     `;
 
                     row.innerHTML = `
@@ -6535,11 +6636,20 @@
             editableFields.forEach(cell => {
                 const input = cell.querySelector('.edit-input');
                 const select = cell.querySelector('.edit-select');
+                const checkbox = cell.querySelector('.edit-checkbox');
                 const displayText = cell.querySelector('.display-text');
                 
                 if (isAdjusting) {
                     if (input) input.style.display = 'block';
                     if (select) select.style.display = 'block';
+                    if (checkbox) {
+                        checkbox.style.display = 'block';
+                        // Add onchange event for checkbox
+                        checkbox.onchange = function() {
+                            const employeeId = row.dataset.id;
+                            updateEmployeeField(employeeId, 'isTeamLeader', this.checked);
+                        };
+                    }
                     if (displayText) displayText.style.display = 'none';
                     button.textContent = 'Save';
                     button.classList.add('save-btn');
@@ -6551,6 +6661,10 @@
                     if (select) {
                         select.style.display = 'none';
                         displayText.textContent = select.value;
+                    }
+                    if (checkbox) {
+                        checkbox.style.display = 'none';
+                        displayText.textContent = checkbox.checked ? 'Yes' : 'No';
                     }
                     button.textContent = 'Adjust';
                     button.classList.remove('save-btn');
