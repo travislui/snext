@@ -4250,47 +4250,55 @@
 
                 console.log('Attempting to remove record with ID:', recordId);
                 
-                // First, get the specific record to identify the employee and timestamp
+                // Get a direct reference to the attendance node
                 const attendanceRef = database.ref('attendance');
                 const snapshot = await attendanceRef.once('value');
                 
-                let recordFound = false;
-                let updates = {};
+                let foundRecord = false;
                 
-                // Search for the record in the attendance node
-                snapshot.forEach(childSnapshot => {
-                    if (childSnapshot.key === recordId) {
-                        updates[`attendance/${recordId}`] = null;
-                        recordFound = true;
-                        console.log('Found record directly at path:', `attendance/${recordId}`);
-                    }
-                });
+                // Search through the entire attendance tree to find the record
+                // This handles nested records in any structure
+                const updateObject = {};
                 
-                // If not found as a direct child, search deeper
-                if (!recordFound) {
-                    snapshot.forEach(userSnapshot => {
-                        userSnapshot.forEach(recordSnapshot => {
-                            if (recordSnapshot.key === recordId) {
-                                updates[`attendance/${userSnapshot.key}/${recordId}`] = null;
-                                recordFound = true;
-                                console.log('Found record at nested path:', `attendance/${userSnapshot.key}/${recordId}`);
-                            }
-                        });
+                // A recursive function to search through the entire tree
+                const searchAndMarkForDeletion = (obj, path) => {
+                    Object.entries(obj).forEach(([key, value]) => {
+                        const currentPath = path ? `${path}/${key}` : key;
+                        
+                        if (key === recordId) {
+                            // Found the record to delete
+                            updateObject[`attendance/${currentPath}`] = null;
+                            foundRecord = true;
+                            console.log(`Found record to delete at path: attendance/${currentPath}`);
+                        } else if (typeof value === 'object' && value !== null) {
+                            // If this is an object, recursively search it
+                            searchAndMarkForDeletion(value, currentPath);
+                        }
                     });
+                };
+                
+                // Start the recursive search from the root of attendance
+                searchAndMarkForDeletion(snapshot.val() || {}, '');
+                
+                if (foundRecord) {
+                    // Apply all deletions in a batch update
+                    await database.ref().update(updateObject);
+                    console.log('Record deleted successfully');
+                    
+                    // Force UI update
+                    await updateAttendanceTable();
+                    
+                    showSyncStatus('Attendance record removed successfully');
+                } else {
+                    // Try a direct approach as a fallback
+                    await database.ref(`attendance/${recordId}`).remove();
+                    console.log('Attempted direct removal at attendance/' + recordId);
+                    
+                    // Force UI update
+                    await updateAttendanceTable();
+                    
+                    showSyncStatus('Attendance record removal attempted');
                 }
-                
-                if (!recordFound) {
-                    throw new Error('Record not found in database');
-                }
-                
-                // Apply the updates to remove the record
-                await database.ref().update(updates);
-                console.log('Record removed successfully');
-                
-                // Force update the UI
-                await updateAttendanceTable();
-                
-                showSyncStatus('Attendance record removed successfully');
             } catch (error) {
                 console.error('Error removing attendance record:', error);
                 alert('Error: ' + error.message);
