@@ -3372,7 +3372,7 @@
 
                 // Calculate deadline (7 days from penalty date)
                 const deadlineDate = new Date(date);
-                deadlineDate.setDate(deadlineDate.getDate() + 6);
+                deadlineDate.setDate(deadlineDate.getDate() + 7);
                 const deadline = deadlineDate.toISOString().split('T')[0];
 
                 // Calculate current date
@@ -3381,7 +3381,7 @@
                 const daysPassed = Math.floor((currentDate - penaltyDate + 1) / (1000 * 60 * 60 * 24));
 
                 // Double the amount if past deadline
-                const finalAmount = daysPassed > 7 ? amount * 2 : amount;
+                const finalAmount = daysPassed > 8 ? amount * 2 : amount;
 
                 const newPenalty = {
                     employeeId: employeeId,  // Make sure this is the correct Firebase key
@@ -3393,7 +3393,7 @@
                     baseAmount: amount,
                     amount: finalAmount,
                     deadline: deadline,
-                    isOverdue: daysPassed > 7,
+                    isOverdue: daysPassed > 8,
                     status: 'Not Submitted',
                     createdAt: new Date().toISOString(),
                     lastModified: new Date().toISOString(),
@@ -3715,7 +3715,7 @@
 
                     // Calculate deadline (7 days from application date)
                     const deadlineDate = new Date(applyDate);
-                    deadlineDate.setDate(deadlineDate.getDate() + 6);
+                    deadlineDate.setDate(deadlineDate.getDate() + 7);
                     
                     // Create penalty record
                     const penaltyData = {
@@ -6225,7 +6225,7 @@
                     if (!existingPenaltyForToday) {
                         // Calculate deadline (7 days from now)
                         const deadline = new Date(now);
-                        deadline.setDate(deadline.getDate() + 6);
+                        deadline.setDate(deadline.getDate() + 7);
 
                         const penaltyData = {
                             employeeId: employeeData.id,
@@ -6974,7 +6974,7 @@
                         minutes: 0,
                         amount: amount,
                         baseAmount: amount,
-                        deadline: formatDate(new Date(new Date(leaveStartDate).getTime() + 6 * 24 * 60 * 60 * 1000)),
+                        deadline: formatDate(new Date(new Date(leaveStartDate).getTime() + 7 * 24 * 60 * 60 * 1000)),
                         status: 'Not Submitted',
                         createdAt: new Date().toISOString(),
                         lastModified: new Date().toISOString(),
