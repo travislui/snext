@@ -4232,65 +4232,41 @@
 
         async function removeAttendanceRecord(recordId) {
             try {
-                const user = auth.currentUser;
-                if (!user) throw new Error('You must be logged in');
-                
-                const adminSnapshot = await database.ref(`users/${user.uid}/isAdmin`).once('value');
-                if (!adminSnapshot.val()) throw new Error('Only admins can remove records');
-
-                if (confirm('Are you sure you want to remove this attendance record?')) {
-                    console.log('Attempting to remove record with ID:', recordId);
-                    
-                    // First, get the specific record to identify the employee and timestamp
-                    const recordRef = database.ref(`attendance/${recordId}`);
-                    const recordSnapshot = await recordRef.once('value');
-                    
-                    if (!recordSnapshot.exists()) {
-                        throw new Error('Record not found in database');
-                    }
-                    
-                    const record = recordSnapshot.val();
-                    const employeeName = record.employeeName;
-                    const timestamp = record.timestamp;
-                    
-                    console.log(`Finding all attendance records for ${employeeName} at ${timestamp}`);
-                    
-                    // Find all attendance records for this employee with the exact same timestamp
-                    const attendanceRef = database.ref('attendance');
-                    const allRecordsSnapshot = await attendanceRef.once('value');
-                    
-                    // Create a batch update to remove all matching records
-                    const updates = {};
-                    
-                    allRecordsSnapshot.forEach(childSnapshot => {
-                        const childRecord = childSnapshot.val();
-                        if (childRecord && 
-                            childRecord.employeeName === employeeName && 
-                            childRecord.timestamp === timestamp) {
-                            
-                            // Mark this record for deletion
-                            updates[`attendance/${childSnapshot.key}`] = null;
-                            console.log(`Marking record ${childSnapshot.key} for deletion`);
-                        }
-                    });
-                    
-                    // Apply all deletions in one batch update
-                    if (Object.keys(updates).length > 0) {
-                        await database.ref().update(updates);
-                        console.log(`Removed ${Object.keys(updates).length} records successfully`);
-                        
-                        // Force UI update
-                        await updateAttendanceTable();
-                        
-                        showSyncStatus(`Attendance record removed successfully`);
-                    } else {
-                        console.log('No matching records found to remove');
-                        throw new Error('No matching records found to remove');
-                    }
+                // Check if user is admin
+                const currentUser = auth.currentUser;
+                if (!currentUser) {
+                    throw new Error('You must be logged in to remove records');
                 }
+
+                const adminSnapshot = await database.ref(`users/${currentUser.uid}/isAdmin`).once('value');
+                if (!adminSnapshot.val()) {
+                    throw new Error('Only administrators can remove attendance records');
+                }
+
+                // Confirm deletion
+                if (!confirm('Are you sure you want to remove this attendance record?')) {
+                    return;
+                }
+
+                // Get the record data first to log details
+                const recordRef = database.ref(`attendance/${recordId}`);
+                const recordSnapshot = await recordRef.once('value');
+                
+                if (!recordSnapshot.exists()) {
+                    throw new Error('Record not found');
+                }
+                
+                // Remove the record
+                await recordRef.remove();
+                console.log(`Removed attendance record ${recordId} successfully`);
+                
+                // Force UI update
+                await updateAttendanceTable();
+                
+                showSyncStatus('Attendance record removed successfully');
             } catch (error) {
-                console.error('Error removing attendance records:', error);
-                alert('Error: ' + error.message);
+                console.error('Error removing attendance record:', error);
+                alert('Error removing attendance record: ' + error.message);
             }
         }
 
