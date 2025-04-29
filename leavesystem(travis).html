@@ -1959,7 +1959,7 @@
                 </div>
                 <div id="admin-proof-container" style="display: none;">
                     <label for="admin-proof-file">Proof:</label>
-                    <input type="file" id="admin-proof-file" accept="image/*" multiple>
+                    <input type="file" id="admin-proof-file" accept="image/*">
                 </div>
                 <button type="submit">Add Leave Record</button>
             </form>
@@ -2355,7 +2355,7 @@
         </div>
         <div id="proof-container" style="display: none;">
             <label for="proof-file">Proof:</label>
-            <input type="file" id="proof-file" accept="image/*" multiple>
+            <input type="file" id="proof-file" accept="image/*">
         </div>
         <button type="submit">Apply</button>
     </form>
@@ -2415,7 +2415,7 @@
         <strong>Total (Not Submitted): $<span id="penalty-sum">0</span></strong>
     </div>
     
-    <input type="file" id="proof-upload" accept="image/*" multiple style="display: none;">
+    <input type="file" id="proof-upload" accept="image/*" style="display: none;">
 
     <!-- Move the logout button downwards -->
     <div style="margin-top: 20px;">
@@ -2992,88 +2992,18 @@
                 modal.classList.add('show');
             }, 10);
 
-            // Fetch the proofs from Firebase
-            database.ref(`penalties/${penaltyId}`).once('value')
+            // Fetch the proof from Firebase
+            database.ref(`penalties/${penaltyId}/proof`).once('value')
                 .then((snapshot) => {
-                    const penalty = snapshot.val();
-                    if (!penalty) {
-                        proofContent.innerHTML = 'Penalty record not found';
-                        return;
-                    }
-                    
-                    // Check if we have single proof or multiple proofs
-                    const hasMultipleProofs = penalty.proofs && Array.isArray(penalty.proofs);
-                    const proofs = hasMultipleProofs ? penalty.proofs : (penalty.proof ? [penalty.proof] : []);
-                    
-                    if (proofs.length === 0) {
-                        proofContent.innerHTML = 'No proof available';
-                        return;
-                    }
-                    
-                    // Use the same viewer logic as showProof
-                    let currentIndex = 0;
-                    
-                    const renderProofViewer = () => {
-                        let galleryHtml = '';
-                        
-                        // Create thumbnails if multiple proofs
-                        if (proofs.length > 1) {
-                            galleryHtml += '<div class="proof-gallery">';
-                            proofs.forEach((proof, index) => {
-                                galleryHtml += `
-                                    <img src="${proof}" 
-                                        class="proof-thumbnail" 
-                                        onclick="changeProofImage(${index})"
-                                        alt="Proof thumbnail ${index + 1}"
-                                        title="View proof ${index + 1}">
-                                `;
-                            });
-                            galleryHtml += '</div>';
-                        }
-                        
-                        // Main image viewer
-                        galleryHtml += `
-                            <div style="text-align: center; margin-top: 20px;">
-                                <img id="current-proof-image" 
-                                    src="${proofs[currentIndex]}" 
-                                    alt="Proof document"
-                                    class="proof-image-full">
-                            </div>
+                    const proofData = snapshot.val();
+                    if (proofData) {
+                        proofContent.innerHTML = `
+                            <img src="${proofData}" 
+                                style="max-width: 100%; max-height: 60vh; object-fit: contain;"
+                                alt="Submitted Proof">
                         `;
-                        
-                        // Navigation controls if multiple proofs
-                        if (proofs.length > 1) {
-                            galleryHtml += `
-                                <div class="proof-navigation">
-                                    <button onclick="changeProofImage(${currentIndex - 1})" 
-                                            class="proof-nav-btn" 
-                                            ${currentIndex === 0 ? 'disabled' : ''}>
-                                        ◀
-                                    </button>
-                                    <span class="proof-counter">${currentIndex + 1} / ${proofs.length}</span>
-                                    <button onclick="changeProofImage(${currentIndex + 1})" 
-                                            class="proof-nav-btn"
-                                            ${currentIndex === proofs.length - 1 ? 'disabled' : ''}>
-                                        ▶
-                                    </button>
-                                </div>
-                            `;
-                        }
-                        
-                        return galleryHtml;
-                    };
-                    
-                    // Set initial content
-                    proofContent.innerHTML = renderProofViewer();
-                    
-                    // Add a function to window for changing images (if not already defined)
-                    if (!window.changeProofImage) {
-                        window.changeProofImage = (index) => {
-                            if (index >= 0 && index < proofs.length) {
-                                currentIndex = index;
-                                proofContent.innerHTML = renderProofViewer();
-                            }
-                        };
+                    } else {
+                        proofContent.innerHTML = 'No proof available';
                     }
                 })
                 .catch(error => {
@@ -3183,15 +3113,6 @@
                     }
 
                     try {
-                        // Show loading indicator
-                        showSyncStatus('Uploading proofs...');
-                        
-                        // Process all files
-                        const proofDataUrls = [];
-                        for (let i = 0; i < files.length; i++) {
-                            const base64 = await convertFileToBase64(files[i]);
-                            proofDataUrls.push(base64);
-                        }                        
                         // Convert file to base64
                         const base64 = await convertFileToBase64(file);
 
@@ -3200,7 +3121,7 @@
                             status: 'Submitted',
                             proofSubmitted: true,
                             proofDate: new Date().toISOString(),
-                            proof: proofDataUrls // Store as array
+                            proof: base64
                         });
 
                         showSyncStatus('Proof submitted successfully');
@@ -3686,17 +3607,13 @@
                     return;
                 }
 
-                // Show loading status
-                showSyncStatus('Processing files...');
-
                 // Convert proof file to base64 and process application
-                const proofDataUrls = [];
-                for (let i = 0; i < files.length; i++) {
-                    const base64 = await convertFileToBase64(files[i]);
-                    proofDataUrls.push(base64);
-                }
-                
-                processLeaveApplication(applyDate, leaveStartDate, leaveEndDate, leaveType, proofDataUrls);
+                const reader = new FileReader();
+                reader.onloadend = function() {
+                    const proofDataUrl = reader.result;
+                    processLeaveApplication(applyDate, leaveStartDate, leaveEndDate, leaveType, proofDataUrl);
+                };
+                reader.readAsDataURL(proofFile);
             } else {
                 processLeaveApplication(applyDate, leaveStartDate, leaveEndDate, leaveType, null);
             }
@@ -3723,7 +3640,7 @@
             });
         }
 
-        async function processLeaveApplication(applyDate, leaveStartDate, leaveEndDate, leaveType, proofDataUrls) {
+        async function processLeaveApplication(applyDate, leaveStartDate, leaveEndDate, leaveType, proofDataUrl) {
             try {
                 // Calculate leave days
                 const leaveDays = Math.ceil((leaveEndDate - leaveStartDate) / (1000 * 60 * 60 * 24)) + 1;
@@ -3883,7 +3800,7 @@
                     leaveType: leaveType,
                     leaveDays: leaveDays,
                     status: 'Approved',
-                    proof: proofDataUrls,
+                    proof: proofDataUrl,
                     createdAt: new Date().toISOString() // This will store the exact timestamp
                 };
 
@@ -5405,7 +5322,7 @@
             
             // Show loading state
             proofContent.innerHTML = '<div style="text-align: center; padding: 20px;">Loading proof...</div>';
-            modal.style.display = 'flex';
+            modal.style.display = 'flex'; // Changed from 'block' to 'flex'
             
             // Add animation
             requestAnimationFrame(() => {
@@ -5413,86 +5330,22 @@
             });
 
             // Fetch the proof from Firebase
-            database.ref(`applications/${applicationId}`).once('value')
+            database.ref(`applications/${applicationId}/proof`).once('value')
                 .then((snapshot) => {
-                    const application = snapshot.val();
-                    if (!application) {
-                        proofContent.innerHTML = '<div style="text-align: center; padding: 20px;">Application not found</div>';
-                        return;
-                    }
-
-                    // Check if we have single proof or multiple proofs
-                    const hasMultipleProofs = application.proofs && Array.isArray(application.proofs);
-                    const proofs = hasMultipleProofs ? application.proofs : (application.proof ? [application.proof] : []);
-                    
-                    if (proofs.length === 0) {
-                        proofContent.innerHTML = '<div style="text-align: center; padding: 20px;">No proof available</div>';
-                        return;
-                    }
-
-                    // Create gallery view for multiple proofs
-                    let currentIndex = 0;
-                    
-                    const renderProofViewer = () => {
-                        let galleryHtml = '';
-                        
-                        // Create thumbnails if multiple proofs
-                        if (proofs.length > 1) {
-                            galleryHtml += '<div class="proof-gallery">';
-                            proofs.forEach((proof, index) => {
-                                galleryHtml += `
-                                    <img src="${proof}" 
-                                        class="proof-thumbnail" 
-                                        onclick="changeProofImage(${index})"
-                                        alt="Proof thumbnail ${index + 1}"
-                                        title="View proof ${index + 1}">
-                                `;
-                            });
-                            galleryHtml += '</div>';
-                        }
-                        
-                        // Main image viewer
-                        galleryHtml += `
-                            <div style="text-align: center; margin-top: 20px;">
-                                <img id="current-proof-image" 
-                                    src="${proofs[currentIndex]}" 
-                                    alt="Proof document"
-                                    class="proof-image-full">
-                            </div>
-                        `;
-                        
-                        // Navigation controls if multiple proofs
-                        if (proofs.length > 1) {
-                            galleryHtml += `
-                                <div class="proof-navigation">
-                                    <button onclick="changeProofImage(${currentIndex - 1})" 
-                                            class="proof-nav-btn" 
-                                            ${currentIndex === 0 ? 'disabled' : ''}>
-                                        ◀
-                                    </button>
-                                    <span class="proof-counter">${currentIndex + 1} / ${proofs.length}</span>
-                                    <button onclick="changeProofImage(${currentIndex + 1})" 
-                                            class="proof-nav-btn"
-                                            ${currentIndex === proofs.length - 1 ? 'disabled' : ''}>
-                                        ▶
-                                    </button>
-                                </div>
+                    const proofData = snapshot.val();
+                    if (proofData) {
+                        const img = new Image();
+                        img.onload = function() {
+                            proofContent.innerHTML = `
+                                <img src="${proofData}" 
+                                    alt="Submitted Proof"
+                                    style="max-width: 100%; max-height: 70vh; object-fit: contain;">
                             `;
-                        }
-                        
-                        return galleryHtml;
-                    };
-                    
-                    // Set initial content
-                    proofContent.innerHTML = renderProofViewer();
-                    
-                    // Add a function to window for changing images
-                    window.changeProofImage = (index) => {
-                        if (index >= 0 && index < proofs.length) {
-                            currentIndex = index;
-                            proofContent.innerHTML = renderProofViewer();
-                        }
-                    };
+                        };
+                        img.src = proofData;
+                    } else {
+                        proofContent.innerHTML = '<div style="text-align: center; padding: 20px;">No proof available</div>';
+                    }
                 })
                 .catch(error => {
                     console.error('Error loading proof:', error);
@@ -6620,7 +6473,6 @@
                     const updates = {
                         status: 'Not Submitted',
                         proof: null,
-                        proofs: null, // For multiple proofs
                         proofSubmitted: false,
                         rejectedAt: new Date().toISOString(),
                         rejectedBy: user.uid,
@@ -7134,22 +6986,14 @@
                     await penaltyRef.push(penaltyData);
                 }
 
-                let proofDataUrls = null;
+                let proofDataUrl = null;
                 if (leaveType === 'Sick Leave' || 
                     leaveType === '不可抗力因素' || 
                     leaveType === '離港' ||
                     leaveType === 'Special Approve') {
-                    
-                    const proofFileInput = document.getElementById('admin-proof-file');
-                    const files = proofFileInput.files;
-                    
-                    if (files && files.length > 0) {
-                        showSyncStatus('Processing files...');
-                        proofDataUrls = [];
-                        for (let i = 0; i < files.length; i++) {
-                            const base64 = await convertFileToBase64(files[i]);
-                            proofDataUrls.push(base64);
-                        }
+                    const proofFile = document.getElementById('admin-proof-file').files[0];
+                    if (proofFile) {
+                        proofDataUrl = await convertFileToBase64(proofFile);
                     }
                 }
 
@@ -7186,7 +7030,7 @@
                     leaveType: leaveType,
                     leaveDays: leaveDays, // Keep total days for record
                     status: 'Approved',
-                    proof: proofDataUrls,
+                    proof: proofDataUrl,
                     createdAt: new Date().toISOString(),
                     createdBy: 'admin'
                 };
