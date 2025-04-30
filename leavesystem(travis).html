@@ -3674,7 +3674,7 @@
                     amount = Math.round(amount);
 
                     // Calculate deadline (7 days from application date)
-                    const deadlineDate = new Date(applyDate);
+                    const deadlineDate = new Date(leaveStartDate);
                     deadlineDate.setDate(deadlineDate.getDate() + 7);
                     
                     // Create penalty record
@@ -3682,7 +3682,7 @@
                         employeeId: currentUser.id,
                         employeeName: currentUser.name,
                         employeeRole: currentUser.role,
-                        date: formatDate(applyDate),
+                        date: formattedStartDate,
                         reason: '活動請假',
                         minutes: 0,
                         amount: amount,
