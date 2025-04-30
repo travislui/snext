@@ -2347,7 +2347,6 @@
                         <th>Leave End Date</th>
                         <th>Leave Type</th>
                         <th>Status</th>
-                        <th>Proof</th>
                     </tr>
                 </thead>
                 <tbody id="team-leave-list">
@@ -5828,7 +5827,7 @@
                 if (applications.length === 0) {
                     const row = document.createElement('tr');
                     row.innerHTML = `
-                        <td colspan="7" class="text-center py-4 text-gray-500">
+                        <td colspan="6" class="text-center py-4 text-gray-500">
                             No team members on leave today
                         </td>
                     `;
@@ -5859,14 +5858,6 @@
                         <td>${formattedEndDate}</td>
                         <td>${application.leaveType}</td>
                         <td><span class="status-${application.status.toLowerCase()}">${application.status}</span></td>
-                        <td>
-                            ${(application.leaveType === 'Sick Leave' || 
-                            application.leaveType === '不可抗力因素' || 
-                            application.leaveType === '離港' ||
-                            application.leaveType === 'Special Approve') && application.proof ? 
-                                `<button type="button" class="show-proof-btn" onclick="showProof('${application.id}')">View Proof</button>` : 
-                                'N/A'}
-                        </td>
                     `;
                     tableBody.appendChild(row);
                 });
