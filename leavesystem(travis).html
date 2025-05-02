@@ -5800,9 +5800,6 @@
                 // Clear the table
                 tableBody.innerHTML = '';
 
-                // Get today's date in YYYY-MM-DD format
-                const today = new Date().toISOString().split('T')[0];
-
                 // Get all employees in the team
                 const employeesRef = database.ref('employees');
                 const employeesSnapshot = await employeesRef
@@ -5827,17 +5824,10 @@
 
                     // Check if the application is from a team member
                     if (application.employeeId in teamMembers) {
-                        // Check if the leave period includes today
-                        const startDate = new Date(application.leaveStartDate);
-                        const endDate = new Date(application.leaveEndDate);
-                        const todayDate = new Date(today);
-
-                        if (startDate <= todayDate && endDate >= todayDate) {
-                            applications.push({
-                                id: applicationId,
-                                ...application
-                            });
-                        }
+                        applications.push({
+                            id: applicationId,
+                            ...application
+                        });
                     }
                 });
 
@@ -5846,15 +5836,22 @@
                     const row = document.createElement('tr');
                     row.innerHTML = `
                         <td colspan="6" class="text-center py-4 text-gray-500">
-                            No team members on leave today
+                            No leave records found for this team
                         </td>
                     `;
                     tableBody.appendChild(row);
                     return;
                 }
 
-                // Sort applications by employee name
-                applications.sort((a, b) => a.employeeName.localeCompare(b.employeeName));
+                // Sort applications by date (newest first) and then by employee name
+                applications.sort((a, b) => {
+                    const dateA = new Date(a.createdAt || a.applyDate);
+                    const dateB = new Date(b.createdAt || b.applyDate);
+                    if (dateB - dateA !== 0) {
+                        return dateB - dateA;
+                    }
+                    return a.employeeName.localeCompare(b.employeeName);
+                });
 
                 // Create table rows
                 applications.forEach(application => {
