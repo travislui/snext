@@ -2026,7 +2026,13 @@
                             <option value="">All Agents</option>
                         </select>
                     </div>
-            
+                                
+                    <!-- Date filter -->
+                    <div>
+                        <label for="applicationdateFilter" class="block text-sm font-medium text-gray-700">Date Filter</label>
+                        <input type="date" id="applicationdateFilter" value="">
+                    </div>
+
                     <!-- Reset button -->
                     <div class="flex items-end">
                         <button id="resetFilter" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded">
@@ -2150,6 +2156,19 @@
         <!-- Section 4: 賀金 Info -->
         <div class="container">
             <h3>賀金 Info</h3>
+
+            <div style="margin-bottom: 10px;">
+                <label for="penaltyStatusFilter">Filter by Status: </label>
+                <select id="penaltyStatusFilter" onchange="filterPenaltyTable()">
+                    <option value="All">All</option>
+                    <option value="Submitted">Submitted</option>
+                    <option value="Not Submitted">Not Submitted</option>
+                </select>
+                <label for="penaltyDateFilter">Filter by Date: </label>
+                <input type="date" id="penaltyDateFilter" onchange="filterPenaltyTable()">
+                <button onclick="resetPenaltyFilter()">Reset Status</button>
+            </div>
+
             <div class="export-buttons" style="margin-top: 20px; margin-bottom: 10px;">
                 <button id="export-penalties-btn" class="export-btn">Export Penalties to Excel</button>
             </div>
@@ -2339,6 +2358,19 @@
 
     <div class="container" id="team-leader-section" style="display: none; margin-top: 20px;">
         <h3>Team Leave Application Record</h3>
+        <div class="table-container">
+            <div>
+                <label for="date-filter">Date Filter:</label>
+                <input type="date" id="date-filter" style="width: 950px">            
+            </div>
+            <div>
+                <label for="agent-filter">Agent:</label>
+                <select id="agent-filter">
+                    <option value="">All Agents</option>
+                </select>
+            </div>
+        </div>
+
         <div class="table-container">
             <table id="team-leave-table">
                 <thead>
@@ -5566,6 +5598,70 @@
             }
         }
 
+        function filterPenaltyTable() {
+            const statusFilterValue = document.getElementById('penaltyStatusFilter').value;
+            const dateFilterValue = document.getElementById('penaltyDateFilter').value;
+            const tbody = document.getElementById('penalty-list');
+            const rows = tbody.getElementsByTagName('tr');
+
+            console.log(`Status Filter: ${statusFilterValue}, Date Filter: ${dateFilterValue}`); // Debug
+            for (let i = 0; i < rows.length; i++) {
+                const statusCell = rows[i].getElementsByTagName('td')[6]; // Status/Action (index 6)
+                const dateCell = rows[i].getElementsByTagName('td')[1]; // Date (index 1)
+                let showRow = true;
+
+                // Status filter
+                if (statusCell) {
+                    const statusSpan = statusCell.querySelector('.status-submitted, .status-not-submitted');
+                    let statusText = '';
+                    if (statusSpan) {
+                        statusText = statusSpan.textContent.trim().toLowerCase();
+                    } else {
+                        statusText = statusCell.textContent.trim().toLowerCase();
+                    }
+                    console.log(`Row ${i}: Status = "${statusText}"`); // Debug
+                    const statusMatches = statusFilterValue === 'All' ||
+                                        (statusFilterValue === 'Submitted' && statusText === 'submitted') ||
+                                        (statusFilterValue === 'Not Submitted' && statusText === 'not submitted');
+                    showRow = showRow && statusMatches;
+                } else {
+                    showRow = false; // Hide rows without status
+                    console.log(`Row ${i}: No status cell`);
+                }
+
+                // Date filter
+                if (dateCell && dateFilterValue) {
+                    let dateText = dateCell.textContent.trim();
+                    // Normalize date format (assume input is DD/MM/YYYY, convert to YYYY-MM-DD for comparison)
+                    if (dateText.includes('/')) {
+                        const [day, month, year] = dateText.split('/');
+                        dateText = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+                    }
+                    console.log(`Row ${i}: Date = "${dateText}"`); // Debug
+                    showRow = showRow && (dateText === dateFilterValue);
+                }
+
+                rows[i].style.display = showRow ? '' : 'none';
+            }
+        }
+
+        function resetPenaltyFilter() {
+            const filter = document.getElementById('penaltyStatusFilter');
+            const dfilter = document.getElementById('penaltyDateFilter');
+            filter.value = 'All';
+            dfilter.value = '';
+            filterPenaltyTable();
+        }
+
+        // Apply filter on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            filterPenaltyTable();
+            // Observe changes to tbody for dynamic updates
+            const tbody = document.getElementById('penalty-list');
+            const observer = new MutationObserver(filterPenaltyTable);
+            observer.observe(tbody, { childList: true, subtree: true });
+        });
+
         // Add event listeners for filters
         function setupAttendanceFilters() {
             const dateFilter = document.getElementById('dateFilter');
@@ -5772,48 +5868,78 @@
             }
         }
 
+        function getVisibleTeamsForLeader(user) {
+            if (!user || !user.team) return [];
+
+            if (user.team === 'Honour') {
+                return ['*']; // Can view all teams
+            } else if (user.team === 'Ride') {
+                return ['Ride', 'Ark', 'Belong']; // Special rule
+            } else {
+                return [user.team]; // Default case
+            }
+        }
+
         // Function to show/hide team leader section based on current user
         function toggleTeamLeaderSection() {
             const teamLeaderSection = document.getElementById('team-leader-section');
             if (!teamLeaderSection) return;
 
-            // Check if current user is a team leader
-            if (currentUser && currentUser.isTeamLeader) {
+            const visibleTeams = getVisibleTeamsForLeader(currentUser);
+
+            if (visibleTeams.length > 0) {
                 teamLeaderSection.style.display = 'block';
-                loadTeamLeaveRecords(currentUser.team);
+                loadTeamLeaveRecords(visibleTeams);
             } else {
                 teamLeaderSection.style.display = 'none';
             }
         }
 
-        // Function to load team leave records for today
-        async function loadTeamLeaveRecords(teamName) {
+        // Function to load team leave records
+        async function loadTeamLeaveRecords(teamList) {
             try {
-                if (!teamName) {
-                    console.error('No team name provided');
+                if (!teamList || teamList.length === 0) {
+                    console.error('No team list provided');
                     return;
                 }
 
                 const tableBody = document.getElementById('team-leave-list');
-                if (!tableBody) return;
+                const agentFilter = document.getElementById('agent-filter');
+                if (!tableBody || !agentFilter) return;
 
-                // Clear the table
                 tableBody.innerHTML = '';
+                agentFilter.innerHTML = '<option value="">All Agents</option>';
 
-                // Get all employees in the team
                 const employeesRef = database.ref('employees');
-                const employeesSnapshot = await employeesRef
-                    .orderByChild('team')
-                    .equalTo(teamName)
-                    .once('value');
+                const employeesSnapshot = await employeesRef.once('value');
 
                 const teamMembers = {};
+                const uniqueAgentNames = new Set();
+
                 employeesSnapshot.forEach(childSnapshot => {
                     const employee = childSnapshot.val();
-                    teamMembers[childSnapshot.key] = employee;
+                    const belongsToTeam = teamList.includes('*') || teamList.includes(employee.team);
+                    if (belongsToTeam) {
+                        teamMembers[childSnapshot.key] = employee;
+
+                        if (employee.name && typeof employee.name === 'string') {
+                            uniqueAgentNames.add(employee.name.trim());
+                        }
+                    }
                 });
 
-                // Get all applications
+                // Populate agent filter dropdown
+                agentFilter.innerHTML = '<option value="">All Agents</option>';
+                Array.from(uniqueAgentNames)
+                    .sort((a, b) => a.localeCompare(b))
+                    .forEach(name => {
+                        const option = document.createElement('option');
+                        option.value = name;
+                        option.textContent = name;
+                        agentFilter.appendChild(option);
+                    });
+
+                // Fetch and filter applications
                 const applicationsRef = database.ref('applications');
                 const applicationsSnapshot = await applicationsRef.once('value');
 
@@ -5822,7 +5948,6 @@
                     const application = childSnapshot.val();
                     const applicationId = childSnapshot.key;
 
-                    // Check if the application is from a team member
                     if (application.employeeId in teamMembers) {
                         applications.push({
                             id: applicationId,
@@ -5831,51 +5956,11 @@
                     }
                 });
 
-                // Display applications or "No records" message
-                if (applications.length === 0) {
-                    const row = document.createElement('tr');
-                    row.innerHTML = `
-                        <td colspan="6" class="text-center py-4 text-gray-500">
-                            No leave records found for this team
-                        </td>
-                    `;
-                    tableBody.appendChild(row);
-                    return;
-                }
+                applyFilters(applications);
 
-                // Sort applications by date (newest first) and then by employee name
-                applications.sort((a, b) => {
-                    const dateA = new Date(a.createdAt || a.applyDate);
-                    const dateB = new Date(b.createdAt || b.applyDate);
-                    if (dateB - dateA !== 0) {
-                        return dateB - dateA;
-                    }
-                    return a.employeeName.localeCompare(b.employeeName);
-                });
-
-                // Create table rows
-                applications.forEach(application => {
-                    const row = document.createElement('tr');
-                    
-                    // Format dates
-                    const applyDateTime = new Date(application.createdAt || application.applyDate);
-                    const startDate = new Date(application.leaveStartDate);
-                    const endDate = new Date(application.leaveEndDate);
-
-                    const formattedApplyDateTime = `${formatDate(applyDateTime)}`;
-                    const formattedStartDate = formatDate(startDate);
-                    const formattedEndDate = formatDate(endDate);
-
-                    row.innerHTML = `
-                        <td>${application.employeeName}</td>
-                        <td>${formattedApplyDateTime}</td>
-                        <td>${formattedStartDate}</td>
-                        <td>${formattedEndDate}</td>
-                        <td>${application.leaveType}</td>
-                        <td><span class="status-${application.status.toLowerCase()}">${application.status}</span></td>
-                    `;
-                    tableBody.appendChild(row);
-                });
+                // Add event listeners
+                document.getElementById('date-filter').addEventListener('change', () => applyFilters(applications));
+                document.getElementById('agent-filter').addEventListener('change', () => applyFilters(applications));
 
             } catch (error) {
                 console.error('Error loading team leave records:', error);
@@ -5883,6 +5968,95 @@
             }
         }
 
+        // Function to apply date and agent filters
+        function applyFilters(applications) {
+            const tableBody = document.getElementById('team-leave-list');
+            const dateFilter = document.getElementById('date-filter').value;
+            const agentFilter = document.getElementById('agent-filter').value;
+
+            // Clear the table
+            tableBody.innerHTML = '';
+
+            // Filter applications
+            const filteredApplications = applications.filter(application => {
+                let dateMatch = true;
+                let agentMatch = true;
+
+                // Date filter: check if selected date is within leave start and end dates
+                if (dateFilter) {
+                    const selectedDate = new Date(dateFilter);
+                    const startDate = new Date(application.leaveStartDate);
+                    const endDate = new Date(application.leaveEndDate);
+                    // Ensure dates are at start of day for comparison
+                    selectedDate.setHours(0, 0, 0, 0);
+                    startDate.setHours(0, 0, 0, 0);
+                    endDate.setHours(0, 0, 0, 0);
+                    dateMatch = selectedDate >= startDate && selectedDate <= endDate;
+                }
+
+                // Agent filter
+                if (agentFilter) {
+                    agentMatch = application.employeeName === agentFilter;
+                }
+
+                return dateMatch && agentMatch;
+            });
+
+            // Display applications or "No records" message
+            if (filteredApplications.length === 0) {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td colspan="6" class="text-center py-4 text-gray-500">
+                        No leave records found
+                    </td>
+                `;
+                tableBody.appendChild(row);
+                return;
+            }
+
+            // Sort applications by date (newest first) and then by employee name
+            filteredApplications.sort((a, b) => {
+                const dateA = new Date(a.createdAt || a.applyDate);
+                const dateB = new Date(b.createdAt || b.applyDate);
+                if (dateB - dateA !== 0) {
+                    return dateB - dateA;
+                }
+                return a.employeeName.localeCompare(b.employeeName);
+            });
+
+            // Create table rows
+            filteredApplications.forEach(application => {
+                const row = document.createElement('tr');
+                
+                // Format dates
+                const applyDateTime = new Date(application.createdAt || application.applyDate);
+                const startDate = new Date(application.leaveStartDate);
+                const endDate = new Date(application.leaveEndDate);
+
+                const formattedApplyDateTime = `${formatDate(applyDateTime)}`;
+                const formattedStartDate = formatDate(startDate);
+                const formattedEndDate = formatDate(endDate);
+
+                row.innerHTML = `
+                    <td>${application.employeeName}</td>
+                    <td>${formattedApplyDateTime}</td>
+                    <td>${formattedStartDate}</td>
+                    <td>${formattedEndDate}</td>
+                    <td>${application.leaveType}</td>
+                    <td><span class="status-${application.status.toLowerCase()}">${application.status}</span></td>
+                `;
+                tableBody.appendChild(row);
+            });
+        }
+
+        // Function to reset filters
+        function resetFilters() {
+            document.getElementById('date-filter').value = '';
+            document.getElementById('agent-filter').value = 'All Agents';
+            const teamList = getVisibleTeamsForLeader(currentUser);
+            loadTeamLeaveRecords(teamList);
+        }
+        
         // Function to show employee interface
         function showEmployeeInterface() {
             // Hide/show appropriate pages
