@@ -1623,7 +1623,7 @@
         }
 
         .filter-container {
-            background-color: #f8f9fa;
+            background-color: #ffffff;
             padding: 1rem;
             margin-bottom: 1rem;
             border-radius: 0.5rem;
@@ -2026,19 +2026,20 @@
                             <option value="">All Agents</option>
                         </select>
                     </div>
-                                
+                        
+                    <!-- Reset button -->
+                    <div class="flex items-end">
+                        <button id="resetFilters" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded">
+                            Reset Filter
+                        </button>
+                    </div>                    
+
                     <!-- Date filter -->
                     <div>
                         <label for="applicationdateFilter" class="block text-sm font-medium text-gray-700">Date Filter</label>
                         <input type="date" id="applicationdateFilter" value="">
                     </div>
 
-                    <!-- Reset button -->
-                    <div class="flex items-end">
-                        <button id="resetFilter" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded">
-                            Reset Filter
-                        </button>
-                    </div>
                 </div>
             </div>
 
@@ -8151,7 +8152,7 @@
             });
         });
 
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             const filter2025Btn = document.getElementById('filter-year-2025');
             const filter2026Btn = document.getElementById('filter-year-2026');
             const filter2027Btn = document.getElementById('filter-year-2027');
@@ -8170,69 +8171,83 @@
                 }
             }
 
-            // 2025 button click handler
+            // Year filter button handlers
             if (filter2025Btn) {
-                filter2025Btn.addEventListener('click', function() {
-                    if (selectedYear === '2025') {
-                        selectedYear = null; // Deselect if clicked again
-                        updateYearButtonStyles(null);
-                    } else {
-                        selectedYear = '2025';
-                        updateYearButtonStyles(filter2025Btn);
-                    }
+                filter2025Btn.addEventListener('click', function () {
+                    selectedYear = selectedYear === '2025' ? null : '2025';
+                    updateYearButtonStyles(selectedYear ? filter2025Btn : null);
                     const employeeFilter = document.getElementById('application-employee-filter');
                     loadAllApplications(employeeFilter ? employeeFilter.value : null);
                 });
             }
 
-            // 2026 button click handler
             if (filter2026Btn) {
-                filter2026Btn.addEventListener('click', function() {
-                    if (selectedYear === '2026') {
-                        selectedYear = null; // Deselect if clicked again
-                        updateYearButtonStyles(null);
-                    } else {
-                        selectedYear = '2026';
-                        updateYearButtonStyles(filter2026Btn);
-                    }
+                filter2026Btn.addEventListener('click', function () {
+                    selectedYear = selectedYear === '2026' ? null : '2026';
+                    updateYearButtonStyles(selectedYear ? filter2026Btn : null);
                     const employeeFilter = document.getElementById('application-employee-filter');
                     loadAllApplications(employeeFilter ? employeeFilter.value : null);
                 });
             }
 
             if (filter2027Btn) {
-                filter2027Btn.addEventListener('click', function() {
-                    if (selectedYear === '2027') {
-                        selectedYear = null; // Deselect if clicked again
-                        updateYearButtonStyles(null);
-                    } else {
-                        selectedYear = '2027';
-                        updateYearButtonStyles(filter2027Btn);
-                    }
+                filter2027Btn.addEventListener('click', function () {
+                    selectedYear = selectedYear === '2027' ? null : '2027';
+                    updateYearButtonStyles(selectedYear ? filter2027Btn : null);
                     const employeeFilter = document.getElementById('application-employee-filter');
                     loadAllApplications(employeeFilter ? employeeFilter.value : null);
                 });
             }
 
             if (filter2028Btn) {
-                filter2028Btn.addEventListener('click', function() {
-                    if (selectedYear === '2028') {
-                        selectedYear = null; // Deselect if clicked again
-                        updateYearButtonStyles(null);
-                    } else {
-                        selectedYear = '2028';
-                        updateYearButtonStyles(filter2028Btn);
-                    }
+                filter2028Btn.addEventListener('click', function () {
+                    selectedYear = selectedYear === '2028' ? null : '2028';
+                    updateYearButtonStyles(selectedYear ? filter2028Btn : null);
                     const employeeFilter = document.getElementById('application-employee-filter');
                     loadAllApplications(employeeFilter ? employeeFilter.value : null);
                 });
             }
 
-            // Expose selectedYear to loadAllApplications
-            window.getSelectedYear = function() {
+            // Expose selectedYear to other functions
+            window.getSelectedYear = function () {
                 return selectedYear;
             };
+
+            // --- Date Filter Functionality ---
+            const dateFilter = document.getElementById('applicationdateFilter');
+            if (dateFilter) {
+                dateFilter.addEventListener('change', function () {
+                    const selectedDate = this.value;
+                    if (!selectedDate) return;
+
+                    const tableBody = document.getElementById('application-list-body');
+                    const rows = tableBody.querySelectorAll('tr');
+
+                    rows.forEach(row => {
+                        const startDate = row.cells[2]?.textContent?.trim();
+                        const endDate = row.cells[3]?.textContent?.trim();
+
+                        const showRow = isDateInRange(selectedDate, startDate, endDate);
+                        row.style.display = showRow ? '' : 'none';
+                    });
+                });
+            }
         });
+
+        // --- Date range checker ---
+        function isDateInRange(target, start, end) {
+            const targetDate = new Date(target);
+            const startDate = new Date(start);
+            const endDate = new Date(end);
+
+            return (
+                !isNaN(targetDate) &&
+                !isNaN(startDate) &&
+                !isNaN(endDate) &&
+                targetDate >= startDate &&
+                targetDate <= endDate
+            );
+        }
 
         function resetAttendanceFilters() {
             document.getElementById('dateFilter').value = '';
