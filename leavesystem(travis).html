@@ -5868,12 +5868,28 @@
             }
         }
 
+        function getVisibleTeamsForLeader(user) {
+            if (!user || !user.team) return [];
 
+            if (user.team === 'Honour') {
+                return ['*']; // Can view all teams
+            } else if (user.team === 'Ride') {
+                return ['Ride', 'Ark', 'Belong']; // Special rule
+            } else {
+                return [user.team]; // Default case
+            }
+        }
 
         // Function to show/hide team leader section based on current user
         function toggleTeamLeaderSection() {
             const teamLeaderSection = document.getElementById('team-leader-section');
             if (!teamLeaderSection) return;
+
+            // Only proceed if current user is a team leader
+            if (!currentUser || !currentUser.isTeamLeader) {
+                teamLeaderSection.style.display = 'none';
+                return;
+            }
 
             const visibleTeams = getVisibleTeamsForLeader(currentUser);
 
