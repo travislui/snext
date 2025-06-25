@@ -2235,8 +2235,16 @@
         <button onclick="startScanning()" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg text-lg shadow-lg">
             Take Attendance
         </button>
+
+        <button onclick="loadEmployeeDetails()" class="bg-green-500 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg text-lg shadow-lg">
+            Load All Data
+        </button>
+        <span id="reminderText" class="mt-2 text-sm text-gray-600 hidden">
+            This may take a few minutes...
+        </span>
+        
     </div>
-    
+  
     <!-- Add this div for the scanner -->
     <div id="reader" class="scanner-section hidden"></div>
     
@@ -2650,9 +2658,6 @@
                         console.log("Login successful, showing employee interface");
                         showEmployeeInterface();
                         loadEmployeeData(currentUser);
-                        loadEmployeeApplications(employeeId);
-                        loadEmployeePenalties(employeeId);
-
                         showSyncStatus('Login successful');
 
                     } catch (error) {
@@ -2825,6 +2830,34 @@
         document.addEventListener('DOMContentLoaded', () => {
             initializeAttendanceTable();
         });
+
+        function loadEmployeeDetails() {
+            // Show the reminder
+            const reminder = document.getElementById("reminderText");
+            reminder.classList.remove("hidden");
+
+            // Simulate delay before loading data
+            setTimeout(() => {
+                // Load employee-specific data
+                loadEmployeeApplications(currentUser.id);
+                loadEmployeePenalties(currentUser.id);
+
+                // Dynamically get the teams visible to the current user
+                const visibleTeams = getVisibleTeamsForLeader(currentUser);
+
+                // If there are visible teams, load the leave records
+                if (visibleTeams.length > 0) {
+                    loadTeamLeaveRecords(visibleTeams);
+                }
+
+                // Update the UI to reflect completion
+                reminder.textContent = "Data loaded successfully!";
+                setTimeout(() => {
+                    reminder.classList.add("hidden");
+                    reminder.textContent = "This may take a few minutes...";
+                }, 3000);
+            }, 2000); // You can adjust this delay time as needed
+        }
 
         // Function to change admin password
         async function changeAdminPassword(currentPassword, newPassword) {
@@ -5896,7 +5929,6 @@
 
             if (visibleTeams.length > 0) {
                 teamLeaderSection.style.display = 'block';
-                loadTeamLeaveRecords(visibleTeams);
             } else {
                 teamLeaderSection.style.display = 'none';
             }
@@ -6083,8 +6115,6 @@
                 database.ref(`attendance/${currentUser.uid}`).off('value');
                 
                 // Load penalties and attendance
-                loadEmployeePenalties(currentUser.id);
-                loadEmployeeApplications(currentUser.id);
                 updateAttendanceTable(); // Add this line to load attendance records
 
                 // Initialize real-time attendance updates
