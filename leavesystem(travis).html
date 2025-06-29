@@ -1855,6 +1855,16 @@
             transform: translateY(1px);
         }
 
+        #success-notice {
+            display: none;
+            color: green;
+            margin-top: 10px;
+            padding: 10px;
+            border: 1px solid green;
+            border-radius: 5px;
+            background-color: #e6ffe6;
+        }
+
     </style>
 </head>
 
@@ -2347,8 +2357,11 @@
             <label for="proof-file">Proof:</label>
             <input type="file" id="proof-file" accept="image/*">
         </div>
-        <button type="submit">Apply</button>
+        <button type="submit" id="apply-button">Apply</button>
     </form>
+    <div id="success-notice" style="display: none; color: green; margin-top: 10px;">
+    Your application was submitted successfully. Please do not click again to avoid duplicate records.
+    </div>
 
     <div class="container mx-auto p-4 mt-8">
         <h3>Application Status</h3>
@@ -3692,6 +3705,13 @@
         }
 
         async function processLeaveApplication(applyDate, leaveStartDate, leaveEndDate, leaveType, proofDataUrl) {
+            const applyButton = document.getElementById('apply-button');
+            const successNotice = document.getElementById('success-notice');
+
+            // Disable the Apply button to prevent multiple clicks
+            applyButton.disabled = true;
+            applyButton.textContent = 'Submitting...'; // Optional: Change button text to indicate processing
+
             try {
                 // Calculate leave days
                 const leaveDays = Math.ceil((leaveEndDate - leaveStartDate) / (1000 * 60 * 60 * 24)) + 1;
@@ -3709,6 +3729,8 @@
                 if (leaveType === 'Annual Leave (Normal)' || leaveType === 'Annual Leave (黃金事假)') {
                     if (employeeData.remainingNormalLeaves <= 0) {
                         alert('You have no remaining Annual Leaves (Normal).');
+                        applyButton.disabled = false;
+                        applyButton.textContent = 'Apply';
                         return;
                     }
                     if (leaveDays > employeeData.remainingNormalLeaves) {
@@ -3888,6 +3910,12 @@
                 if (proofContainer) proofContainer.style.display = 'none';
                 if (forceMajeureOptions) forceMajeureOptions.style.display = 'none';
 
+                // Show success notice
+                successNotice.style.display = 'block';
+                setTimeout(() => {
+                    successNotice.style.display = 'none'; // Hide notice after 5 seconds
+                }, 5000);
+
                 // Refresh the application status table
                 await loadEmployeeApplications(currentUser.id);
                 
@@ -3896,6 +3924,12 @@
             } catch (error) {
                 console.error('Error processing leave application:', error);
                 alert('Error submitting leave application: ' + error.message);
+
+            } finally {
+                setTimeout(() => {
+                    applyButton.disabled = false;
+                    applyButton.textContent = 'Apply';
+                }, 1000); // Wait 1 second before re-enabling
             }
         }
 
