@@ -3965,7 +3965,7 @@
             const recordTime = new Date(timestamp);
             
             // Extract configuration from QR pattern
-            let cutoffTime = '09:30'; // Default fallback
+            let cutoffTime = '09:30';
             let earlyRoles = [];
             try {
                 const parts = qrPattern.split('-');
@@ -4688,7 +4688,7 @@
                             const earlyRoles = Array.from(document.querySelectorAll('input[name="early-roles"]:checked'))
                                 .map(input => input.value);
                             const configData = JSON.stringify({ cutoffTime, earlyRoles });
-                            return \`\${timestamp}-\${uuid}-\${random}-${btoa(configData)}\`;
+                            return \`\${timestamp}-\${uuid}-\${random}-\${btoa(configData)}\`;
                         }
 
                         function updateQRCode() {
