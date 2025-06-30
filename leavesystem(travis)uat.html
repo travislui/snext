@@ -3965,16 +3965,20 @@
             const recordTime = new Date(timestamp);
             
             // Extract configuration from QR pattern
-            let cutoffTime = '09:30'; // Default fallback
+            let cutoffTime;
             let earlyRoles = [];
             try {
                 const parts = qrPattern.split('-');
                 const configData = atob(parts[parts.length - 1]);
                 const config = JSON.parse(configData);
-                cutoffTime = config.cutoffTime || '09:30';
+                cutoffTime = config.cutoffTime;
                 earlyRoles = config.earlyRoles || [];
+                if (!cutoffTime) {
+                    throw new Error('No cutoff time set in QR pattern');
+                }
             } catch (e) {
                 console.error('Error parsing QR config:', e);
+                throw new Error('Invalid QR configuration');
             }
             
             // Create deadline time
@@ -4639,6 +4643,11 @@
                         #config-form button:hover {
                             background-color: #45a049;
                         }
+                        .error {
+                            color: red;
+                            font-size: 14px;
+                            display: none;
+                        }
                     </style>
                 </head>
                 <body>
@@ -4646,7 +4655,8 @@
                         <h1 class="title">Attendance QR Code</h1>
                         <div id="config-form">
                             <label for="cutoff-time">Set Cutoff Time:</label>
-                            <input type="time" id="cutoff-time" value="09:30">
+                            <input type="time" id="cutoff-time" required>
+                            <div id="cutoff-error" class="error">Please set a cutoff time.</div>
                             <label for="early-roles">Roles Requiring Early Arrival (10 mins):</label>
                             <div class="checkbox-group">
                                 <label><input type="checkbox" name="early-roles" value="AUM/UM"> AUM/UM</label>
@@ -4681,17 +4691,24 @@
                         }
 
                         function generateRandomPattern() {
-                            const timestamp = new Date().getTime();
-                            const uuid = generateUUID();
-                            const random = Math.random().toString(36).substring(2);
                             const cutoffTime = document.getElementById('cutoff-time').value;
                             const earlyRoles = Array.from(document.querySelectorAll('input[name="early-roles"]:checked'))
                                 .map(input => input.value);
                             const configData = JSON.stringify({ cutoffTime, earlyRoles });
+                            const timestamp = new Date().getTime();
+                            const uuid = generateUUID();
+                            const random = Math.random().toString(36).substring(2);
                             return \`\${timestamp}-\${uuid}-\${random}-\${btoa(configData)}\`;
                         }
 
                         function updateQRCode() {
+                            const cutoffTime = document.getElementById('cutoff-time').value;
+                            if (!cutoffTime) {
+                                document.getElementById('cutoff-error').style.display = 'block';
+                                return;
+                            }
+                            document.getElementById('cutoff-error').style.display = 'none';
+
                             const pattern = generateRandomPattern();
                             if (previousPatterns.has(pattern)) {
                                 console.log('Pattern collision detected, generating new pattern');
@@ -4712,16 +4729,14 @@
                         }
 
                         window.generateQRCode = function() {
+                            console.log("Generating QR Code...");
                             updateQRCode();
-                            // Update QR code every 7 seconds
                             clearInterval(window.qrInterval);
                             window.qrInterval = setInterval(updateQRCode, 7000);
                         };
 
-                        // Update time every second
                         setInterval(updateTime, 1000);
 
-                        // Prevent window from being closed accidentally
                         window.onbeforeunload = function(e) {
                             e.preventDefault();
                             e.returnValue = '';
