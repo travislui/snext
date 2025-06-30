@@ -3965,7 +3965,7 @@
             const recordTime = new Date(timestamp);
             
             // Extract configuration from QR pattern
-            let cutoffTime = '09:30';
+            let cutoffTime = '09:30'; // Default fallback
             let earlyRoles = [];
             try {
                 const parts = qrPattern.split('-');
