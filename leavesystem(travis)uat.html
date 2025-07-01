@@ -3969,16 +3969,17 @@
             let earlyRoles = [];
             try {
                 const parts = qrPattern.split('-');
+                if (parts.length < 4) throw new Error('Invalid QR pattern format');
                 const configData = atob(parts[parts.length - 1]);
                 const config = JSON.parse(configData);
                 cutoffTime = config.cutoffTime;
                 earlyRoles = config.earlyRoles || [];
-                if (!cutoffTime) {
-                    throw new Error('No cutoff time set in QR pattern');
+                if (!cutoffTime || !/^\d{2}:\d{2}$/.test(cutoffTime)) {
+                    throw new Error('No valid cutoff time set in QR pattern');
                 }
             } catch (e) {
-                console.error('Error parsing QR config:', e);
-                throw new Error('Invalid QR configuration');
+                console.error('QR configuration error:', e.message);
+                throw new Error('Invalid QR configuration: ' + e.message);
             }
             
             // Create deadline time
@@ -4571,7 +4572,7 @@
                 <html>
                 <head>
                     <title>Attendance QR Code</title>
-                    <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"><\/script>
+                    <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
                     <style>
                         body {
                             display: flex;
@@ -4656,7 +4657,7 @@
                         <div id="config-form">
                             <label for="cutoff-time">Set Cutoff Time:</label>
                             <input type="time" id="cutoff-time" required>
-                            <div id="cutoff-error" class="error">Please set a cutoff time.</div>
+                            <div id="cutoff-error" class="error">Please set a valid cutoff time.</div>
                             <label for="early-roles">Roles Requiring Early Arrival (10 mins):</label>
                             <div class="checkbox-group">
                                 <label><input type="checkbox" name="early-roles" value="AUM/UM"> AUM/UM</label>
@@ -4691,9 +4692,14 @@
                         }
 
                         function generateRandomPattern() {
-                            const cutoffTime = document.getElementById('cutoff-time').value;
+                            const cutoffTime = document.getElementById('cutoff-time').value.trim();
                             const earlyRoles = Array.from(document.querySelectorAll('input[name="early-roles"]:checked'))
                                 .map(input => input.value);
+                            if (!cutoffTime) {
+                                document.getElementById('cutoff-error').style.display = 'block';
+                                return null;
+                            }
+                            document.getElementById('cutoff-error').style.display = 'none';
                             const configData = JSON.stringify({ cutoffTime, earlyRoles });
                             const timestamp = new Date().getTime();
                             const uuid = generateUUID();
@@ -4702,14 +4708,8 @@
                         }
 
                         function updateQRCode() {
-                            const cutoffTime = document.getElementById('cutoff-time').value;
-                            if (!cutoffTime) {
-                                document.getElementById('cutoff-error').style.display = 'block';
-                                return;
-                            }
-                            document.getElementById('cutoff-error').style.display = 'none';
-
                             const pattern = generateRandomPattern();
+                            if (!pattern) return; // Exit if pattern generation failed
                             if (previousPatterns.has(pattern)) {
                                 console.log('Pattern collision detected, generating new pattern');
                                 return updateQRCode();
