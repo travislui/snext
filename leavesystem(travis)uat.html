@@ -3962,15 +3962,16 @@
 
         // Update the calculateLateStatus function to ensure consistent penalty amounts
         function calculateLateStatus(timestamp, role, cutoffTime, earlyRoles) {
+            console.log('calculateLateStatus - Input:', { timestamp, role, cutoffTime, earlyRoles });
             const recordTime = new Date(timestamp);
             
-            // Use default cutoff time if not provided or invalid
-            const validCutoffTime = cutoffTime && typeof cutoffTime === 'string' && cutoffTime.includes(':') 
-                ? cutoffTime 
-                : '09:30';
+            // Validate cutoffTime
+            if (!cutoffTime || typeof cutoffTime !== 'string' || !cutoffTime.includes(':')) {
+                throw new Error('Invalid or missing cutoff time');
+            }
             
             // Parse admin-selected cutoff time (format: "HH:MM")
-            const [cutoffHours, cutoffMinutes] = validCutoffTime.split(':').map(Number);
+            const [cutoffHours, cutoffMinutes] = cutoffTime.split(':').map(Number);
             
             // Ensure earlyRoles is an array
             const safeEarlyRoles = Array.isArray(earlyRoles) ? earlyRoles : [];
@@ -3985,6 +3986,8 @@
             // Set deadline: apply 10-minute earlier requirement for specified roles
             if (isEarlyRole) {
                 deadline.setHours(cutoffHours, cutoffMinutes - 10, 0, 0); // 10 minutes earlier
+            } else if (isMonday && role !== 'Agent') {
+                deadline.setHours(9, 20, 0, 0); // Maintain original Monday non-Agent rule
             } else {
                 deadline.setHours(cutoffHours, cutoffMinutes, 0, 0); // Admin-specified cutoff
             }
@@ -4038,6 +4041,8 @@
 
             // Round the amount to nearest integer
             amount = Math.round(amount);
+
+            console.log('calculateLateStatus - Result:', { status, amount, lateMinutes, deadline: deadline.toTimeString().substring(0, 5) });
 
             return {
                 status: status,
@@ -4251,15 +4256,19 @@
                 const ipData = await ipResponse.json();
                 const ipAddress = ipData.ip;
 
-                // Get admin settings from Firebase with fallback
+                // Get admin settings from Firebase
                 const settingsRef = database.ref('attendanceSettings');
                 const settingsSnapshot = await settingsRef.once('value');
-                const settings = settingsSnapshot.val() || {
-                    cutoffTime: '09:30', // Default cutoff time
-                    earlyRoles: [] // Default empty array
-                };
+                const settings = settingsSnapshot.val();
+                
+                console.log('onScanSuccess - Retrieved settings from Firebase:', settings);
 
-                const lateInfo = calculateLateStatus(now.toISOString(), employeeData.role, settings.cutoffTime, settings.earlyRoles);
+                // Check if settings exist and have a valid cutoffTime
+                if (!settings || !settings.cutoffTime || typeof settings.cutoffTime !== 'string' || !settings.cutoffTime.includes(':')) {
+                    throw new Error('Attendance settings not configured or invalid in Firebase');
+                }
+
+                const lateInfo = calculateLateStatus(now.toISOString(), employeeData.role, settings.cutoffTime, settings.earlyRoles || []);
 
                 const attendanceData = {
                     employeeId: employeeId,
@@ -4602,11 +4611,20 @@
                             cursor: pointer;
                             margin-top: 20px;
                         }
-                        .btn:hover {
+                        .btn:disabled {
+                            background-color: #cccccc;
+                            cursor: not-allowed;
+                        }
+                        .btn:hover:not(:disabled) {
                             background-color: #45a049;
                         }
                         .hidden {
                             display: none;
+                        }
+                        .error {
+                            color: red;
+                            font-size: 14px;
+                            margin-top: 10px;
                         }
                     </style>
                 </head>
@@ -4615,8 +4633,8 @@
                         <h1 class="title">Configure Attendance Settings</h1>
                         <div id="settings-form">
                             <div class="form-group">
-                                <label for="cutoff-time">Cutoff Time:</label>
-                                <input type="time" id="cutoff-time" value="09:30">
+                                <label for="cutoff-time">Cutoff Time (Required):</label>
+                                <input type="time" id="cutoff-time" required>
                             </div>
                             <div class="form-group">
                                 <label>Roles Requiring 10-Minute Earlier Arrival:</label>
@@ -4629,7 +4647,8 @@
                                     <label><input type="checkbox" name="early-role" value="DD"> DD</label>
                                 </div>
                             </div>
-                            <button class="btn" onclick="saveSettings()">Save and Show QR Code</button>
+                            <div id="error-message" class="error hidden"></div>
+                            <button class="btn" id="save-btn" disabled>Save and Show QR Code</button>
                         </div>
                         <div id="qr-section" class="hidden">
                             <h1 class="title">Attendance QR Code</h1>
@@ -4641,7 +4660,24 @@
                         const timeDisplay = document.getElementById('current-time');
                         const settingsForm = document.getElementById('settings-form');
                         const qrSection = document.getElementById('qr-section');
-                        
+                        const cutoffTimeInput = document.getElementById('cutoff-time');
+                        const saveBtn = document.getElementById('save-btn');
+                        const errorMessage = document.getElementById('error-message');
+
+                        function validateForm() {
+                            const cutoffTime = cutoffTimeInput.value;
+                            if (cutoffTime) {
+                                saveBtn.disabled = false;
+                                errorMessage.classList.add('hidden');
+                            } else {
+                                saveBtn.disabled = true;
+                                errorMessage.textContent = 'Please select a cutoff time';
+                                errorMessage.classList.remove('hidden');
+                            }
+                        }
+
+                        cutoffTimeInput.addEventListener('input', validateForm);
+
                         function updateTime() {
                             const now = new Date();
                             const hours = String(now.getHours()).padStart(2, '0');
@@ -4686,9 +4722,17 @@
                         }
 
                         function saveSettings() {
-                            const cutoffTime = document.getElementById('cutoff-time').value;
+                            const cutoffTime = cutoffTimeInput.value;
+                            if (!cutoffTime) {
+                                errorMessage.textContent = 'Please select a cutoff time';
+                                errorMessage.classList.remove('hidden');
+                                return;
+                            }
+                            
                             const earlyRoles = Array.from(document.querySelectorAll('input[name="early-role"]:checked'))
                                 .map(checkbox => checkbox.value);
+                            
+                            console.log('saveSettings - Sending settings:', { cutoffTime, earlyRoles });
                             
                             // Send settings to parent window
                             window.opener.postMessage({
@@ -4707,6 +4751,11 @@
                             setInterval(updateQRCode, 7000);
                             setInterval(updateTime, 1000);
                         }
+
+                        saveBtn.addEventListener('click', saveSettings);
+
+                        // Initial validation
+                        validateForm();
 
                         window.onbeforeunload = function(e) {
                             e.preventDefault();
@@ -4730,17 +4779,23 @@
             window.addEventListener('message', async function(event) {
                 if (event.data.type === 'saveAttendanceSettings') {
                     try {
+                        // Verify admin role before saving
+                        if (!isAdmin) {
+                            throw new Error('Only admins can save attendance settings');
+                        }
                         const settingsRef = database.ref('attendanceSettings');
                         await settingsRef.set({
                             cutoffTime: event.data.cutoffTime,
                             earlyRoles: event.data.earlyRoles
                         });
-                        console.log('Attendance settings saved:', event.data);
+                        console.log('openQRCodeWindow - Settings saved to Firebase:', event.data);
+                        qrWindow.alert('Settings saved successfully!');
                     } catch (error) {
                         console.error('Error saving attendance settings:', error);
+                        qrWindow.alert('Failed to save settings: ' + error.message);
                     }
                 }
-            });
+            }, { once: true });
         }
 
         // Add event listener to the button
