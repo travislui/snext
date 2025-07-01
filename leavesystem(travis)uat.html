@@ -3964,21 +3964,27 @@
         function calculateLateStatus(timestamp, role, cutoffTime, earlyRoles) {
             const recordTime = new Date(timestamp);
             
+            // Use default cutoff time if not provided or invalid
+            const validCutoffTime = cutoffTime && typeof cutoffTime === 'string' && cutoffTime.includes(':') 
+                ? cutoffTime 
+                : '09:30';
+            
             // Parse admin-selected cutoff time (format: "HH:MM")
-            const [cutoffHours, cutoffMinutes] = cutoffTime.split(':').map(Number);
+            const [cutoffHours, cutoffMinutes] = validCutoffTime.split(':').map(Number);
+            
+            // Ensure earlyRoles is an array
+            const safeEarlyRoles = Array.isArray(earlyRoles) ? earlyRoles : [];
             
             // Create deadline time based on admin settings
             const deadline = new Date(recordTime);
             
             // Check if the role requires earlier arrival
-            const isEarlyRole = earlyRoles.includes(role);
+            const isEarlyRole = safeEarlyRoles.includes(role);
             const isMonday = recordTime.getDay() === 1;
             
             // Set deadline: apply 10-minute earlier requirement for specified roles
             if (isEarlyRole) {
                 deadline.setHours(cutoffHours, cutoffMinutes - 10, 0, 0); // 10 minutes earlier
-            } else if (isMonday && role !== 'Agent') {
-                deadline.setHours(9, 20, 0, 0); // Maintain original Monday non-Agent rule
             } else {
                 deadline.setHours(cutoffHours, cutoffMinutes, 0, 0); // Admin-specified cutoff
             }
@@ -3993,7 +3999,7 @@
                 status = 'Punctual';
                 amount = 0;
             } else {
-                if (lateMinutes >= 60) { // 1 hour or more (No Show)
+                if (lateMinutes >= 60) {
                     status = 'No Show';
                     amount = 200;
                 } else if (lateMinutes <= 5) {
@@ -4245,12 +4251,12 @@
                 const ipData = await ipResponse.json();
                 const ipAddress = ipData.ip;
 
-                // Get admin settings from Firebase or default to 9:30
+                // Get admin settings from Firebase with fallback
                 const settingsRef = database.ref('attendanceSettings');
                 const settingsSnapshot = await settingsRef.once('value');
                 const settings = settingsSnapshot.val() || {
-                    cutoffTime: '09:30',
-                    earlyRoles: []
+                    cutoffTime: '09:30', // Default cutoff time
+                    earlyRoles: [] // Default empty array
                 };
 
                 const lateInfo = calculateLateStatus(now.toISOString(), employeeData.role, settings.cutoffTime, settings.earlyRoles);
