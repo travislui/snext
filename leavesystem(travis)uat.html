@@ -3961,49 +3961,40 @@
         }        
 
         // Update the calculateLateStatus function to ensure consistent penalty amounts
-        async function calculateLateStatus(timestamp, role) {
+        function calculateLateStatus(timestamp, role, qrConfig = null) {
             const recordTime = new Date(timestamp);
+            const deadline = new Date(recordTime);
 
-            // Default settings
-            let cutoffHour = 9;
-            let cutoffMinute = 30;
-            let earlyArrivalRoles = []; // Roles that need to arrive 10 minutes early
+            // Default cutoff time (9:30 AM) if QR config is not provided or invalid
+            let cutoffHours = 9;
+            let cutoffMinutes = 30;
+            let earlyRoles = [];
 
-            // Fetch admin settings from Firebase
-            try {
-                const settingsRef = database.ref('settings/attendance');
-                const settingsSnapshot = await settingsRef.once('value');
-                const settings = settingsSnapshot.val();
-
-                if (settings) {
-                    // Extract cutoff time (e.g., "09:30" format)
-                    if (settings.cutoffTime) {
-                        const [hour, minute] = settings.cutoffTime.split(':').map(Number);
-                        cutoffHour = hour;
-                        cutoffMinute = minute;
+            // Parse QR config if provided
+            if (qrConfig) {
+                try {
+                    const { cutoffTime, earlyRoles: qrEarlyRoles } = qrConfig;
+                    if (cutoffTime) {
+                        const [hours, minutes] = cutoffTime.split(':').map(Number);
+                        if (!isNaN(hours) && !isNaN(minutes)) {
+                            cutoffHours = hours;
+                            cutoffMinutes = minutes;
+                        }
                     }
-                    // Extract roles requiring early arrival
-                    if (settings.earlyArrivalRoles) {
-                        earlyArrivalRoles = settings.earlyArrivalRoles; // Array of roles, e.g., ['AUM/UM', 'SUM']
-                    }
+                    earlyRoles = qrEarlyRoles || [];
+                } catch (error) {
+                    console.error('Error parsing QR config:', error);
+                    // Fallback to default values
                 }
-            } catch (error) {
-                console.error('Error fetching attendance settings:', error);
-                // Fallback to default settings if there's an error
             }
 
-            // Create deadline time based on settings
-            const deadline = new Date(recordTime);
-            
-            // Check if the role requires arriving 10 minutes early
-            const requiresEarlyArrival = earlyArrivalRoles.includes(role);
-            
-            // Set the deadline
-            if (requiresEarlyArrival) {
-                // Subtract 10 minutes from the cutoff time for early arrival roles
-                deadline.setHours(cutoffHour, cutoffMinute - 10, 0, 0);
+            // Set deadline based on role and QR config
+            if (earlyRoles.includes(role)) {
+                // Roles requiring early arrival (10 minutes before cutoff)
+                deadline.setHours(cutoffHours, cutoffMinutes - 10, 0, 0);
             } else {
-                deadline.setHours(cutoffHour, cutoffMinute, 0, 0);
+                // Standard deadline
+                deadline.setHours(cutoffHours, cutoffMinutes, 0, 0);
             }
 
             // Calculate minutes late
@@ -4060,7 +4051,7 @@
                 status: status,
                 amount: amount,
                 lateMinutes: Math.max(0, lateMinutes), // Ensure non-negative
-                deadline: deadline.toTimeString().substring(0, 5) // e.g., "09:20"
+                deadline: deadline.toTimeString().substring(0, 5) // Add deadline time for display/debugging
             };
         }
 
@@ -4069,19 +4060,27 @@
                 // Update agent's personal attendance table (today's record only)
                 const agentTableBody = document.getElementById('attendanceTableBody');
                 if (agentTableBody && currentUser) {
+                    // Get today's date in YYYY-MM-DD format
                     const today = new Date().toISOString().split('T')[0];
+                    
+                    // Clear existing records
                     agentTableBody.innerHTML = '';
 
+                    // Fetch today's records for current user
                     const attendanceRef = database.ref('attendance');
                     const snapshot = await attendanceRef.once('value');
+                    
+                    // Get a Set of already processed record IDs to prevent duplicates
                     const processedRecordIds = new Set();
                     const records = [];
-
+                    
                     snapshot.forEach(childSnapshot => {
                         const record = childSnapshot.val();
+                        // Only include records for the current user and from today
                         if (record && record.employeeId === currentUser.id) {
                             const recordDate = new Date(record.timestamp).toISOString().split('T')[0];
                             if (recordDate === today) {
+                                // Use record ID to prevent duplicates
                                 const recordId = childSnapshot.key;
                                 if (!processedRecordIds.has(recordId)) {
                                     processedRecordIds.add(recordId);
@@ -4095,31 +4094,37 @@
                     });
 
                     if (records.length > 0) {
+                        // Sort by time (earliest first)
                         records.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+                        
+                        // Only show the first record for the day
                         const todayRecord = records[0];
                         const recordTime = new Date(todayRecord.timestamp);
 
                         const row = document.createElement('tr');
                         row.innerHTML = `
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <div class="text-sm font-medium text-gray-900">
-                                    ${currentUser.name}
-                                </div>
+                            <td class="px-6 py-4">${record.employeeName || 'N/A'}</td>
+                            <td class="px-6 py-4">${record.role || 'N/A'}</td>
+                            <td class="px-6 py-4">
+                                ${formatDate(recordDate)} ${formatTime(recordDate)}
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <div class="text-sm text-gray-900">
-                                    ${formatDate(recordTime)} ${formatTime(recordTime)}
-                                </div>
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <span class="status-badge ${todayRecord.status.toLowerCase()}">
-                                    ${todayRecord.status}
-                                    ${todayRecord.amount > 0 ? ` (-$${todayRecord.amount})` : ''}
+                            <td class="px-6 py-4">
+                                <span class="status-badge ${record.status?.toLowerCase() || 'unknown'}">
+                                    ${record.status || 'N/A'}
+                                    ${record.amount > 0 ? ` (-$${record.amount})` : ''}
+                                    ${record.deadline ? ` (Deadline: ${record.deadline})` : ''}
                                 </span>
+                            </td>
+                            <td class="px-6 py-4">${record.ipAddress || 'N/A'}</td>
+                            <td class="px-6 py-4">
+                                <button class="remove-btn-small" onclick="removeAttendanceRecord('${record.id}')">
+                                    Remove
+                                </button>
                             </td>
                         `;
                         agentTableBody.appendChild(row);
                     } else {
+                        // Show "No record for today" message
                         agentTableBody.innerHTML = `
                             <tr>
                                 <td colspan="3" class="px-6 py-4 text-center text-gray-500">
@@ -4133,17 +4138,25 @@
                 // Update admin's all attendance records table
                 const adminTableBody = document.getElementById('allAttendanceTableBody');
                 if (adminTableBody && isAdmin) {
+                    // Clear existing records
                     adminTableBody.innerHTML = '';
 
+                    // Fetch all attendance records
                     const attendanceRef = database.ref('attendance');
                     const snapshot = await attendanceRef.once('value');
+                    
+                    // Use a Map with composite key to track unique records
+                    // Create key using employeeId + date to handle duplicates
                     const uniqueRecords = new Map();
 
                     snapshot.forEach(childSnapshot => {
                         const record = childSnapshot.val();
                         if (record && record.employeeName && record.timestamp) {
+                            // Create a composite key using employeeId and the date part of timestamp
                             const recordDate = new Date(record.timestamp).toISOString().split('T')[0];
                             const compositeKey = `${record.employeeId || record.employeeName}_${recordDate}`;
+                            
+                            // For records on the same day, keep only the earliest one
                             if (!uniqueRecords.has(compositeKey) || 
                                 new Date(record.timestamp) < new Date(uniqueRecords.get(compositeKey).timestamp)) {
                                 uniqueRecords.set(compositeKey, {
@@ -4154,46 +4167,51 @@
                         }
                     });
 
+                    // Convert to array
                     const records = Array.from(uniqueRecords.values());
+
+                    // Sort records by timestamp (newest first)
                     records.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
                     if (records.length === 0) {
                         adminTableBody.innerHTML = `
                             <tr>
-                                <td colspan="7" class="px-6 py-4 text-center text-gray-500">
+                                <td colspan="6" class="px-6 py-4 text-center text-gray-500">
                                     No attendance records found
                                 </td>
                             </tr>
                         `;
                     } else {
+                        // Apply any active filters
                         let filteredRecords = records;
                         const dateFilter = document.getElementById('dateFilter')?.value;
                         const statusFilter = document.getElementById('statusFilter')?.value;
                         const employeeFilter = document.getElementById('attendanceEmployeeFilter')?.value;
-
+                        
                         if (dateFilter) {
                             filteredRecords = filteredRecords.filter(record => {
                                 const recordDate = new Date(record.timestamp).toISOString().split('T')[0];
                                 return recordDate === dateFilter;
                             });
                         }
-
+                        
                         if (statusFilter) {
                             filteredRecords = filteredRecords.filter(record => 
                                 record.status === statusFilter
                             );
                         }
-
+                        
                         if (employeeFilter) {
                             filteredRecords = filteredRecords.filter(record => 
                                 record.employeeId === employeeFilter
                             );
                         }
-
+                        
+                        // Display filtered records
                         filteredRecords.forEach(record => {
                             const row = document.createElement('tr');
                             const recordDate = new Date(record.timestamp);
-
+                            
                             row.innerHTML = `
                                 <td class="px-6 py-4">${record.employeeName || 'N/A'}</td>
                                 <td class="px-6 py-4">${record.role || 'N/A'}</td>
@@ -4206,7 +4224,6 @@
                                         ${record.amount > 0 ? ` (-$${record.amount})` : ''}
                                     </span>
                                 </td>
-                                <td class="px-6 py-4">${record.deadline || 'N/A'}</td>
                                 <td class="px-6 py-4">${record.ipAddress || 'N/A'}</td>
                                 <td class="px-6 py-4">
                                     <button class="remove-btn-small" onclick="removeAttendanceRecord('${record.id}')">
@@ -4259,7 +4276,6 @@
                 
                 let existingRecord = false;
                 
-                // Check if there's already a record for this employee on this date
                 todaySnapshot.forEach(childSnapshot => {
                     const record = childSnapshot.val();
                     if (record.employeeId === employeeId) {
@@ -4276,13 +4292,30 @@
                     return;
                 }
 
+                // Decode QR code pattern
+                let qrConfig = null;
+                try {
+                    const patternParts = decodedText.split('-');
+                    if (patternParts.length >= 4) {
+                        const base64Config = patternParts[patternParts.length - 1];
+                        qrConfig = JSON.parse(atob(base64Config));
+                    } else {
+                        throw new Error('Invalid QR code format');
+                    }
+                } catch (error) {
+                    console.error('Error decoding QR code:', error);
+                    showScanResult('Invalid QR code format', false);
+                    stopScanner();
+                    return;
+                }
+
                 // Get user's IP address
                 const ipResponse = await fetch('https://api.ipify.org?format=json');
                 const ipData = await ipResponse.json();
                 const ipAddress = ipData.ip;
 
-                // Calculate late status
-                const lateInfo = calculateLateStatus(now.toISOString(), employeeData.role);
+                // Calculate late status with QR config
+                const lateInfo = calculateLateStatus(now.toISOString(), employeeData.role, qrConfig);
 
                 // Create attendance record
                 const attendanceData = {
@@ -4295,7 +4328,8 @@
                     status: lateInfo.status,
                     lateMinutes: lateInfo.lateMinutes,
                     amount: lateInfo.amount,
-                    ipAddress: ipAddress
+                    ipAddress: ipAddress,
+                    qrConfig: qrConfig // Optional: Store QR config for reference
                 };
 
                 // Save to Firebase
@@ -4307,10 +4341,8 @@
                 // Stop the scanner
                 stopScanner();
                 
-                // Important: Manually update the UI once without relying on listeners
-                // This avoids duplicate rendering
+                // Manually update the UI
                 setTimeout(() => {
-                    // Force a manual update of the attendance table to show the new record
                     updateAttendanceTable();
                 }, 1000);
 
@@ -4556,258 +4588,172 @@
         // Function to create QR code window content
         function createQRWindowContent() {
             return `
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <title>Attendance QR Code</title>
-                    <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"><\/script>
-                    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js"><\/script>
-                    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js"><\/script>
-                    <style>
-                        body {
-                            display: flex;
-                            flex-direction: column;
-                            align-items: center;
-                            justify-content: center;
-                            min-height: 100vh;
-                            margin: 0;
-                            background-color: #f0f0f0;
-                            font-family: Arial, sans-serif;
-                        }
-                        #qr-container {
-                            background: white;
-                            padding: 40px;
-                            border-radius: 20px;
-                            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-                            text-align: center;
-                        }
-                        #qr-code {
-                            margin-bottom: 30px;
-                        }
-                        #qr-code img {
-                            width: 400px;
-                            height: 400px;
-                        }
-                        #current-time {
-                            font-size: 48px;
-                            color: #333;
-                            margin-top: 20px;
-                            font-weight: bold;
-                        }
-                        .title {
-                            font-size: 36px;
-                            color: #333;
-                            margin-bottom: 30px;
-                            font-weight: bold;
-                        }
-                        #config-form {
-                            margin-bottom: 30px;
-                            display: flex;
-                            flex-direction: column;
-                            gap: 15px;
-                        }
-                        #config-form label {
-                            font-size: 18px;
-                            color: #333;
-                        }
-                        #config-form input[type="time"],
-                        #config-form select {
-                            padding: 8px;
-                            font-size: 16px;
-                            border: 1px solid #ccc;
-                            border-radius: 4px;
-                        }
-                        #config-form .checkbox-group {
-                            display: flex;
-                            flex-direction: column;
-                            gap: 10px;
-                        }
-                        #config-form button {
-                            padding: 10px 20px;
-                            background-color: #4CAF50;
-                            color: white;
-                            border: none;
-                            border-radius: 4px;
-                            cursor: pointer;
-                            font-size: 16px;
-                        }
-                        #config-form button:hover {
-                            background-color: #45a049;
-                        }
-                    </style>
-                </head>
-                <body>
-                    <div id="qr-container">
-                        <h1 class="title">Attendance QR Code</h1>
-                        <div id="config-form">
-                            <label for="cutoff-time">Set Cutoff Time:</label>
-                            <input type="time" id="cutoff-time" value="09:30">
-                            <label for="early-roles">Roles Requiring Early Arrival (10 mins):</label>
-                            <div class="checkbox-group">
-                                <label><input type="checkbox" name="early-roles" value="AUM/UM"> AUM/UM</label>
-                                <label><input type="checkbox" name="early-roles" value="SUM"> SUM</label>
-                                <label><input type="checkbox" name="early-roles" value="BM"> BM</label>
-                                <label><input type="checkbox" name="early-roles" value="DM"> DM</label>
-                                <label><input type="checkbox" name="early-roles" value="DD"> DD</label>
-                            </div>
-                            <button onclick="generateQRCode()">Generate QR Code</button>
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Attendance QR Code</title>
+                <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"><\/script>
+                <style>
+                    body {
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                        justify-content: center;
+                        min-height: 100vh;
+                        margin: 0;
+                        background-color: #f0f0f0;
+                        font-family: Arial, sans-serif;
+                    }
+                    #qr-container {
+                        background: white;
+                        padding: 40px;
+                        border-radius: 20px;
+                        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+                        text-align: center;
+                    }
+                    #qr-code {
+                        margin-bottom: 30px;
+                    }
+                    #qr-code img {
+                        width: 400px;
+                        height: 400px;
+                    }
+                    #current-time {
+                        font-size: 48px;
+                        color: #333;
+                        margin-top: 20px;
+                        font-weight: bold;
+                    }
+                    .title {
+                        font-size: 36px;
+                        color: #333;
+                        margin-bottom: 30px;
+                        font-weight: bold;
+                    }
+                    #config-form {
+                        margin-bottom: 30px;
+                        display: flex;
+                        flex-direction: column;
+                        gap: 15px;
+                    }
+                    #config-form label {
+                        font-size: 18px;
+                        color: #333;
+                    }
+                    #config-form input[type="time"],
+                    #config-form select {
+                        padding: 8px;
+                        font-size: 16px;
+                        border: 1px solid #ccc;
+                        border-radius: 4px;
+                    }
+                    #config-form .checkbox-group {
+                        display: flex;
+                        flex-direction: column;
+                        gap: 10px;
+                    }
+                    #config-form button {
+                        padding: 10px 20px;
+                        background-color: #4CAF50;
+                        color: white;
+                        border: none;
+                        border-radius: 4px;
+                        cursor: pointer;
+                        font-size: 16px;
+                    }
+                    #config-form button:hover {
+                        background-color: #45a049;
+                    }
+                </style>
+            </head>
+            <body>
+                <div id="qr-container">
+                    <h1 class="title">Attendance QR Code</h1>
+                    <div id="config-form">
+                        <label for="cutoff-time">Set Cutoff Time:</label>
+                        <input type="time" id="cutoff-time" value="09:30">
+                        <label for="early-roles">Roles Requiring Early Arrival (10 mins):</label>
+                        <div class="checkbox-group">
+                            <label><input type="checkbox" name="early-roles" value="AUM/UM"> AUM/UM</label>
+                            <label><input type="checkbox" name="early-roles" value="SUM"> SUM</label>
+                            <label><input type="checkbox" name="early-roles" value="BM"> BM</label>
+                            <label><input type="checkbox" name="early-roles" value="DM"> DM</label>
+                            <label><input type="checkbox" name="early-roles" value="DD"> DD</label>
                         </div>
-                        <div id="qr-code" style="display: none;"></div>
-                        <div id="current-time"></div>
+                        <button onclick="generateQRCode()">Generate QR Code</button>
                     </div>
-                    <script>
-                        // Initialize Firebase (replace with your actual config)
-                        const firebaseConfig = {
-                            apiKey: "YOUR_API_KEY",
-                            authDomain: "YOUR_AUTH_DOMAIN",
-                            databaseURL: "YOUR_DATABASE_URL",
-                            projectId: "YOUR_PROJECT_ID",
-                            storageBucket: "YOUR_STORAGE_BUCKET",
-                            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-                            appId: "YOUR_APP_ID"
-                        };
-                        firebase.initializeApp(firebaseConfig);
+                    <div id="qr-code" style="display: none;"></div>
+                    <div id="current-time"></div>
+                </div>
+                <script>
+                    let previousPatterns = new Set();
+                    const timeDisplay = document.getElementById('current-time');
+                    
+                    function updateTime() {
+                        const now = new Date();
+                        const hours = String(now.getHours()).padStart(2, '0');
+                        const minutes = String(now.getMinutes()).padStart(2, '0');
+                        const seconds = String(now.getSeconds()).padStart(2, '0');
+                        timeDisplay.textContent = \`\${hours}:\${minutes}:\${seconds}\`;
+                    }
 
-                        let previousPatterns = new Set();
-                        const timeDisplay = document.getElementById('current-time');
+                    function generateUUID() {
+                        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                            const r = Math.random() * 16 | 0;
+                            const v = c == 'x' ? r : (r & 0x3 | 0x8);
+                            return v.toString(16);
+                        });
+                    }
+
+                    function generateRandomPattern() {
+                        const timestamp = new Date().getTime();
+                        const uuid = generateUUID();
+                        const random = Math.random().toString(36).substring(2);
+                        const cutoffTime = document.getElementById('cutoff-time').value;
+                        const earlyRoles = Array.from(document.querySelectorAll('input[name="early-roles"]:checked'))
+                            .map(input => input.value);
+                        const configData = JSON.stringify({ cutoffTime, earlyRoles });
+                        return \`\${timestamp}-\${uuid}-\${random}-\${btoa(configData)}\`;
+                    }
+
+                    function updateQRCode() {
+                        const pattern = generateRandomPattern();
+                        if (previousPatterns.has(pattern)) {
+                            console.log('Pattern collision detected, generating new pattern');
+                            return updateQRCode();
+                        }
+                        previousPatterns.add(pattern);
+                        if (previousPatterns.size > 1000) {
+                            const iterator = previousPatterns.values();
+                            previousPatterns.delete(iterator.next().value);
+                        }
+                        const qr = qrcode(0, 'L');
+                        qr.addData(pattern);
+                        qr.make();
                         const qrContainer = document.getElementById('qr-code');
-                        
-                        function updateTime() {
-                            const now = new Date();
-                            const hours = String(now.getHours()).padStart(2, '0');
-                            const minutes = String(now.getMinutes()).padStart(2, '0');
-                            const seconds = String(now.getSeconds()).padStart(2, '0');
-                            timeDisplay.textContent = \`\${hours}:\${minutes}:\${seconds}\`;
-                        }
+                        qrContainer.innerHTML = qr.createImgTag(12);
+                        qrContainer.style.display = 'block';
+                        console.log('Generated new pattern:', pattern);
+                    }
 
-                        function generateUUID() {
-                            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-                                const r = Math.random() * 16 | 0;
-                                const v = c == 'x' ? r : (r & 0x3 | 0x8);
-                                return v.toString(16);
-                            });
-                        }
-                        
-                        function generateRandomPattern() {
-                            const timestamp = new Date().getTime();
-                            const uuid = generateUUID();
-                            const random = Math.random().toString(36).substring(2);
-                            return \`\${timestamp}-\${uuid}-\${random}\`;
-                        }
+                    window.generateQRCode = function() {
+                        updateQRCode();
+                        // Update QR code every 7 seconds
+                        clearInterval(window.qrInterval);
+                        window.qrInterval = setInterval(updateQRCode, 7000);
+                    };
 
-                        function updateQRCode() {
-                            try {
-                                const pattern = generateRandomPattern();
-                                if (previousPatterns.has(pattern)) {
-                                    console.log('Pattern collision detected, generating new pattern');
-                                    return updateQRCode();
-                                }
-                                previousPatterns.add(pattern);
-                                if (previousPatterns.size > 1000) {
-                                    const iterator = previousPatterns.values();
-                                    previousPatterns.delete(iterator.next().value);
-                                }
-                                const qr = qrcode(0, 'L');
-                                qr.addData(pattern);
-                                qr.make();
-                                qrContainer.innerHTML = qr.createImgTag(12);
-                                qrContainer.style.display = 'block';
-                                console.log('Generated new pattern:', pattern);
-                            } catch (error) {
-                                console.error('Error generating QR code:', error);
-                                alert('Failed to generate QR code: ' + error.message);
-                            }
-                        }
+                    // Update time every second
+                    setInterval(updateTime, 1000);
 
-                        function saveSettings() {
-                            const cutoffTime = document.getElementById('cutoff-time').value;
-                            const earlyRoles = Array.from(document.querySelectorAll('input[name="early-roles"]:checked')).map(input => input.value);
-                            
-                            if (!cutoffTime) {
-                                alert('Please select a cutoff time');
-                                return Promise.resolve(false);
-                            }
-
-                            const settings = {
-                                cutoffTime: cutoffTime,
-                                earlyArrivalRoles: earlyRoles
-                            };
-
-                            console.log('Attempting to save settings:', settings);
-                            return firebase.database().ref('settings/attendance').set(settings)
-                                .then(() => {
-                                    console.log('Settings saved successfully');
-                                    alert('Settings saved successfully');
-                                    return true;
-                                })
-                                .catch(error => {
-                                    console.error('Error saving settings:', error);
-                                    alert('Error saving settings: ' + error.message);
-                                    return false;
-                                });
-                        }
-
-                        function loadSettings() {
-                            console.log('Loading settings from Firebase');
-                            firebase.database().ref('settings/attendance').once('value').then(snapshot => {
-                                const settings = snapshot.val();
-                                if (settings) {
-                                    console.log('Loaded settings:', settings);
-                                    if (settings.cutoffTime) {
-                                        document.getElementById('cutoff-time').value = settings.cutoffTime;
-                                    }
-                                    if (settings.earlyArrivalRoles) {
-                                        document.querySelectorAll('input[name="early-roles"]').forEach(checkbox => {
-                                            checkbox.checked = settings.earlyArrivalRoles.includes(checkbox.value);
-                                        });
-                                    }
-                                } else {
-                                    console.log('No settings found, using defaults');
-                                }
-                            }).catch(error => {
-                                console.error('Error loading settings:', error);
-                                alert('Error loading settings: ' + error.message);
-                            });
-                        }
-
-                        function generateQRCode() {
-                            console.log('Generate QR Code button clicked');
-                            saveSettings().then(success => {
-                                if (success) {
-                                    updateQRCode();
-                                    // Start periodic QR code updates
-                                    setInterval(updateQRCode, 7000);
-                                } else {
-                                    // Generate QR code anyway as a fallback
-                                    updateQRCode();
-                                    console.log('Settings save failed, but QR code generated as fallback');
-                                }
-                            }).catch(error => {
-                                console.error('Error in generateQRCode:', error);
-                                alert('Error generating QR code: ' + error.message);
-                                // Generate QR code as a fallback
-                                updateQRCode();
-                            });
-                        }
-
-                        // Initial setup
-                        try {
-                            updateTime();
-                            loadSettings();
-                            setInterval(updateTime, 1000);
-                        } catch (error) {
-                            console.error('Error during initialization:', error);
-                            alert('Initialization error: ' + error.message);
-                        }
-
-                        // Prevent window from being closed accidentally
-                        window.onbeforeunload = function(e) {
-                            e.preventDefault();
-                            e.returnValue = '';
-                        };
-                    <\/script>
-                </body>
-                </html>
+                    // Prevent window from being closed accidentally
+                    window.onbeforeunload = function(e) {
+                        e.preventDefault();
+                        e.returnValue = '';
+                    };
+                <\/script>
+            </body>
+            </html>
             `;
         }
 
