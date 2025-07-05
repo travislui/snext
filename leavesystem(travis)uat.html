@@ -3965,33 +3965,27 @@
             const recordTime = new Date(timestamp);
             const deadline = new Date(recordTime);
 
-            // Default cutoff time (9:30 AM) if QR config is not provided or invalid
-            let cutoffHours = 9;
-            let cutoffMinutes = 30;
-            let earlyRoles = [];
+            // Validate QR config
+            let cutoffHours, cutoffMinutes, earlyRoles;
+            if (!qrConfig || typeof qrConfig !== 'object') {
+                throw new Error('Invalid QR config: qrConfig is missing or not an object');
+            }
 
-            // Parse QR config if provided
-            if (qrConfig && typeof qrConfig === 'object') {
-                try {
-                    const { cutoffTime, earlyRoles: qrEarlyRoles } = qrConfig;
-                    if (cutoffTime && typeof cutoffTime === 'string') {
-                        const [hours, minutes] = cutoffTime.split(':').map(Number);
-                        if (!isNaN(hours) && !isNaN(minutes)) {
-                            cutoffHours = hours;
-                            cutoffMinutes = minutes;
-                        } else {
-                            console.warn('Invalid cutoffTime format:', cutoffTime);
-                        }
-                    } else {
-                        console.warn('cutoffTime is missing or invalid in qrConfig:', qrConfig);
-                    }
-                    earlyRoles = Array.isArray(qrEarlyRoles) ? qrEarlyRoles : [];
-                } catch (error) {
-                    console.error('Error parsing QR config:', error);
-                    // Fallback to default values
+            try {
+                const { cutoffTime, earlyRoles: qrEarlyRoles } = qrConfig;
+                if (!cutoffTime || typeof cutoffTime !== 'string') {
+                    throw new Error('Invalid QR config: cutoffTime is missing or invalid');
                 }
-            } else {
-                console.warn('qrConfig is null or not an object:', qrConfig);
+                const [hours, minutes] = cutoffTime.split(':').map(Number);
+                if (isNaN(hours) || isNaN(minutes)) {
+                    throw new Error('Invalid cutoffTime format: must be HH:MM');
+                }
+                cutoffHours = hours;
+                cutoffMinutes = minutes;
+                earlyRoles = Array.isArray(qrEarlyRoles) ? qrEarlyRoles : [];
+            } catch (error) {
+                console.error('Error parsing QR config:', error);
+                throw new Error(`Failed to parse QR config: ${error.message}`);
             }
 
             // Set deadline based on role and QR config
