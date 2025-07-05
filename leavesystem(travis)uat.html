@@ -4305,12 +4305,15 @@
                     if (patternParts.length >= 4) {
                         const base64Config = patternParts[patternParts.length - 1];
                         qrConfig = JSON.parse(atob(base64Config));
+                        if (!qrConfig.cutoffTime || !Array.isArray(qrConfig.earlyRoles)) {
+                            throw new Error('Invalid QR config: missing cutoffTime or earlyRoles');
+                        }
                     } else {
-                        throw new Error('Invalid QR code format');
+                        throw new Error('Invalid QR code format: insufficient parts');
                     }
                 } catch (error) {
                     console.error('Error decoding QR code:', error);
-                    showScanResult('Invalid QR code format', false);
+                    showScanResult('Invalid QR code format: ' + error.message, false);
                     stopScanner();
                     return;
                 }
