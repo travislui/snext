@@ -3963,11 +3963,12 @@
         // Update the calculateLateStatus function to ensure consistent penalty amounts
         function calculateLateStatus(timestamp, role, qrConfig = null) {
             const recordTime = new Date(timestamp);
-            const deadline = new Date(recordTime);
+            const deadline = new Date(recordTime); // Same date as recordTime
 
             // Validate QR config
             let cutoffHours, cutoffMinutes, earlyRoles;
             if (!qrConfig || typeof qrConfig !== 'object') {
+                console.error('qrConfig validation failed:', qrConfig); // Debug: Log qrConfig
                 throw new Error('Invalid QR config: qrConfig is missing or not an object');
             }
 
@@ -3983,6 +3984,7 @@
                 cutoffHours = hours;
                 cutoffMinutes = minutes;
                 earlyRoles = Array.isArray(qrEarlyRoles) ? qrEarlyRoles : [];
+                console.log('calculateLateStatus - Parsed cutoffTime:', cutoffTime, 'earlyRoles:', earlyRoles); // Debug
             } catch (error) {
                 console.error('Error parsing QR config:', error);
                 throw new Error(`Failed to parse QR config: ${error.message}`);
@@ -3996,6 +3998,7 @@
                 // Standard deadline
                 deadline.setHours(cutoffHours, cutoffMinutes, 0, 0);
             }
+            console.log('Calculated deadline:', deadline.toISOString()); // Debug: Log deadline
 
             // Calculate minutes late
             const lateMinutes = Math.floor((recordTime - deadline) / (1000 * 60));
@@ -4295,19 +4298,31 @@
                 // Decode QR code pattern
                 let qrConfig = null;
                 try {
-                    const patternParts = decodedText.split('-');
-                    if (patternParts.length >= 4) {
-                        const base64Config = patternParts[patternParts.length - 1];
-                        qrConfig = JSON.parse(atob(base64Config));
-                        if (!qrConfig.cutoffTime || !Array.isArray(qrConfig.earlyRoles)) {
-                            throw new Error('Invalid QR config: missing cutoffTime or earlyRoles');
-                        }
-                    } else {
-                        throw new Error('Invalid QR code format: insufficient parts');
+                    if (!decodedText || typeof decodedText !== 'string') {
+                        throw new Error('QR code text is empty or invalid');
                     }
+                    console.log('Decoded QR text:', decodedText); // Debug: Log raw QR code
+                    const patternParts = decodedText.split('-');
+                    if (patternParts.length < 4) {
+                        throw new Error('Invalid QR code format: must have at least 4 parts');
+                    }
+                    const base64Config = patternParts[patternParts.length - 1];
+                    console.log('Base64 config:', base64Config); // Debug: Log base64 part
+                    let decodedConfig;
+                    try {
+                        decodedConfig = atob(base64Config);
+                        console.log('Decoded config:', decodedConfig); // Debug: Log decoded string
+                    } catch (error) {
+                        throw new Error('Failed to decode base64 config: ' + error.message);
+                    }
+                    qrConfig = JSON.parse(decodedConfig);
+                    if (!qrConfig.cutoffTime || !Array.isArray(qrConfig.earlyRoles)) {
+                        throw new Error('Invalid QR config: missing cutoffTime or earlyRoles');
+                    }
+                    console.log('Parsed qrConfig:', qrConfig); // Debug: Log final config
                 } catch (error) {
                     console.error('Error decoding QR code:', error);
-                    showScanResult('Invalid QR code format: ' + error.message, false);
+                    showScanResult('Invalid QR code: ' + error.message, false);
                     stopScanner();
                     return;
                 }
@@ -4580,12 +4595,24 @@
 
         // Function to generate a random pattern
         function generateRandomPattern() {
-            const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-            let result = '';
-            for (let i = 0; i < 20; i++) {
-                result += characters.charAt(Math.floor(Math.random() * characters.length));
+            const timestamp = new Date().getTime();
+            const uuid = generateUUID();
+            const random = Math.random().toString(36).substring(2);
+            const cutoffTime = document.getElementById('cutoff-time').value;
+            const earlyRoles = Array.from(document.querySelectorAll('input[name="early-roles"]:checked'))
+                .map(input => input.value);
+            const configData = { cutoffTime, earlyRoles };
+            try {
+                const base64Config = btoa(JSON.stringify(configData));
+                const pattern = `${timestamp}-${uuid}-${random}-${base64Config}`;
+                console.log('Generated QR pattern:', pattern); // Debug: Log pattern
+                console.log('Config data:', configData); // Debug: Log config
+                return pattern;
+            } catch (error) {
+                console.error('Error generating QR pattern:', error);
+                alert('Failed to generate QR code: Invalid configuration.');
+                return null; // Prevent QR code generation
             }
-            return result;
         }
 
         // Function to create QR code window content
@@ -4715,12 +4742,26 @@
                         const cutoffTime = document.getElementById('cutoff-time').value;
                         const earlyRoles = Array.from(document.querySelectorAll('input[name="early-roles"]:checked'))
                             .map(input => input.value);
-                        const configData = JSON.stringify({ cutoffTime, earlyRoles });
-                        return \`\${timestamp}-\${uuid}-\${random}-\${btoa(configData)}\`;
+                        const configData = { cutoffTime, earlyRoles };
+                        try {
+                            const base64Config = btoa(JSON.stringify(configData));
+                            const pattern = \`\${timestamp}-\${uuid}-\${random}-\${base64Config}\`;
+                            console.log('Generated QR pattern:', pattern); // Debug
+                            console.log('Config data:', configData); // Debug
+                            return pattern;
+                        } catch (error) {
+                            console.error('Error generating QR pattern:', error);
+                            alert('Failed to generate QR code: Invalid configuration.');
+                            return null;
+                        }
                     }
 
                     function updateQRCode() {
                         const pattern = generateRandomPattern();
+                        if (!pattern) {
+                            console.error('Failed to update QR code: Invalid pattern');
+                            return;
+                        }
                         if (previousPatterns.has(pattern)) {
                             console.log('Pattern collision detected, generating new pattern');
                             return updateQRCode();
@@ -4736,15 +4777,63 @@
                         const qrContainer = document.getElementById('qr-code');
                         qrContainer.innerHTML = qr.createImgTag(12);
                         qrContainer.style.display = 'block';
-                        console.log('Generated new pattern:', pattern);
+                        console.log('Generated new QR code with pattern:', pattern);
                     }
 
                     window.generateQRCode = function() {
+                        const cutoffTimeInput = document.getElementById('cutoff-time').value;
+                        console.log('Cutoff time input:', cutoffTimeInput); // Debug
+                        const earlyRolesInputs = document.querySelectorAll('input[name="early-roles"]:checked');
+                        const earlyRoles = Array.from(earlyRolesInputs).map(input => input.value);
+
+                        // Validate cutoffTime
+                        if (!cutoffTimeInput) {
+                            alert('Please set a valid cutoff time.');
+                            return;
+                        }
+
+                        // Normalize and validate cutoffTime
+                        let normalizedCutoffTime = cutoffTimeInput;
+                        // Handle browser variations (e.g., "9:30" or "09:30:00")
+                        const timeParts = cutoffTimeInput.split(':');
+                        if (timeParts.length >= 2) {
+                            const hours = parseInt(timeParts[0], 10);
+                            const minutes = parseInt(timeParts[1], 10);
+                            if (isNaN(hours) || isNaN(minutes) || hours > 23 || minutes > 59) {
+                                alert('Cutoff time must be in HH:MM format (00:00–23:59).');
+                                return;
+                            }
+                            normalizedCutoffTime = \`\${String(hours).padStart(2, '0')}:\${String(minutes).padStart(2, '0')}\`;
+                        } else {
+                            alert('Cutoff time must be in HH:MM format (00:00–23:59).');
+                            return;
+                        }
+                        console.log('Normalized cutoff time:', normalizedCutoffTime); // Debug
+
+                        // Optional: Require at least one early role
+                        // if (earlyRoles.length === 0) {
+                        //     alert('Please select at least one early role.');
+                        //     return;
+                        // }
+
+                        // Update cutoff-time input to normalized value
+                        document.getElementById('cutoff-time').value = normalizedCutoffTime;
+
+                        // Proceed with QR code generation
                         updateQRCode();
                         // Update QR code every 7 seconds
                         clearInterval(window.qrInterval);
                         window.qrInterval = setInterval(updateQRCode, 7000);
                     };
+
+                    // Ensure default value is applied on load
+                    document.addEventListener('DOMContentLoaded', () => {
+                        const cutoffTimeInput = document.getElementById('cutoff-time');
+                        if (!cutoffTimeInput.value) {
+                            cutoffTimeInput.value = '09:30';
+                        }
+                        console.log('Initial cutoff time:', cutoffTimeInput.value); // Debug
+                    });
 
                     // Update time every second
                     setInterval(updateTime, 1000);
