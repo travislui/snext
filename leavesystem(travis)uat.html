@@ -3971,21 +3971,27 @@
             let earlyRoles = [];
 
             // Parse QR config if provided
-            if (qrConfig) {
+            if (qrConfig && typeof qrConfig === 'object') {
                 try {
                     const { cutoffTime, earlyRoles: qrEarlyRoles } = qrConfig;
-                    if (cutoffTime) {
+                    if (cutoffTime && typeof cutoffTime === 'string') {
                         const [hours, minutes] = cutoffTime.split(':').map(Number);
                         if (!isNaN(hours) && !isNaN(minutes)) {
                             cutoffHours = hours;
                             cutoffMinutes = minutes;
+                        } else {
+                            console.warn('Invalid cutoffTime format:', cutoffTime);
                         }
+                    } else {
+                        console.warn('cutoffTime is missing or invalid in qrConfig:', qrConfig);
                     }
-                    earlyRoles = qrEarlyRoles || [];
+                    earlyRoles = Array.isArray(qrEarlyRoles) ? qrEarlyRoles : [];
                 } catch (error) {
                     console.error('Error parsing QR config:', error);
                     // Fallback to default values
                 }
+            } else {
+                console.warn('qrConfig is null or not an object:', qrConfig);
             }
 
             // Set deadline based on role and QR config
