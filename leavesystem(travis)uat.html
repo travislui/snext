@@ -3961,48 +3961,24 @@
         }        
 
         // Update the calculateLateStatus function to ensure consistent penalty amounts
-        function calculateLateStatus(timestamp, role, qrConfig = null) {
+        function calculateLateStatus(timestamp, role, cutoffTime, earlyRoles) {
             const recordTime = new Date(timestamp);
-            const deadline = new Date(recordTime); // Same date as recordTime
-
-            // Validate QR config
-            let cutoffHours, cutoffMinutes, earlyRoles;
-            if (!qrConfig || typeof qrConfig !== 'object') {
-                console.error('qrConfig validation failed:', qrConfig); // Debug: Log qrConfig
-                throw new Error('Invalid QR config: qrConfig is missing or not an object');
-            }
-
-            try {
-                const { cutoffTime, earlyRoles: qrEarlyRoles } = qrConfig;
-                if (!cutoffTime || typeof cutoffTime !== 'string') {
-                    throw new Error('Invalid QR config: cutoffTime is missing or invalid');
-                }
-                const [hours, minutes] = cutoffTime.split(':').map(Number);
-                if (isNaN(hours) || isNaN(minutes)) {
-                    throw new Error('Invalid cutoffTime format: must be HH:MM');
-                }
-                cutoffHours = hours;
-                cutoffMinutes = minutes;
-                earlyRoles = Array.isArray(qrEarlyRoles) ? qrEarlyRoles : [];
-                console.log('calculateLateStatus - Parsed cutoffTime:', cutoffTime, 'earlyRoles:', earlyRoles); // Debug
-            } catch (error) {
-                console.error('Error parsing QR config:', error);
-                throw new Error(`Failed to parse QR config: ${error.message}`);
-            }
-
-            // Set deadline based on role and QR config
+            
+            // Parse admin-set cutoff time (format: "HH:MM")
+            const [cutoffHours, cutoffMinutes] = cutoffTime.split(':').map(Number);
+            
+            // Set deadline based on admin's cutoff time
+            const deadline = new Date(recordTime);
+            deadline.setHours(cutoffHours, cutoffMinutes, 0, 0);
+            
+            // Adjust deadline for roles requiring early arrival (10 minutes earlier)
             if (earlyRoles.includes(role)) {
-                // Roles requiring early arrival (10 minutes before cutoff)
-                deadline.setHours(cutoffHours, cutoffMinutes - 10, 0, 0);
-            } else {
-                // Standard deadline
-                deadline.setHours(cutoffHours, cutoffMinutes, 0, 0);
+                deadline.setMinutes(deadline.getMinutes() - 10);
             }
-            console.log('Calculated deadline:', deadline.toISOString()); // Debug: Log deadline
-
+            
             // Calculate minutes late
             const lateMinutes = Math.floor((recordTime - deadline) / (1000 * 60));
-
+            
             let status = '';
             let amount = 0;
 
@@ -4010,7 +3986,7 @@
                 status = 'Punctual';
                 amount = 0;
             } else {
-                if (lateMinutes >= 60) { // 1 hour or more (No Show)
+                if (lateMinutes >= 60) { // 1 hours or more (No Show)
                     status = 'No Show';
                     amount = 200;
                 } else if (lateMinutes <= 5) {
@@ -4106,23 +4082,21 @@
 
                         const row = document.createElement('tr');
                         row.innerHTML = `
-                            <td class="px-6 py-4">${record.employeeName || 'N/A'}</td>
-                            <td class="px-6 py-4">${record.role || 'N/A'}</td>
-                            <td class="px-6 py-4">
-                                ${formatDate(recordDate)} ${formatTime(recordDate)}
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm font-medium text-gray-900">
+                                    ${currentUser.name}
+                                </div>
                             </td>
-                            <td class="px-6 py-4">
-                                <span class="status-badge ${record.status?.toLowerCase() || 'unknown'}">
-                                    ${record.status || 'N/A'}
-                                    ${record.amount > 0 ? ` (-$${record.amount})` : ''}
-                                    ${record.deadline ? ` (Deadline: ${record.deadline})` : ''}
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm text-gray-900">
+                                    ${formatDate(recordTime)} ${formatTime(recordTime)}
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="status-badge ${todayRecord.status.toLowerCase()}">
+                                    ${todayRecord.status}
+                                    ${todayRecord.amount > 0 ? ` (-$${todayRecord.amount})` : ''}
                                 </span>
-                            </td>
-                            <td class="px-6 py-4">${record.ipAddress || 'N/A'}</td>
-                            <td class="px-6 py-4">
-                                <button class="remove-btn-small" onclick="removeAttendanceRecord('${record.id}')">
-                                    Remove
-                                </button>
                             </td>
                         `;
                         agentTableBody.appendChild(row);
@@ -4279,6 +4253,7 @@
                 
                 let existingRecord = false;
                 
+                // Check if there's already a record for this employee on this date
                 todaySnapshot.forEach(childSnapshot => {
                     const record = childSnapshot.val();
                     if (record.employeeId === employeeId) {
@@ -4295,45 +4270,13 @@
                     return;
                 }
 
-                // Decode QR code pattern
-                let qrConfig = null;
-                try {
-                    if (!decodedText || typeof decodedText !== 'string') {
-                        throw new Error('QR code text is empty or invalid');
-                    }
-                    console.log('Decoded QR text:', decodedText); // Debug: Log raw QR code
-                    const patternParts = decodedText.split('-');
-                    if (patternParts.length < 4) {
-                        throw new Error('Invalid QR code format: must have at least 4 parts');
-                    }
-                    const base64Config = patternParts[patternParts.length - 1];
-                    console.log('Base64 config:', base64Config); // Debug: Log base64 part
-                    let decodedConfig;
-                    try {
-                        decodedConfig = atob(base64Config);
-                        console.log('Decoded config:', decodedConfig); // Debug: Log decoded string
-                    } catch (error) {
-                        throw new Error('Failed to decode base64 config: ' + error.message);
-                    }
-                    qrConfig = JSON.parse(decodedConfig);
-                    if (!qrConfig.cutoffTime || !Array.isArray(qrConfig.earlyRoles)) {
-                        throw new Error('Invalid QR config: missing cutoffTime or earlyRoles');
-                    }
-                    console.log('Parsed qrConfig:', qrConfig); // Debug: Log final config
-                } catch (error) {
-                    console.error('Error decoding QR code:', error);
-                    showScanResult('Invalid QR code: ' + error.message, false);
-                    stopScanner();
-                    return;
-                }
-
                 // Get user's IP address
                 const ipResponse = await fetch('https://api.ipify.org?format=json');
                 const ipData = await ipResponse.json();
                 const ipAddress = ipData.ip;
 
-                // Calculate late status with QR config
-                const lateInfo = calculateLateStatus(now.toISOString(), employeeData.role, qrConfig);
+                // Calculate late status
+                const lateInfo = calculateLateStatus(now.toISOString(), employeeData.role);
 
                 // Create attendance record
                 const attendanceData = {
@@ -4346,8 +4289,7 @@
                     status: lateInfo.status,
                     lateMinutes: lateInfo.lateMinutes,
                     amount: lateInfo.amount,
-                    ipAddress: ipAddress,
-                    qrConfig: qrConfig // Optional: Store QR config for reference
+                    ipAddress: ipAddress
                 };
 
                 // Save to Firebase
@@ -4359,8 +4301,10 @@
                 // Stop the scanner
                 stopScanner();
                 
-                // Manually update the UI
+                // Important: Manually update the UI once without relying on listeners
+                // This avoids duplicate rendering
                 setTimeout(() => {
+                    // Force a manual update of the attendance table to show the new record
                     updateAttendanceTable();
                 }, 1000);
 
@@ -4595,24 +4539,12 @@
 
         // Function to generate a random pattern
         function generateRandomPattern() {
-            const timestamp = new Date().getTime();
-            const uuid = generateUUID();
-            const random = Math.random().toString(36).substring(2);
-            const cutoffTime = document.getElementById('cutoff-time').value;
-            const earlyRoles = Array.from(document.querySelectorAll('input[name="early-roles"]:checked'))
-                .map(input => input.value);
-            const configData = { cutoffTime, earlyRoles };
-            try {
-                const base64Config = btoa(JSON.stringify(configData));
-                const pattern = `${timestamp}-${uuid}-${random}-${base64Config}`;
-                console.log('Generated QR pattern:', pattern); // Debug: Log pattern
-                console.log('Config data:', configData); // Debug: Log config
-                return pattern;
-            } catch (error) {
-                console.error('Error generating QR pattern:', error);
-                alert('Failed to generate QR code: Invalid configuration.');
-                return null; // Prevent QR code generation
+            const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+            let result = '';
+            for (let i = 0; i < 20; i++) {
+                result += characters.charAt(Math.floor(Math.random() * characters.length));
             }
+            return result;
         }
 
         // Function to create QR code window content
@@ -4694,6 +4626,11 @@
                     #config-form button:hover {
                         background-color: #45a049;
                     }
+                    #config-result {
+                        font-size: 18px;
+                        color: #333;
+                        margin-top: 20px;
+                    }
                 </style>
             </head>
             <body>
@@ -4713,11 +4650,13 @@
                         <button onclick="generateQRCode()">Generate QR Code</button>
                     </div>
                     <div id="qr-code" style="display: none;"></div>
+                    <div id="config-result"></div>
                     <div id="current-time"></div>
                 </div>
                 <script>
                     let previousPatterns = new Set();
                     const timeDisplay = document.getElementById('current-time');
+                    const resultDisplay = document.getElementById('config-result');
                     
                     function updateTime() {
                         const now = new Date();
@@ -4794,7 +4733,6 @@
 
                         // Normalize and validate cutoffTime
                         let normalizedCutoffTime = cutoffTimeInput;
-                        // Handle browser variations (e.g., "9:30" or "09:30:00")
                         const timeParts = cutoffTimeInput.split(':');
                         if (timeParts.length >= 2) {
                             const hours = parseInt(timeParts[0], 10);
@@ -4810,14 +4748,14 @@
                         }
                         console.log('Normalized cutoff time:', normalizedCutoffTime); // Debug
 
-                        // Optional: Require at least one early role
-                        // if (earlyRoles.length === 0) {
-                        //     alert('Please select at least one early role.');
-                        //     return;
-                        // }
-
                         // Update cutoff-time input to normalized value
                         document.getElementById('cutoff-time').value = normalizedCutoffTime;
+
+                        // Display configuration results
+                        resultDisplay.innerHTML = \`
+                            <div>Cutoff Time: \${normalizedCutoffTime}</div>
+                            <div>Early Arrival Roles: \${earlyRoles.length > 0 ? earlyRoles.join(', ') : 'None'}</div>
+                        \`;
 
                         // Proceed with QR code generation
                         updateQRCode();
