@@ -4475,6 +4475,8 @@
         // Modify your onScanSuccess function to update the table
         async function onScanSuccess(decodedText, decodedResult) {
             try {
+                console.log('Scanned QR pattern:', decodedText); // Debug: Log the raw QR pattern
+
                 const user = auth.currentUser;
                 if (!user) {
                     throw new Error('You must be logged in to take attendance');
@@ -4497,22 +4499,31 @@
                 }
 
                 // Decode QR code pattern to extract cutoffTime and earlyRoles
-                const parts = decodedText.split('-');
-                if (parts.length < 4) {
-                    throw new Error('Invalid QR code pattern format');
-                }
-                const base64Config = parts[parts.length - 1];
-                let configData;
-                try {
-                    configData = JSON.parse(atob(base64Config));
-                } catch (error) {
-                    console.error('Error decoding QR config:', error);
-                    throw new Error('Invalid QR code configuration');
-                }
-
-                const { cutoffTime, earlyRoles } = configData;
-                if (!cutoffTime || !Array.isArray(earlyRoles)) {
-                    throw new Error('Invalid QR configuration: cutoffTime or earlyRoles missing');
+                let cutoffTime, earlyRoles;
+                if (decodedText.includes('-')) {
+                    // Assume pattern is from createQRWindowContent (timestamp-uuid-random-base64Config)
+                    const parts = decodedText.split('-');
+                    if (parts.length < 4) {
+                        throw new Error('Invalid QR code pattern format: Expected timestamp-uuid-random-base64Config');
+                    }
+                    const base64Config = parts[parts.length - 1];
+                    try {
+                        const configData = JSON.parse(atob(base64Config));
+                        console.log('Decoded QR config:', configData); // Debug: Log decoded config
+                        cutoffTime = configData.cutoffTime;
+                        earlyRoles = configData.earlyRoles;
+                        if (!cutoffTime || !Array.isArray(earlyRoles)) {
+                            throw new Error('Invalid QR configuration: cutoffTime or earlyRoles missing');
+                        }
+                    } catch (error) {
+                        console.error('Error decoding QR config:', error);
+                        throw new Error('Invalid QR code configuration: Failed to decode config');
+                    }
+                } else {
+                    // Handle case where QR code is a random string (from simple generateRandomPattern)
+                    console.warn('QR code appears to be a random string, using default cutoffTime and empty earlyRoles');
+                    cutoffTime = '09:30'; // Fallback default
+                    earlyRoles = [];
                 }
 
                 // Get current date and time
@@ -4525,7 +4536,6 @@
                 
                 let existingRecord = false;
                 
-                // Check if there's already a record for this employee on this date
                 todaySnapshot.forEach(childSnapshot => {
                     const record = childSnapshot.val();
                     if (record.employeeId === employeeId) {
@@ -4562,8 +4572,8 @@
                     lateMinutes: lateInfo.lateMinutes,
                     amount: lateInfo.amount,
                     ipAddress: ipAddress,
-                    cutoffTime: cutoffTime, // Optional: store for reference
-                    earlyRoles: earlyRoles // Optional: store for reference
+                    cutoffTime: cutoffTime,
+                    earlyRoles: earlyRoles
                 };
 
                 // Save to Firebase
@@ -4575,10 +4585,8 @@
                 // Stop the scanner
                 stopScanner();
                 
-                // Important: Manually update the UI once without relying on listeners
-                // This avoids duplicate rendering
+                // Manually update the UI
                 setTimeout(() => {
-                    // Force a manual update of the attendance table to show the new record
                     updateAttendanceTable();
                 }, 1000);
 
