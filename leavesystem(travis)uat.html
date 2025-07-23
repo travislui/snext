@@ -4203,17 +4203,29 @@
 
         // Update the calculateLateStatus function to ensure consistent penalty amounts
         function calculateLateStatus(timestamp, role, cutoffTime, earlyRoles) {
+            // Validate cutoffTime
+            if (!cutoffTime || typeof cutoffTime !== 'string' || !cutoffTime.includes(':')) {
+                console.error('Invalid cutoffTime:', cutoffTime);
+                throw new Error('cutoffTime must be a valid string in HH:MM format');
+            }
+
             const recordTime = new Date(timestamp);
             
             // Parse admin-set cutoff time (format: "HH:MM")
             const [cutoffHours, cutoffMinutes] = cutoffTime.split(':').map(Number);
+            
+            // Validate parsed time
+            if (isNaN(cutoffHours) || isNaN(cutoffMinutes) || cutoffHours > 23 || cutoffMinutes > 59) {
+                console.error('Invalid cutoffTime format:', cutoffTime);
+                throw new Error('cutoffTime must be in HH:MM format (00:00–23:59)');
+            }
             
             // Set deadline based on admin's cutoff time
             const deadline = new Date(recordTime);
             deadline.setHours(cutoffHours, cutoffMinutes, 0, 0);
             
             // Adjust deadline for roles requiring early arrival (10 minutes earlier)
-            if (earlyRoles.includes(role)) {
+            if (Array.isArray(earlyRoles) && earlyRoles.includes(role)) {
                 deadline.setMinutes(deadline.getMinutes() - 10);
             }
             
@@ -4227,7 +4239,7 @@
                 status = 'Punctual';
                 amount = 0;
             } else {
-                if (lateMinutes >= 60) { // 1 hours or more (No Show)
+                if (lateMinutes >= 60) { // 1 hour or more (No Show)
                     status = 'No Show';
                     amount = 200;
                 } else if (lateMinutes <= 5) {
@@ -4484,6 +4496,25 @@
                     throw new Error('Employee not found');
                 }
 
+                // Decode QR code pattern to extract cutoffTime and earlyRoles
+                const parts = decodedText.split('-');
+                if (parts.length < 4) {
+                    throw new Error('Invalid QR code pattern format');
+                }
+                const base64Config = parts[parts.length - 1];
+                let configData;
+                try {
+                    configData = JSON.parse(atob(base64Config));
+                } catch (error) {
+                    console.error('Error decoding QR config:', error);
+                    throw new Error('Invalid QR code configuration');
+                }
+
+                const { cutoffTime, earlyRoles } = configData;
+                if (!cutoffTime || !Array.isArray(earlyRoles)) {
+                    throw new Error('Invalid QR configuration: cutoffTime or earlyRoles missing');
+                }
+
                 // Get current date and time
                 const now = new Date();
                 const currentDate = formatDate(now);
@@ -4516,8 +4547,8 @@
                 const ipData = await ipResponse.json();
                 const ipAddress = ipData.ip;
 
-                // Calculate late status
-                const lateInfo = calculateLateStatus(now.toISOString(), employeeData.role);
+                // Calculate late status with decoded cutoffTime and earlyRoles
+                const lateInfo = calculateLateStatus(now.toISOString(), employeeData.role, cutoffTime, earlyRoles);
 
                 // Create attendance record
                 const attendanceData = {
@@ -4530,7 +4561,9 @@
                     status: lateInfo.status,
                     lateMinutes: lateInfo.lateMinutes,
                     amount: lateInfo.amount,
-                    ipAddress: ipAddress
+                    ipAddress: ipAddress,
+                    cutoffTime: cutoffTime, // Optional: store for reference
+                    earlyRoles: earlyRoles // Optional: store for reference
                 };
 
                 // Save to Firebase
