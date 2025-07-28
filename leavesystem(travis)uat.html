@@ -2422,6 +2422,7 @@
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date & Time</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Calculation</th>
                     </tr>
                 </thead>
                 <tbody id="attendanceTableBody" class="bg-white divide-y divide-gray-200">
@@ -4106,6 +4107,7 @@
                                     ${todayRecord.amount > 0 ? ` (-$${todayRecord.amount})` : ''}
                                 </span>
                             </td>
+                            <td class="px-6 py-4 whitespace-nowrap">${calculationStr}</td>
                         `;
                         agentTableBody.appendChild(row);
                     } else {
