@@ -3965,7 +3965,7 @@
             const recordTime = new Date(timestamp);
 
             if (!Array.isArray(cutoffTimeArray) || cutoffTimeArray.length < 2) {
-                cutoffTimeArray = [9, 30, 0, 0];
+                cutoffTimeArray = [];
             }
 
             let [hour, minute, second = 0, ms = 0] = cutoffTimeArray;
@@ -4272,7 +4272,7 @@
                 const parts = decodedText.split('-');
                 const configEncoded = parts[3];
 
-                let cutoffTimeArray = [9, 30, 0, 0]; // fallback
+                let cutoffTimeArray = []; // fallback
                 let earlyRoles = [];
 
                 try {
