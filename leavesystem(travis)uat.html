@@ -2422,7 +2422,9 @@
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date & Time</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Calculation</th>
+                        
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Deadline</th>
+
                     </tr>
                 </thead>
                 <tbody id="attendanceTableBody" class="bg-white divide-y divide-gray-200">
@@ -4090,12 +4092,6 @@
                         const recordTime = new Date(todayRecord.timestamp);
                         const row = document.createElement('tr');
 
-
-                        const recordTimeStr = recordTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                        const deadlineStr = deadline.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                        const calculationStr = `(${recordTimeStr} - ${deadlineStr}) / 60 = ${lateMinutes} mins`;
-
-
                         row.innerHTML = `
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="text-sm font-medium text-gray-900">
@@ -4113,7 +4109,6 @@
                                     ${todayRecord.amount > 0 ? ` (-$${todayRecord.amount})` : ''}
                                 </span>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap">${calculationStr}</td>
                         `;
                         agentTableBody.appendChild(row);
                     } else {
@@ -4205,6 +4200,8 @@
                             const row = document.createElement('tr');
                             const recordDate = new Date(record.timestamp);
                             
+                            const deadlineStr = deadline.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
                             row.innerHTML = `
                                 <td class="px-6 py-4">${record.employeeName || 'N/A'}</td>
                                 <td class="px-6 py-4">${record.role || 'N/A'}</td>
@@ -4218,6 +4215,7 @@
                                     </span>
                                 </td>
                                 <td class="px-6 py-4">${record.ipAddress || 'N/A'}</td>
+                                <td class="px-6 py-4 whitespace-nowrap">${deadlineStr}</td>
                                 <td class="px-6 py-4">
                                     <button class="remove-btn-small" onclick="removeAttendanceRecord('${record.id}')">
                                         Remove
