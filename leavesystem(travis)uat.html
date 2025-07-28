@@ -3962,24 +3962,21 @@
 
         // Update the calculateLateStatus function to ensure consistent penalty amounts
         function calculateLateStatus(timestamp, role, cutoffTimeArray, earlyRoles = []) {
-            const recordTime = new Date(timestamp);
-
-            // Default fallback
             if (!Array.isArray(cutoffTimeArray) || cutoffTimeArray.length < 2) {
-                cutoffTimeArray = [9, 30, 0, 0];
+                cutoffTimeArray = [9, 30, 0, 0]; // fallback
             }
 
             let [hour, minute, second = 0, ms = 0] = cutoffTimeArray;
 
-            // Apply early arrival rule
             if (earlyRoles.includes(role)) {
                 const totalMinutes = hour * 60 + minute - 10;
                 hour = Math.floor(totalMinutes / 60);
                 minute = totalMinutes % 60;
             }
 
-            const deadline = new Date(recordTime);
+            const deadline = new Date(timestamp);
             deadline.setHours(hour, minute, second, ms);
+
 
             const lateMinutes = Math.floor((recordTime - deadline) / (1000 * 60));
 
@@ -4272,15 +4269,19 @@
                 const parts = decodedText.split('-');
                 const configEncoded = parts[3];
 
-                const config = JSON.parse(atob(configEncoded));
-                const cutoffTimeArray = config.cutoffTime || [9, 30, 0, 0];
-                const earlyRoles = config.earlyRoles || [];
+                let cutoffTimeArray = [9, 30, 0, 0]; // fallback
+                let earlyRoles = [];
 
+                try {
+                    const config = JSON.parse(atob(configEncoded));
+                    cutoffTimeArray = config.cutoffTime || cutoffTimeArray;
+                    earlyRoles = config.earlyRoles || [];
+                } catch (e) {
+                    console.error('Failed to decode config:', e);
+                }
 
                 // Calculate late status
-                
                 const lateInfo = calculateLateStatus(now.toISOString(), employeeData.role, cutoffTimeArray, earlyRoles);
-
 
                 // Create attendance record
                 const attendanceData = {
@@ -4676,19 +4677,17 @@
                             const timestamp = new Date().getTime();
                             const uuid = generateUUID();
                             const random = Math.random().toString(36).substring(2);
-
-                            
                             const earlyRoles = Array.from(document.querySelectorAll('input[name="early-roles"]:checked'))
                                 .map(input => input.value);
 
                             
                             const cutoffTimeStr = document.getElementById('cutoff-time').value || '09:30';
                             const [hour, minute] = cutoffTimeStr.split(':').map(Number);
-                            const cutoffTime = [hour, minute, 0, 0]; // [hour, minute, second, ms]
+                            const cutoffTime = [hour, minute, 0, 0]; // Format: [hour, minute, second, ms]
 
                             const configData = JSON.stringify({ cutoffTime, earlyRoles });
-
                             return \`\${timestamp}-\${uuid}-\${random}-\${btoa(configData)}\`;
+
                         }
 
                         function updateQRCode() {
