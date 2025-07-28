@@ -3964,12 +3964,15 @@
         function calculateLateStatus(timestamp, role, cutoffTimeArray, earlyRoles = []) {
             const recordTime = new Date(timestamp);
 
-            if (!Array.isArray(cutoffTimeArray) || cutoffTimeArray.length < 2) {
-                cutoffTimeArray = [];
+            // Validate cutoffTimeArray from QR config
+            if (!Array.isArray(cutoffTimeArray) || cutoffTimeArray.length < 2 || cutoffTimeArray.some(isNaN)) {
+                console.warn('Invalid cutoffTimeArray received. Using default [9, 30, 0, 0]');
+                cutoffTimeArray = [9, 30, 0, 0]; // fallback default
             }
 
             let [hour, minute, second = 0, ms = 0] = cutoffTimeArray;
 
+            // Adjust for early roles (10 minutes earlier)
             if (earlyRoles.includes(role)) {
                 const totalMinutes = hour * 60 + minute - 10;
                 hour = Math.floor(totalMinutes / 60);
@@ -3979,9 +3982,18 @@
             const deadline = new Date(recordTime);
             deadline.setHours(hour, minute, second, ms);
 
-            // Calculate lateness
-            const lateMinutes = Math.floor((recordTime - deadline) / (1000 * 60));
+            // Validate deadline and recordTime
+            if (isNaN(recordTime.getTime()) || isNaN(deadline.getTime())) {
+                console.error('Invalid date objects in lateness calculation');
+                return {
+                    status: 'Invalid Time',
+                    amount: 0,
+                    lateMinutes: 0,
+                    deadline: 'Invalid'
+                };
+            }
 
+            const lateMinutes = Math.floor((recordTime - deadline) / (1000 * 60));
             let status = '';
             let amount = 0;
 
@@ -4025,6 +4037,7 @@
                 deadline: deadline.toTimeString().substring(0, 5)
             };
         }
+
 
 
         async function updateAttendanceTable() {
@@ -4277,14 +4290,25 @@
 
                 try {
                     const config = JSON.parse(atob(configEncoded));
-                    cutoffTimeArray = config.cutoffTime || cutoffTimeArray;
-                    earlyRoles = config.earlyRoles || [];
+                    
+                    if (Array.isArray(config.cutoffTime) && config.cutoffTime.length >= 2 && config.cutoffTime.every(n => typeof n === 'number' && !isNaN(n))) {
+                        cutoffTimeArray = config.cutoffTime;
+                    } else {
+                        throw new Error('Invalid cutoffTime in QR config');
+                    }
 
-                    // ✅ Debug log
+                    if (Array.isArray(config.earlyRoles)) {
+                        earlyRoles = config.earlyRoles;
+                    }
+
                     console.log('Decoded config from QR:', { cutoffTimeArray, earlyRoles });
                 } catch (e) {
                     console.error('Failed to decode config:', e);
+                    showScanResult('Invalid QR code configuration', false);
+                    stopScanner();
+                    return;
                 }
+
 
                 // Calculate late status
                 const lateInfo = calculateLateStatus(now.toISOString(), employeeData.role, cutoffTimeArray, earlyRoles);
@@ -4679,12 +4703,15 @@
                         }
 
 
-                        function generateRandomPattern() {
-                            const timestamp = new Date().getTime();
-                            const uuid = generateUUID();
-                            const random = Math.random().toString(36).substring(2);
 
-                            const cutoffTimeStr = document.getElementById('cutoff-time').value || '09:30';
+                        function generateRandomPattern() {
+                            const cutoffTimeStr = document.getElementById('cutoff-time').value;
+
+                            if (!cutoffTimeStr || !/^\d{2}:\d{2}$/.test(cutoffTimeStr)) {
+                                alert('Please set a valid cutoff time before generating the QR code.');
+                                throw new Error('Cutoff time not set or invalid');
+                            }
+
                             const [hour, minute] = cutoffTimeStr.split(':').map(Number);
                             const cutoffTime = [hour, minute, 0, 0];
 
@@ -4693,8 +4720,12 @@
 
                             const configData = JSON.stringify({ cutoffTime, earlyRoles });
 
-                            // ✅ Debug log
+                            const timestamp = new Date().getTime();
+                            const uuid = generateUUID();
+                            const random = Math.random().toString(36).substring(2);
+
                             console.log('Encoding config into QR:', { cutoffTime, earlyRoles });
+
 
                             return \`\${timestamp}-\${uuid}-\${random}-\${btoa(configData)}\`;
                         }
