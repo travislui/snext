@@ -3962,22 +3962,28 @@
 
         // Update the calculateLateStatus function to ensure consistent penalty amounts
         function calculateLateStatus(timestamp, role, cutoffTimeArray, earlyRoles = []) {
+            // Parse timestamp into a Date object
+            const recordTime = new Date(timestamp);
+
+            // Fallback if cutoffTimeArray is invalid
             if (!Array.isArray(cutoffTimeArray) || cutoffTimeArray.length < 2) {
-                cutoffTimeArray = [9, 30, 0, 0]; // fallback
+                cutoffTimeArray = [9, 30, 0, 0]; // default to 09:30:00.000
             }
 
             let [hour, minute, second = 0, ms = 0] = cutoffTimeArray;
 
+            // Apply early arrival rule
             if (earlyRoles.includes(role)) {
                 const totalMinutes = hour * 60 + minute - 10;
                 hour = Math.floor(totalMinutes / 60);
                 minute = totalMinutes % 60;
             }
 
-            const deadline = new Date(timestamp);
+            // Create deadline time
+            const deadline = new Date(recordTime);
             deadline.setHours(hour, minute, second, ms);
 
-
+            // Calculate lateness
             const lateMinutes = Math.floor((recordTime - deadline) / (1000 * 60));
 
             let status = '';
@@ -4004,6 +4010,7 @@
                     amount = 100;
                 }
 
+                // Apply role multiplier
                 switch (role) {
                     case 'AUM/UM': amount *= 1.5; break;
                     case 'SUM': amount *= 2; break;
