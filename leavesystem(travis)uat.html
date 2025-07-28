@@ -3960,278 +3960,25 @@
             }
         }        
 
-        // Function to create QR code window content
-        function createQRWindowContent() {
-            return `
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>Attendance QR Code</title>
-                <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"><\/script>
-                <style>
-                    body {
-                        display: flex;
-                        flex-direction: column;
-                        align-items: center;
-                        justify-content: center;
-                        min-height: 100vh;
-                        margin: 0;
-                        background-color: #f0f0f0;
-                        font-family: Arial, sans-serif;
-                    }
-                    #qr-container {
-                        background: white;
-                        padding: 40px;
-                        border-radius: 20px;
-                        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-                        text-align: center;
-                    }
-                    #qr-code {
-                        margin-bottom: 30px;
-                    }
-                    #qr-code img {
-                        width: 400px;
-                        height: 400px;
-                    }
-                    #current-time {
-                        font-size: 48px;
-                        color: #333;
-                        margin-top: 20px;
-                        font-weight: bold;
-                    }
-                    .title {
-                        font-size: 36px;
-                        color: #333;
-                        margin-bottom: 30px;
-                        font-weight: bold;
-                    }
-                    #config-form {
-                        margin-bottom: 30px;
-                        display: flex;
-                        flex-direction: column;
-                        gap: 15px;
-                    }
-                    #config-form label {
-                        font-size: 18px;
-                        color: #333;
-                    }
-                    #config-form input[type="time"],
-                    #config-form select {
-                        padding: 8px;
-                        font-size: 16px;
-                        border: 1px solid #ccc;
-                        border-radius: 4px;
-                    }
-                    #config-form .checkbox-group {
-                        display: flex;
-                        flex-direction: column;
-                        gap: 10px;
-                    }
-                    #config-form button {
-                        padding: 10px 20px;
-                        background-color: #4CAF50;
-                        color: white;
-                        border: none;
-                        border-radius: 4px;
-                        cursor: pointer;
-                        font-size: 16px;
-                    }
-                    #config-form button:hover {
-                        background-color: #45a049;
-                    }
-                    #config-result {
-                        font-size: 18px;
-                        color: #333;
-                        margin-top: 20px;
-                    }
-                </style>
-            </head>
-            <body>
-                <div id="qr-container">
-                    <h1 class="title">Attendance QR Code</h1>
-                    <div id="config-form">
-                        <label for="cutoff-time">Set Cutoff Time:</label>
-                        <input type="time" id="cutoff-time" value="09:30">
-                        <label for="early-roles">Roles Requiring Early Arrival (10 mins):</label>
-                        <div class="checkbox-group">
-                            <label><input type="checkbox" name="early-roles" value="AUM/UM"> AUM/UM</label>
-                            <label><input type="checkbox" name="early-roles" value="SUM"> SUM</label>
-                            <label><input type="checkbox" name="early-roles" value="BM"> BM</label>
-                            <label><input type="checkbox" name="early-roles" value="DM"> DM</label>
-                            <label><input type="checkbox" name="early-roles" value="DD"> DD</label>
-                        </div>
-                        <button onclick="generateQRCode()">Generate QR Code</button>
-                    </div>
-                    <div id="qr-code" style="display: none;"></div>
-                    <div id="config-result"></div>
-                    <div id="current-time"></div>
-                </div>
-                <script>
-                    let previousPatterns = new Set();
-                    const timeDisplay = document.getElementById('current-time');
-                    const resultDisplay = document.getElementById('config-result');
-                    
-                    function updateTime() {
-                        const now = new Date();
-                        const hours = String(now.getHours()).padStart(2, '0');
-                        const minutes = String(now.getMinutes()).padStart(2, '0');
-                        const seconds = String(now.getSeconds()).padStart(2, '0');
-                        timeDisplay.textContent = \`\${hours}:\${minutes}:\${seconds}\`;
-                    }
-
-                    function generateUUID() {
-                        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-                            const r = Math.random() * 16 | 0;
-                            const v = c == 'x' ? r : (r & 0x3 | 0x8);
-                            return v.toString(16);
-                        });
-                    }
-
-                    function generateRandomPattern() {
-                        const timestamp = new Date().getTime();
-                        const uuid = generateUUID();
-                        const random = Math.random().toString(36).substring(2);
-                        const cutoffTime = document.getElementById('cutoff-time').value;
-                        const earlyRoles = Array.from(document.querySelectorAll('input[name="early-roles"]:checked'))
-                            .map(input => input.value);
-                        const configData = { cutoffTime, earlyRoles };
-                        try {
-                            const base64Config = btoa(JSON.stringify(configData));
-                            const pattern = \`\${timestamp}-\${uuid}-\${random}-\${base64Config}\`;
-                            console.log('Generated QR pattern:', pattern); // Debug
-                            console.log('Config data:', configData); // Debug
-                            return pattern;
-                        } catch (error) {
-                            console.error('Error generating QR pattern:', error);
-                            alert('Failed to generate QR code: Invalid configuration.');
-                            return null;
-                        }
-                    }
-
-                    function updateQRCode() {
-                        const pattern = generateRandomPattern();
-                        if (!pattern) {
-                            console.error('Failed to update QR code: Invalid pattern');
-                            return;
-                        }
-                        if (previousPatterns.has(pattern)) {
-                            console.log('Pattern collision detected, generating new pattern');
-                            return updateQRCode();
-                        }
-                        previousPatterns.add(pattern);
-                        if (previousPatterns.size > 1000) {
-                            const iterator = previousPatterns.values();
-                            previousPatterns.delete(iterator.next().value);
-                        }
-                        const qr = qrcode(0, 'L');
-                        qr.addData(pattern);
-                        qr.make();
-                        const qrContainer = document.getElementById('qr-code');
-                        qrContainer.innerHTML = qr.createImgTag(12);
-                        qrContainer.style.display = 'block';
-                        console.log('Generated new QR code with pattern:', pattern);
-                    }
-
-                    window.generateQRCode = function() {
-                        const cutoffTimeInput = document.getElementById('cutoff-time').value;
-                        console.log('Cutoff time input:', cutoffTimeInput); // Debug
-                        const earlyRolesInputs = document.querySelectorAll('input[name="early-roles"]:checked');
-                        const earlyRoles = Array.from(earlyRolesInputs).map(input => input.value);
-
-                        // Validate cutoffTime
-                        if (!cutoffTimeInput) {
-                            alert('Please set a valid cutoff time.');
-                            return;
-                        }
-
-                        // Normalize and validate cutoffTime
-                        let normalizedCutoffTime = cutoffTimeInput;
-                        const timeParts = cutoffTimeInput.split(':');
-                        if (timeParts.length >= 2) {
-                            const hours = parseInt(timeParts[0], 10);
-                            const minutes = parseInt(timeParts[1], 10);
-                            if (isNaN(hours) || isNaN(minutes) || hours > 23 || minutes > 59) {
-                                alert('Cutoff time must be in HH:MM format (00:00–23:59).');
-                                return;
-                            }
-                            normalizedCutoffTime = \`\${String(hours).padStart(2, '0')}:\${String(minutes).padStart(2, '0')}\`;
-                        } else {
-                            alert('Cutoff time must be in HH:MM format (00:00–23:59).');
-                            return;
-                        }
-                        console.log('Normalized cutoff time:', normalizedCutoffTime); // Debug
-
-                        // Update cutoff-time input to normalized value
-                        document.getElementById('cutoff-time').value = normalizedCutoffTime;
-
-                        // Display configuration results
-                        resultDisplay.innerHTML = \`
-                            <div>Cutoff Time: \${normalizedCutoffTime}</div>
-                            <div>Early Arrival Roles: \${earlyRoles.length > 0 ? earlyRoles.join(', ') : 'None'}</div>
-                        \`;
-
-                        // Proceed with QR code generation
-                        updateQRCode();
-                        // Update QR code every 7 seconds
-                        clearInterval(window.qrInterval);
-                        window.qrInterval = setInterval(updateQRCode, 7000);
-                    };
-
-                    // Ensure default value is applied on load
-                    document.addEventListener('DOMContentLoaded', () => {
-                        const cutoffTimeInput = document.getElementById('cutoff-time');
-                        if (!cutoffTimeInput.value) {
-                            cutoffTimeInput.value = '09:30';
-                        }
-                        console.log('Initial cutoff time:', cutoffTimeInput.value); // Debug
-                    });
-
-                    // Update time every second
-                    setInterval(updateTime, 1000);
-
-                    // Prevent window from being closed accidentally
-                    window.onbeforeunload = function(e) {
-                        e.preventDefault();
-                        e.returnValue = '';
-                    };
-                <\/script>
-            </body>
-            </html>
-            `;
-        }
-
-
         // Update the calculateLateStatus function to ensure consistent penalty amounts
-        function calculateLateStatus(timestamp, role, cutoffTime, earlyRoles) {
-            // Validate cutoffTime
-            if (!cutoffTime || typeof cutoffTime !== 'string' || !cutoffTime.includes(':')) {
-                console.error('Invalid cutoffTime:', cutoffTime);
-                throw new Error('cutoffTime must be a valid string in HH:MM format');
+        function calculateLateStatus(timestamp, role, cutoffTimeStr, earlyRoles = []) {
+            const recordTime = new Date(timestamp);
+
+            // Parse cutoff time string (e.g., "09:30")
+            let [cutoffHour, cutoffMinute] = cutoffTimeStr.split(':').map(Number);
+
+            // Apply early arrival rule (10 mins earlier) if role is in earlyRoles
+            if (earlyRoles.includes(role)) {
+                const totalMinutes = cutoffHour * 60 + cutoffMinute - 10;
+                cutoffHour = Math.floor(totalMinutes / 60);
+                cutoffMinute = totalMinutes % 60;
             }
 
-            const recordTime = new Date(timestamp);
-            
-            // Parse admin-set cutoff time (format: "HH:MM")
-            const [cutoffHours, cutoffMinutes] = cutoffTime.split(':').map(Number);
-            
-            // Validate parsed time
-            if (isNaN(cutoffHours) || isNaN(cutoffMinutes) || cutoffHours > 23 || cutoffMinutes > 59) {
-                console.error('Invalid cutoffTime format:', cutoffTime);
-                throw new Error('cutoffTime must be in HH:MM format (00:00–23:59)');
-            }
-            
-            // Set deadline based on admin's cutoff time
             const deadline = new Date(recordTime);
-            deadline.setHours(cutoffHours, cutoffMinutes, 0, 0);
-            
-            // Adjust deadline for roles requiring early arrival (10 minutes earlier)
-            if (Array.isArray(earlyRoles) && earlyRoles.includes(role)) {
-                deadline.setMinutes(deadline.getMinutes() - 10);
-            }
-            
-            // Calculate minutes late
+            deadline.setHours(cutoffHour, cutoffMinute, 0, 0);
+
             const lateMinutes = Math.floor((recordTime - deadline) / (1000 * 60));
-            
+
             let status = '';
             let amount = 0;
 
@@ -4239,7 +3986,7 @@
                 status = 'Punctual';
                 amount = 0;
             } else {
-                if (lateMinutes >= 60) { // 1 hour or more (No Show)
+                if (lateMinutes >= 60) {
                     status = 'No Show';
                     amount = 200;
                 } else if (lateMinutes <= 5) {
@@ -4276,14 +4023,13 @@
                 }
             }
 
-            // Round the amount to nearest integer
             amount = Math.round(amount);
 
             return {
-                status: status,
-                amount: amount,
-                lateMinutes: Math.max(0, lateMinutes), // Ensure non-negative
-                deadline: deadline.toTimeString().substring(0, 5) // Add deadline time for display/debugging
+                status,
+                amount,
+                lateMinutes: Math.max(0, lateMinutes),
+                deadline: deadline.toTimeString().substring(0, 5)
             };
         }
 
@@ -4475,8 +4221,6 @@
         // Modify your onScanSuccess function to update the table
         async function onScanSuccess(decodedText, decodedResult) {
             try {
-                console.log('Scanned QR pattern:', decodedText); // Debug: Log the raw QR pattern
-
                 const user = auth.currentUser;
                 if (!user) {
                     throw new Error('You must be logged in to take attendance');
@@ -4498,34 +4242,6 @@
                     throw new Error('Employee not found');
                 }
 
-                // Decode QR code pattern to extract cutoffTime and earlyRoles
-                let cutoffTime, earlyRoles;
-                if (decodedText.includes('-')) {
-                    // Assume pattern is from createQRWindowContent (timestamp-uuid-random-base64Config)
-                    const parts = decodedText.split('-');
-                    if (parts.length < 4) {
-                        throw new Error('Invalid QR code pattern format: Expected timestamp-uuid-random-base64Config');
-                    }
-                    const base64Config = parts[parts.length - 1];
-                    try {
-                        const configData = JSON.parse(atob(base64Config));
-                        console.log('Decoded QR config:', configData); // Debug: Log decoded config
-                        cutoffTime = configData.cutoffTime;
-                        earlyRoles = configData.earlyRoles;
-                        if (!cutoffTime || !Array.isArray(earlyRoles)) {
-                            throw new Error('Invalid QR configuration: cutoffTime or earlyRoles missing');
-                        }
-                    } catch (error) {
-                        console.error('Error decoding QR config:', error);
-                        throw new Error('Invalid QR code configuration: Failed to decode config');
-                    }
-                } else {
-                    // Handle case where QR code is a random string (from simple generateRandomPattern)
-                    console.warn('QR code appears to be a random string, using default cutoffTime and empty earlyRoles');
-                    cutoffTime = '09:30'; // Fallback default
-                    earlyRoles = [];
-                }
-
                 // Get current date and time
                 const now = new Date();
                 const currentDate = formatDate(now);
@@ -4536,6 +4252,7 @@
                 
                 let existingRecord = false;
                 
+                // Check if there's already a record for this employee on this date
                 todaySnapshot.forEach(childSnapshot => {
                     const record = childSnapshot.val();
                     if (record.employeeId === employeeId) {
@@ -4557,8 +4274,15 @@
                 const ipData = await ipResponse.json();
                 const ipAddress = ipData.ip;
 
-                // Calculate late status with decoded cutoffTime and earlyRoles
-                const lateInfo = calculateLateStatus(now.toISOString(), employeeData.role, cutoffTime, earlyRoles);
+                // Decode QR pattern
+                const parts = decodedText.split('-');
+                const configEncoded = parts[3];
+                const config = JSON.parse(atob(configEncoded));
+                const cutoffTime = config.cutoffTime;
+                const earlyRoles = config.earlyRoles || [];
+
+                // Calculate late status
+                const lateInfo = calculateLateStatus(now.toISOString(), employeeData.role, cutoffTime);
 
                 // Create attendance record
                 const attendanceData = {
@@ -4571,9 +4295,7 @@
                     status: lateInfo.status,
                     lateMinutes: lateInfo.lateMinutes,
                     amount: lateInfo.amount,
-                    ipAddress: ipAddress,
-                    cutoffTime: cutoffTime,
-                    earlyRoles: earlyRoles
+                    ipAddress: ipAddress
                 };
 
                 // Save to Firebase
@@ -4585,8 +4307,10 @@
                 // Stop the scanner
                 stopScanner();
                 
-                // Manually update the UI
+                // Important: Manually update the UI once without relying on listeners
+                // This avoids duplicate rendering
                 setTimeout(() => {
+                    // Force a manual update of the attendance table to show the new record
                     updateAttendanceTable();
                 }, 1000);
 
@@ -4829,6 +4553,178 @@
             return result;
         }
 
+        // Function to create QR code window content
+        function createQRWindowContent() {
+            return `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Attendance QR Code</title>
+                    <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"><\/script>
+                    <style>
+                        body {
+                            display: flex;
+                            flex-direction: column;
+                            align-items: center;
+                            justify-content: center;
+                            min-height: 100vh;
+                            margin: 0;
+                            background-color: #f0f0f0;
+                            font-family: Arial, sans-serif;
+                        }
+                        #qr-container {
+                            background: white;
+                            padding: 40px;
+                            border-radius: 20px;
+                            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+                            text-align: center;
+                        }
+                        #qr-code {
+                            margin-bottom: 30px;
+                        }
+                        #qr-code img {
+                            width: 400px;
+                            height: 400px;
+                        }
+                        #current-time {
+                            font-size: 48px;
+                            color: #333;
+                            margin-top: 20px;
+                            font-weight: bold;
+                        }
+                        .title {
+                            font-size: 36px;
+                            color: #333;
+                            margin-bottom: 30px;
+                            font-weight: bold;
+                        }
+                        #config-form {
+                            margin-bottom: 30px;
+                            display: flex;
+                            flex-direction: column;
+                            gap: 15px;
+                        }
+                        #config-form label {
+                            font-size: 18px;
+                            color: #333;
+                        }
+                        #config-form input[type="time"],
+                        #config-form select {
+                            padding: 8px;
+                            font-size: 16px;
+                            border: 1px solid #ccc;
+                            border-radius: 4px;
+                        }
+                        #config-form .checkbox-group {
+                            display: flex;
+                            flex-direction: column;
+                            gap: 10px;
+                        }
+                        #config-form button {
+                            padding: 10px 20px;
+                            background-color: #4CAF50;
+                            color: white;
+                            border: none;
+                            border-radius: 4px;
+                            cursor: pointer;
+                            font-size: 16px;
+                        }
+                        #config-form button:hover {
+                            background-color: #45a049;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div id="qr-container">
+                        <h1 class="title">Attendance QR Code</h1>
+                        <div id="config-form">
+                            <label for="cutoff-time">Set Cutoff Time:</label>
+                            <input type="time" id="cutoff-time" value="09:30">
+                            <label for="early-roles">Roles Requiring Early Arrival (10 mins):</label>
+                            <div class="checkbox-group">
+                                <label><input type="checkbox" name="early-roles" value="AUM/UM"> AUM/UM</label>
+                                <label><input type="checkbox" name="early-roles" value="SUM"> SUM</label>
+                                <label><input type="checkbox" name="early-roles" value="BM"> BM</label>
+                                <label><input type="checkbox" name="early-roles" value="DM"> DM</label>
+                                <label><input type="checkbox" name="early-roles" value="DD"> DD</label>
+                            </div>
+                            <button onclick="generateQRCode()">Generate QR Code</button>
+                        </div>
+                        <div id="qr-code" style="display: none;"></div>
+                        <div id="current-time"></div>
+                    </div>
+                    <script>
+                        let previousPatterns = new Set();
+                        const timeDisplay = document.getElementById('current-time');
+                        
+                        function updateTime() {
+                            const now = new Date();
+                            const hours = String(now.getHours()).padStart(2, '0');
+                            const minutes = String(now.getMinutes()).padStart(2, '0');
+                            const seconds = String(now.getSeconds()).padStart(2, '0');
+                            timeDisplay.textContent = \`\${hours}:\${minutes}:\${seconds}\`;
+                        }
+
+                        function generateUUID() {
+                            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                                const r = Math.random() * 16 | 0;
+                                const v = c == 'x' ? r : (r & 0x3 | 0x8);
+                                return v.toString(16);
+                            });
+                        }
+
+                        function generateRandomPattern() {
+                            const timestamp = new Date().getTime();
+                            const uuid = generateUUID();
+                            const random = Math.random().toString(36).substring(2);
+                            const cutoffTime = document.getElementById('cutoff-time').value;
+                            const earlyRoles = Array.from(document.querySelectorAll('input[name="early-roles"]:checked'))
+                                .map(input => input.value);
+                            const configData = JSON.stringify({ cutoffTime, earlyRoles });
+                            const encoded = btoa(configData);
+                            return \`\${timestamp}-\${uuid}-\${random}-\${btoa(configData)}\`;
+                        }
+
+                        function updateQRCode() {
+                            const pattern = generateRandomPattern();
+                            if (previousPatterns.has(pattern)) {
+                                console.log('Pattern collision detected, generating new pattern');
+                                return updateQRCode();
+                            }
+                            previousPatterns.add(pattern);
+                            if (previousPatterns.size > 1000) {
+                                const iterator = previousPatterns.values();
+                                previousPatterns.delete(iterator.next().value);
+                            }
+                            const qr = qrcode(0, 'L');
+                            qr.addData(pattern);
+                            qr.make();
+                            const qrContainer = document.getElementById('qr-code');
+                            qrContainer.innerHTML = qr.createImgTag(12);
+                            qrContainer.style.display = 'block';
+                            console.log('Generated new pattern:', pattern);
+                        }
+
+                        window.generateQRCode = function() {
+                            updateQRCode();
+                            // Update QR code every 7 seconds
+                            clearInterval(window.qrInterval);
+                            window.qrInterval = setInterval(updateQRCode, 7000);
+                        };
+
+                        // Update time every second
+                        setInterval(updateTime, 1000);
+
+                        // Prevent window from being closed accidentally
+                        window.onbeforeunload = function(e) {
+                            e.preventDefault();
+                            e.returnValue = '';
+                        };
+                    <\/script>
+                </body>
+                </html>
+            `;
+        }
 
         // Update the window opening function to create a larger window
         function openQRCodeWindow() {
