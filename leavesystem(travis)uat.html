@@ -4707,22 +4707,11 @@
 
                         function generateRandomPattern() {
                             const cutoffTimeStr = document.getElementById('cutoff-time').value;
-
-                            if (!cutoffTimeStr || !/^\d{2}:\d{2}$/.test(cutoffTimeStr)) {
-                                alert('Please set a valid cutoff time before generating the QR code.');
-                                throw new Error('Cutoff time not set or invalid');
-                            }
-
-
                             const [hour, minute] = cutoffTimeStr.split(':').map(Number);
                             const cutoffTime = [hour, minute, 0, 0]; // Always 4-element array
-
-
                             const earlyRoles = Array.from(document.querySelectorAll('input[name="early-roles"]:checked'))
                                 .map(input => input.value);
-
                             const configData = JSON.stringify({ cutoffTime, earlyRoles });
-
                             const timestamp = new Date().getTime();
                             const uuid = generateUUID();
                             const random = Math.random().toString(36).substring(2);
