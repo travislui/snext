@@ -3961,21 +3961,25 @@
         }        
 
         // Update the calculateLateStatus function to ensure consistent penalty amounts
-        function calculateLateStatus(timestamp, role, cutoffTimeStr, earlyRoles = []) {
+        function calculateLateStatus(timestamp, role, cutoffTimeArray, earlyRoles = []) {
             const recordTime = new Date(timestamp);
 
-            // Parse cutoff time string (e.g., "09:30")
-            let [cutoffHour, cutoffMinute] = cutoffTimeStr.split(':').map(Number);
+            // Default fallback
+            if (!Array.isArray(cutoffTimeArray) || cutoffTimeArray.length < 2) {
+                cutoffTimeArray = [9, 30, 0, 0];
+            }
 
-            // Apply early arrival rule (10 mins earlier) if role is in earlyRoles
+            let [hour, minute, second = 0, ms = 0] = cutoffTimeArray;
+
+            // Apply early arrival rule
             if (earlyRoles.includes(role)) {
-                const totalMinutes = cutoffHour * 60 + cutoffMinute - 10;
-                cutoffHour = Math.floor(totalMinutes / 60);
-                cutoffMinute = totalMinutes % 60;
+                const totalMinutes = hour * 60 + minute - 10;
+                hour = Math.floor(totalMinutes / 60);
+                minute = totalMinutes % 60;
             }
 
             const deadline = new Date(recordTime);
-            deadline.setHours(cutoffHour, cutoffMinute, 0, 0);
+            deadline.setHours(hour, minute, second, ms);
 
             const lateMinutes = Math.floor((recordTime - deadline) / (1000 * 60));
 
@@ -4003,23 +4007,12 @@
                     amount = 100;
                 }
 
-                // Apply role multiplier
                 switch (role) {
-                    case 'AUM/UM':
-                        amount *= 1.5;
-                        break;
-                    case 'SUM':
-                        amount *= 2;
-                        break;
-                    case 'BM':
-                        amount *= 3;
-                        break;
-                    case 'DM':
-                        amount *= 4;
-                        break;
-                    case 'DD':
-                        amount *= 6;
-                        break;
+                    case 'AUM/UM': amount *= 1.5; break;
+                    case 'SUM': amount *= 2; break;
+                    case 'BM': amount *= 3; break;
+                    case 'DM': amount *= 4; break;
+                    case 'DD': amount *= 6; break;
                 }
             }
 
@@ -4032,6 +4025,7 @@
                 deadline: deadline.toTimeString().substring(0, 5)
             };
         }
+
 
         async function updateAttendanceTable() {
             try {
@@ -4277,21 +4271,16 @@
                 // Decode QR pattern
                 const parts = decodedText.split('-');
                 const configEncoded = parts[3];
+
                 const config = JSON.parse(atob(configEncoded));
+                const cutoffTimeArray = config.cutoffTime || [9, 30, 0, 0];
+                const earlyRoles = config.earlyRoles || [];
 
-                let cutoffTime = '09:30'; // fallback default
-                let earlyRoles = [];
-
-                try {
-                    const config = JSON.parse(atob(configEncoded));
-                    cutoffTime = config.cutoffTime || cutoffTime;
-                    earlyRoles = config.earlyRoles || [];
-                } catch (e) {
-                    console.error('Failed to decode config from QR:', e);
-                }
 
                 // Calculate late status
-                const lateInfo = calculateLateStatus(now.toISOString(), employeeData.role, cutoffTime, earlyRoles);
+                
+                const lateInfo = calculateLateStatus(now.toISOString(), employeeData.role, cutoffTimeArray, earlyRoles);
+
 
                 // Create attendance record
                 const attendanceData = {
@@ -4688,11 +4677,17 @@
                             const uuid = generateUUID();
                             const random = Math.random().toString(36).substring(2);
 
-                            const cutoffTime = document.getElementById('cutoff-time').value || '09:30';
+                            
                             const earlyRoles = Array.from(document.querySelectorAll('input[name="early-roles"]:checked'))
                                 .map(input => input.value);
 
+                            
+                            const cutoffTimeStr = document.getElementById('cutoff-time').value || '09:30';
+                            const [hour, minute] = cutoffTimeStr.split(':').map(Number);
+                            const cutoffTime = [hour, minute, 0, 0]; // [hour, minute, second, ms]
+
                             const configData = JSON.stringify({ cutoffTime, earlyRoles });
+
                             return \`\${timestamp}-\${uuid}-\${random}-\${btoa(configData)}\`;
                         }
 
