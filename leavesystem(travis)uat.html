@@ -4088,8 +4088,14 @@
                         // Only show the first record for the day
                         const todayRecord = records[0];
                         const recordTime = new Date(todayRecord.timestamp);
-
                         const row = document.createElement('tr');
+
+
+                        const recordTimeStr = recordTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                        const deadlineStr = deadline.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                        const calculationStr = `(${recordTimeStr} - ${deadlineStr}) / 60 = ${lateMinutes} mins`;
+
+
                         row.innerHTML = `
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="text-sm font-medium text-gray-900">
