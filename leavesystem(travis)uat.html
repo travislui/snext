@@ -4278,11 +4278,20 @@
                 const parts = decodedText.split('-');
                 const configEncoded = parts[3];
                 const config = JSON.parse(atob(configEncoded));
-                const cutoffTime = config.cutoffTime;
-                const earlyRoles = config.earlyRoles || [];
+
+                let cutoffTime = '09:30'; // fallback default
+                let earlyRoles = [];
+
+                try {
+                    const config = JSON.parse(atob(configEncoded));
+                    cutoffTime = config.cutoffTime || cutoffTime;
+                    earlyRoles = config.earlyRoles || [];
+                } catch (e) {
+                    console.error('Failed to decode config from QR:', e);
+                }
 
                 // Calculate late status
-                const lateInfo = calculateLateStatus(now.toISOString(), employeeData.role, cutoffTime);
+                const lateInfo = calculateLateStatus(now.toISOString(), employeeData.role, cutoffTime, earlyRoles);
 
                 // Create attendance record
                 const attendanceData = {
@@ -4673,15 +4682,17 @@
                             });
                         }
 
+
                         function generateRandomPattern() {
                             const timestamp = new Date().getTime();
                             const uuid = generateUUID();
                             const random = Math.random().toString(36).substring(2);
-                            const cutoffTime = document.getElementById('cutoff-time').value;
+
+                            const cutoffTime = document.getElementById('cutoff-time').value || '09:30';
                             const earlyRoles = Array.from(document.querySelectorAll('input[name="early-roles"]:checked'))
                                 .map(input => input.value);
+
                             const configData = JSON.stringify({ cutoffTime, earlyRoles });
-                            const encoded = btoa(configData);
                             return \`\${timestamp}-\${uuid}-\${random}-\${btoa(configData)}\`;
                         }
 
