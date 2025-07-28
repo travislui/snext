@@ -3962,24 +3962,20 @@
 
         // Update the calculateLateStatus function to ensure consistent penalty amounts
         function calculateLateStatus(timestamp, role, cutoffTimeArray, earlyRoles = []) {
-            // Parse timestamp into a Date object
             const recordTime = new Date(timestamp);
 
-            // Fallback if cutoffTimeArray is invalid
             if (!Array.isArray(cutoffTimeArray) || cutoffTimeArray.length < 2) {
-                cutoffTimeArray = [9, 30, 0, 0]; // default to 09:30:00.000
+                cutoffTimeArray = [9, 30, 0, 0];
             }
 
             let [hour, minute, second = 0, ms = 0] = cutoffTimeArray;
 
-            // Apply early arrival rule
             if (earlyRoles.includes(role)) {
                 const totalMinutes = hour * 60 + minute - 10;
                 hour = Math.floor(totalMinutes / 60);
                 minute = totalMinutes % 60;
             }
 
-            // Create deadline time
             const deadline = new Date(recordTime);
             deadline.setHours(hour, minute, second, ms);
 
@@ -4283,6 +4279,9 @@
                     const config = JSON.parse(atob(configEncoded));
                     cutoffTimeArray = config.cutoffTime || cutoffTimeArray;
                     earlyRoles = config.earlyRoles || [];
+
+                    // ✅ Debug log
+                    console.log('Decoded config from QR:', { cutoffTimeArray, earlyRoles });
                 } catch (e) {
                     console.error('Failed to decode config:', e);
                 }
@@ -4684,18 +4683,22 @@
                             const timestamp = new Date().getTime();
                             const uuid = generateUUID();
                             const random = Math.random().toString(36).substring(2);
+
+                            const cutoffTimeStr = document.getElementById('cutoff-time').value || '09:30';
+                            const [hour, minute] = cutoffTimeStr.split(':').map(Number);
+                            const cutoffTime = [hour, minute, 0, 0];
+
                             const earlyRoles = Array.from(document.querySelectorAll('input[name="early-roles"]:checked'))
                                 .map(input => input.value);
 
-                            
-                            const cutoffTimeStr = document.getElementById('cutoff-time').value || '09:30';
-                            const [hour, minute] = cutoffTimeStr.split(':').map(Number);
-                            const cutoffTime = [hour, minute, 0, 0]; // Format: [hour, minute, second, ms]
-
                             const configData = JSON.stringify({ cutoffTime, earlyRoles });
-                            return \`\${timestamp}-\${uuid}-\${random}-\${btoa(configData)}\`;
 
+                            // ✅ Debug log
+                            console.log('Encoding config into QR:', { cutoffTime, earlyRoles });
+
+                            return \`\${timestamp}-\${uuid}-\${random}-\${btoa(configData)}\`;
                         }
+
 
                         function updateQRCode() {
                             const pattern = generateRandomPattern();
