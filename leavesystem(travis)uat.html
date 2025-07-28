@@ -3965,7 +3965,11 @@
             const recordTime = new Date(timestamp);
 
             // Validate cutoffTimeArray from QR config
-            if (!Array.isArray(cutoffTimeArray) || cutoffTimeArray.length < 2 || cutoffTimeArray.some(isNaN)) {
+            if (
+                !Array.isArray(cutoffTimeArray) ||
+                cutoffTimeArray.length !== 4 ||
+                cutoffTimeArray.some(n => typeof n !== 'number' || isNaN(n))
+            ) {
                 console.warn('Invalid cutoffTimeArray received. Using default [9, 30, 0, 0]');
                 cutoffTimeArray = [9, 30, 0, 0]; // fallback default
             }
@@ -4037,8 +4041,6 @@
                 deadline: deadline.toTimeString().substring(0, 5)
             };
         }
-
-
 
         async function updateAttendanceTable() {
             try {
