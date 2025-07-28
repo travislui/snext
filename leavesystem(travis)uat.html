@@ -4290,11 +4290,11 @@
 
                 try {
                     const config = JSON.parse(atob(configEncoded));
-                    
-                    if (Array.isArray(config.cutoffTime) && config.cutoffTime.length >= 2 && config.cutoffTime.every(n => typeof n === 'number' && !isNaN(n))) {
+
+                    if (Array.isArray(config.cutoffTime) && config.cutoffTime.length === 4 && config.cutoffTime.every(n => typeof n === 'number' && !isNaN(n))) {
                         cutoffTimeArray = config.cutoffTime;
                     } else {
-                        throw new Error('Invalid cutoffTime in QR config');
+                        throw new Error('Invalid cutoffTime format in QR');
                     }
 
                     if (Array.isArray(config.earlyRoles)) {
@@ -4308,6 +4308,7 @@
                     stopScanner();
                     return;
                 }
+
 
 
                 // Calculate late status
@@ -4712,8 +4713,10 @@
                                 throw new Error('Cutoff time not set or invalid');
                             }
 
+
                             const [hour, minute] = cutoffTimeStr.split(':').map(Number);
-                            const cutoffTime = [hour, minute, 0, 0];
+                            const cutoffTime = [hour, minute, 0, 0]; // Always 4-element array
+
 
                             const earlyRoles = Array.from(document.querySelectorAll('input[name="early-roles"]:checked'))
                                 .map(input => input.value);
