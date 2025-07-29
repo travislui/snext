@@ -2415,6 +2415,7 @@
     <!-- Attendance Record Section -->
     <div class="container mx-auto p-4 mt-8">
         <h2 class="text-2xl font-bold mb-4">Attendance Record</h2>
+        <p class="text-sm text-gray-600 mb-4" id="formulaText"></p>
         <div class="overflow-x-auto bg-white rounded-lg shadow">
             <table class="min-w-full table-auto">
                 <thead class="bg-gray-100">
@@ -2431,7 +2432,6 @@
                     <!-- Records will be inserted here -->
                 </tbody>
             </table>
-            <p class="text-sm text-gray-600 mb-4" id="formulaText"></p>
         </div>
     </div>
 
@@ -4091,7 +4091,16 @@
                         // Only show the first record for the day
                         const todayRecord = records[0];
                         const recordTime = new Date(todayRecord.timestamp);
+                        const deadlineTime = new Date(recordTime);
                         const row = document.createElement('tr');
+                        const statusResult = calculateLateStatus(todayRecord.timestamp, todayRecord.role, cutoffTimeArray, earlyRoles);
+
+
+                        deadlineTime.setHours(...cutoffTimeArray); // or use adjusted time from calculateLateStatus
+
+                        const deadlineStr = deadlineTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                        document.getElementById('formulaText').textContent = `Deadline Time: ${statusResult.deadline}`;
+
 
                         row.innerHTML = `
                             <td class="px-6 py-4 whitespace-nowrap">
@@ -4105,9 +4114,9 @@
                                 </div>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
-                                <span class="status-badge ${todayRecord.status.toLowerCase()}">
-                                    ${todayRecord.status}
-                                    ${todayRecord.amount > 0 ? ` (-$${todayRecord.amount})` : ''}
+                                <span class="status-badge ${statusResult.status.toLowerCase()}">
+                                    ${statusResult.status}
+                                    ${statusResult.amount > 0 ? ` (-$${statusResult.amount})` : ''}
                                 </span>
                             </td>
                         `;
@@ -4201,12 +4210,9 @@
                             const row = document.createElement('tr');
                             const recordDate = new Date(record.timestamp);
                             
-                            const recordTimeStr = recordTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                            const statusResult = calculateLateStatus(record.timestamp, record.role, cutoffTimeArray, earlyRoles);
+
                             const deadlineStr = deadline.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-                            const formulaText = `lateMinutes = (${recordTimeStr} - ${deadlineStr}) / 60 = ${lateMinutes} mins`;
-                            document.getElementById('formulaText').textContent = formulaText;
-
 
                             row.innerHTML = `
                                 <td class="px-6 py-4">${record.employeeName || 'N/A'}</td>
@@ -4215,10 +4221,12 @@
                                     ${formatDate(recordDate)} ${formatTime(recordDate)}
                                 </td>
                                 <td class="px-6 py-4">
-                                    <span class="status-badge ${record.status?.toLowerCase() || 'unknown'}">
-                                        ${record.status || 'N/A'}
-                                        ${record.amount > 0 ? ` (-$${record.amount})` : ''}
+
+                                    <span class="status-badge ${statusResult.status.toLowerCase()}">
+                                        ${statusResult.status}
+                                        ${statusResult.amount > 0 ? ` (-$${statusResult.amount})` : ''}
                                     </span>
+
                                 </td>
                                 <td class="px-6 py-4">${record.ipAddress || 'N/A'}</td>
                                 <td class="px-6 py-4 whitespace-nowrap">${deadlineStr}</td>
