@@ -3968,15 +3968,10 @@
         function calculateLateStatus(timestamp, role, cutoffTimeArray, earlyRoles = []) {
             const recordTime = new Date(timestamp);
 
-            // Validate cutoffTimeArray from QR config
-            if (
-                !Array.isArray(cutoffTimeArray) ||
-                cutoffTimeArray.length !== 4 ||
-                cutoffTimeArray.some(n => typeof n !== 'number' || isNaN(n))
-            ) {
-                console.warn('Invalid cutoffTimeArray received. Using default [9, 30, 0, 0]');
-                const cutoffTimeArray = cutoffTime; // fallback default
+            if (!Array.isArray(cutoffTimeArray) || cutoffTimeArray.length !== 4) {
+                throw new Error('cutoffTimeArray must be a valid 4-element array');
             }
+
 
             let [hour, minute, second = 0, ms = 0] = cutoffTimeArray;
 
