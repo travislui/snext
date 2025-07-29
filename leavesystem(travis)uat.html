@@ -2431,6 +2431,7 @@
                     <!-- Records will be inserted here -->
                 </tbody>
             </table>
+            <p class="text-sm text-gray-600 mb-4" id="formulaText"></p>
         </div>
     </div>
 
@@ -4200,7 +4201,12 @@
                             const row = document.createElement('tr');
                             const recordDate = new Date(record.timestamp);
                             
+                            const recordTimeStr = recordTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                             const deadlineStr = deadline.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+                            const formulaText = `lateMinutes = (${recordTimeStr} - ${deadlineStr}) / 60 = ${lateMinutes} mins`;
+                            document.getElementById('formulaText').textContent = formulaText;
+
 
                             row.innerHTML = `
                                 <td class="px-6 py-4">${record.employeeName || 'N/A'}</td>
