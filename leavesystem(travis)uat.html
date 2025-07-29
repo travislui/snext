@@ -2422,15 +2422,13 @@
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date & Time</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                        
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Deadline</th>
-
                     </tr>
                 </thead>
                 <tbody id="attendanceTableBody" class="bg-white divide-y divide-gray-200">
                     <!-- Records will be inserted here -->
                 </tbody>
             </table>
+            <p class="text-sm text-gray-600 mb-4" id="formulaText"></p>
         </div>
     </div>
 
@@ -4045,6 +4043,14 @@
             };
         }
 
+
+        const recordTimeStr = recordTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const deadlineStr = deadline.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+        const formulaText = `lateMinutes = (${recordTimeStr} - ${deadlineStr}) / 60 = ${lateMinutes} mins`;
+        document.getElementById('formulaText').textContent = formulaText;
+
+
         async function updateAttendanceTable() {
             try {
                 // Update agent's personal attendance table (today's record only)
@@ -4200,7 +4206,7 @@
                             const row = document.createElement('tr');
                             const recordDate = new Date(record.timestamp);
                             
-                            const deadlineStr = deadline.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                            
 
                             row.innerHTML = `
                                 <td class="px-6 py-4">${record.employeeName || 'N/A'}</td>
@@ -4215,7 +4221,7 @@
                                     </span>
                                 </td>
                                 <td class="px-6 py-4">${record.ipAddress || 'N/A'}</td>
-                                <td class="px-6 py-4 whitespace-nowrap">${deadlineStr}</td>
+                                
                                 <td class="px-6 py-4">
                                     <button class="remove-btn-small" onclick="removeAttendanceRecord('${record.id}')">
                                         Remove
