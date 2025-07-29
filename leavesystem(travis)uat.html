@@ -3975,7 +3975,7 @@
                 cutoffTimeArray.some(n => typeof n !== 'number' || isNaN(n))
             ) {
                 console.warn('Invalid cutoffTimeArray received. Using default [9, 30, 0, 0]');
-                cutoffTimeArray = [9, 30, 0, 0]; // fallback default
+                cutoffTimeArray = cutoffTime; // fallback default
             }
 
             let [hour, minute, second = 0, ms = 0] = cutoffTimeArray;
@@ -4212,7 +4212,7 @@
                             
                             const statusResult = calculateLateStatus(record.timestamp, record.role, cutoffTimeArray, earlyRoles);
 
-                            const deadlineStr = deadline.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                            const deadlineStr = statusResult.deadline;
 
                             row.innerHTML = `
                                 <td class="px-6 py-4">${record.employeeName || 'N/A'}</td>
