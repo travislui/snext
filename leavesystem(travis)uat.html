@@ -3975,7 +3975,7 @@
                 cutoffTimeArray.some(n => typeof n !== 'number' || isNaN(n))
             ) {
                 console.warn('Invalid cutoffTimeArray received. Using default [9, 30, 0, 0]');
-                cutoffTimeArray = cutoffTime; // fallback default
+                const cutoffTimeArray = cutoffTime; // fallback default
             }
 
             let [hour, minute, second = 0, ms = 0] = cutoffTimeArray;
@@ -4731,6 +4731,7 @@
                             const cutoffTimeStr = document.getElementById('cutoff-time').value;
                             const [hour, minute] = cutoffTimeStr.split(':').map(Number);
                             const cutoffTime = [hour, minute, 0, 0]; // Always 4-element array
+                            const cutoffTimeArray = cutoffTime; // ✅ Assign to cutoffTimeArray
                             const earlyRoles = Array.from(document.querySelectorAll('input[name="early-roles"]:checked'))
                                 .map(input => input.value);
                             const configData = JSON.stringify({ cutoffTime, earlyRoles });
