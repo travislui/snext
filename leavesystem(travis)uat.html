@@ -3965,9 +3965,31 @@
 
         // Update the calculateLateStatus function to ensure consistent penalty amounts
         function calculateLateStatus(timestamp, role, cutoffTimeArray, earlyRoles = []) {
+            // Validate timestamp
+            if (!timestamp || typeof timestamp !== 'string') {
+                console.error('Invalid timestamp provided to calculateLateStatus:', timestamp);
+                return {
+                    status: 'Invalid Time',
+                    amount: 0,
+                    lateMinutes: 0,
+                    deadline: 'Invalid'
+                };
+            }
+
             const recordTime = new Date(timestamp);
 
-            // Since onScanSuccess already validates cutoffTimeArray, we can assume it's valid
+            // Validate recordTime
+            if (isNaN(recordTime.getTime())) {
+                console.error('Invalid date object created from timestamp:', timestamp);
+                return {
+                    status: 'Invalid Time',
+                    amount: 0,
+                    lateMinutes: 0,
+                    deadline: 'Invalid'
+                };
+            }
+
+            // Assume cutoffTimeArray is validated in onScanSuccess
             let [hour, minute, second = 0, ms = 0] = cutoffTimeArray;
 
             // Adjust for early roles (10 minutes earlier)
@@ -3980,9 +4002,9 @@
             const deadline = new Date(recordTime);
             deadline.setHours(hour, minute, second, ms);
 
-            // Validate date objects
-            if (isNaN(recordTime.getTime()) || isNaN(deadline.getTime())) {
-                console.error('Invalid date objects in lateness calculation', { recordTime, deadline });
+            // Validate deadline
+            if (isNaN(deadline.getTime())) {
+                console.error('Invalid deadline date object:', { hour, minute, second, ms });
                 return {
                     status: 'Invalid Time',
                     amount: 0,
@@ -4259,6 +4281,10 @@
 
                 // Get current date and time
                 const now = new Date();
+                const timestamp = now.toISOString();
+                if (!timestamp) {
+                    throw new Error('Failed to generate valid timestamp');
+                }
                 const currentDate = formatDate(now);
 
                 // Check for existing attendance record for today
@@ -4300,7 +4326,6 @@
 
                 try {
                     const config = JSON.parse(atob(configEncoded));
-                    // Validate cutoffTime
                     if (
                         !Array.isArray(config.cutoffTime) ||
                         config.cutoffTime.length !== 4 ||
@@ -4309,8 +4334,6 @@
                         throw new Error('Invalid cutoffTime format in QR code');
                     }
                     cutoffTimeArray = config.cutoffTime;
-
-                    // Validate earlyRoles
                     earlyRoles = Array.isArray(config.earlyRoles) ? config.earlyRoles : [];
                     console.log('Decoded config from QR:', { cutoffTimeArray, earlyRoles });
                 } catch (e) {
@@ -4321,7 +4344,12 @@
                 }
 
                 // Calculate late status
-                const lateInfo = calculateLateStatus(now.toISOString(), employeeData.role, cutoffTimeArray, earlyRoles);
+                const lateInfo = calculateLateStatus(timestamp, employeeData.role, cutoffTimeArray, earlyRoles);
+
+                // Check if lateInfo is valid
+                if (lateInfo.status === 'Invalid Time') {
+                    throw new Error('Invalid timestamp or configuration in late status calculation');
+                }
 
                 // Create attendance record
                 const attendanceData = {
@@ -4330,12 +4358,12 @@
                     role: employeeData.role,
                     date: currentDate,
                     time: formatTime(now),
-                    timestamp: now.toISOString(),
+                    timestamp: timestamp,
                     status: lateInfo.status,
                     lateMinutes: lateInfo.lateMinutes,
                     amount: lateInfo.amount,
                     ipAddress: ipAddress,
-                    cutoffTimeArray: cutoffTimeArray // Add this
+                    cutoffTimeArray: cutoffTimeArray
                 };
 
                 // Save to Firebase
