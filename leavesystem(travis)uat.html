@@ -2415,7 +2415,6 @@
     <!-- Attendance Record Section -->
     <div class="container mx-auto p-4 mt-8">
         <h2 class="text-2xl font-bold mb-4">Attendance Record</h2>
-        <p class="text-sm text-gray-600 mb-4" id="formulaText"></p>
         <div class="overflow-x-auto bg-white rounded-lg shadow">
             <table class="min-w-full table-auto">
                 <thead class="bg-gray-100">
@@ -3968,11 +3967,7 @@
         function calculateLateStatus(timestamp, role, cutoffTimeArray, earlyRoles = []) {
             const recordTime = new Date(timestamp);
 
-            if (!Array.isArray(cutoffTimeArray) || cutoffTimeArray.length !== 4) {
-                throw new Error('cutoffTimeArray must be a valid 4-element array');
-            }
-
-
+            // Since onScanSuccess already validates cutoffTimeArray, we can assume it's valid
             let [hour, minute, second = 0, ms = 0] = cutoffTimeArray;
 
             // Adjust for early roles (10 minutes earlier)
@@ -3985,9 +3980,9 @@
             const deadline = new Date(recordTime);
             deadline.setHours(hour, minute, second, ms);
 
-            // Validate deadline and recordTime
+            // Validate date objects
             if (isNaN(recordTime.getTime()) || isNaN(deadline.getTime())) {
-                console.error('Invalid date objects in lateness calculation');
+                console.error('Invalid date objects in lateness calculation', { recordTime, deadline });
                 return {
                     status: 'Invalid Time',
                     amount: 0,
@@ -4086,16 +4081,7 @@
                         // Only show the first record for the day
                         const todayRecord = records[0];
                         const recordTime = new Date(todayRecord.timestamp);
-                        const deadlineTime = new Date(recordTime);
                         const row = document.createElement('tr');
-                        const statusResult = calculateLateStatus(todayRecord.timestamp, todayRecord.role, cutoffTimeArray, earlyRoles);
-
-
-                        deadlineTime.setHours(...cutoffTimeArray); // or use adjusted time from calculateLateStatus
-
-                        const deadlineStr = deadlineTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                        document.getElementById('formulaText').textContent = `Deadline Time: ${statusResult.deadline}`;
-
 
                         row.innerHTML = `
                             <td class="px-6 py-4 whitespace-nowrap">
@@ -4109,9 +4095,9 @@
                                 </div>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
-                                <span class="status-badge ${statusResult.status.toLowerCase()}">
-                                    ${statusResult.status}
-                                    ${statusResult.amount > 0 ? ` (-$${statusResult.amount})` : ''}
+                                <span class="status-badge ${todayRecord.status.toLowerCase()}">
+                                    ${todayRecord.status}
+                                    ${todayRecord.amount > 0 ? ` (-$${todayRecord.amount})` : ''}
                                 </span>
                             </td>
                         `;
@@ -4205,9 +4191,16 @@
                             const row = document.createElement('tr');
                             const recordDate = new Date(record.timestamp);
                             
-                            const statusResult = calculateLateStatus(record.timestamp, record.role, cutoffTimeArray, earlyRoles);
-
-                            const deadlineStr = statusResult.deadline;
+                            // Calculate deadline from cutoffTimeArray if available, else use record.deadline
+                            let deadlineStr = 'N/A';
+                            if (record.cutoffTimeArray) {
+                                const [hour, minute, second = 0, ms = 0] = record.cutoffTimeArray;
+                                const deadline = new Date(recordDate);
+                                deadline.setHours(hour, minute, second, ms);
+                                deadlineStr = deadline.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                            } else if (record.deadline) {
+                                deadlineStr = record.deadline;
+                            }
 
                             row.innerHTML = `
                                 <td class="px-6 py-4">${record.employeeName || 'N/A'}</td>
@@ -4216,12 +4209,10 @@
                                     ${formatDate(recordDate)} ${formatTime(recordDate)}
                                 </td>
                                 <td class="px-6 py-4">
-
-                                    <span class="status-badge ${statusResult.status.toLowerCase()}">
-                                        ${statusResult.status}
-                                        ${statusResult.amount > 0 ? ` (-$${statusResult.amount})` : ''}
+                                    <span class="status-badge ${record.status?.toLowerCase() || 'unknown'}">
+                                        ${record.status || 'N/A'}
+                                        ${record.amount > 0 ? ` (-$${record.amount})` : ''}
                                     </span>
-
                                 </td>
                                 <td class="px-6 py-4">${record.ipAddress || 'N/A'}</td>
                                 <td class="px-6 py-4 whitespace-nowrap">${deadlineStr}</td>
@@ -4276,7 +4267,6 @@
                 
                 let existingRecord = false;
                 
-                // Check if there's already a record for this employee on this date
                 todaySnapshot.forEach(childSnapshot => {
                     const record = childSnapshot.val();
                     if (record.employeeId === employeeId) {
@@ -4300,24 +4290,28 @@
 
                 // Decode QR pattern
                 const parts = decodedText.split('-');
+                if (parts.length !== 4) {
+                    throw new Error('Invalid QR code format');
+                }
                 const configEncoded = parts[3];
 
-                let cutoffTimeArray = []; // fallback
+                let cutoffTimeArray = [];
                 let earlyRoles = [];
 
                 try {
                     const config = JSON.parse(atob(configEncoded));
-
-                    if (Array.isArray(config.cutoffTime) && config.cutoffTime.length === 4 && config.cutoffTime.every(n => typeof n === 'number' && !isNaN(n))) {
-                        cutoffTimeArray = config.cutoffTime;
-                    } else {
-                        throw new Error('Invalid cutoffTime format in QR');
+                    // Validate cutoffTime
+                    if (
+                        !Array.isArray(config.cutoffTime) ||
+                        config.cutoffTime.length !== 4 ||
+                        config.cutoffTime.some(n => typeof n !== 'number' || isNaN(n))
+                    ) {
+                        throw new Error('Invalid cutoffTime format in QR code');
                     }
+                    cutoffTimeArray = config.cutoffTime;
 
-                    if (Array.isArray(config.earlyRoles)) {
-                        earlyRoles = config.earlyRoles;
-                    }
-
+                    // Validate earlyRoles
+                    earlyRoles = Array.isArray(config.earlyRoles) ? config.earlyRoles : [];
                     console.log('Decoded config from QR:', { cutoffTimeArray, earlyRoles });
                 } catch (e) {
                     console.error('Failed to decode config:', e);
@@ -4325,8 +4319,6 @@
                     stopScanner();
                     return;
                 }
-
-
 
                 // Calculate late status
                 const lateInfo = calculateLateStatus(now.toISOString(), employeeData.role, cutoffTimeArray, earlyRoles);
@@ -4342,7 +4334,8 @@
                     status: lateInfo.status,
                     lateMinutes: lateInfo.lateMinutes,
                     amount: lateInfo.amount,
-                    ipAddress: ipAddress
+                    ipAddress: ipAddress,
+                    cutoffTimeArray: cutoffTimeArray // Add this
                 };
 
                 // Save to Firebase
@@ -4354,10 +4347,8 @@
                 // Stop the scanner
                 stopScanner();
                 
-                // Important: Manually update the UI once without relying on listeners
-                // This avoids duplicate rendering
+                // Force a manual update of the attendance table
                 setTimeout(() => {
-                    // Force a manual update of the attendance table to show the new record
                     updateAttendanceTable();
                 }, 1000);
 
@@ -4590,15 +4581,6 @@
         let qrWindow = null;
         let qrInterval = null;
 
-        // Function to generate a random pattern
-        function generateRandomPattern() {
-            const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-            let result = '';
-            for (let i = 0; i < 20; i++) {
-                result += characters.charAt(Math.floor(Math.random() * characters.length));
-            }
-            return result;
-        }
 
         // Function to create QR code window content
         function createQRWindowContent() {
@@ -4725,8 +4707,10 @@
                         function generateRandomPattern() {
                             const cutoffTimeStr = document.getElementById('cutoff-time').value;
                             const [hour, minute] = cutoffTimeStr.split(':').map(Number);
-                            const cutoffTime = [hour, minute, 0, 0]; // Always 4-element array
-                            const cutoffTimeArray = cutoffTime; // ✅ Assign to cutoffTimeArray
+                            // Ensure valid numbers, default to 9:30 if invalid
+                            const validHour = isNaN(hour) ? 9 : hour;
+                            const validMinute = isNaN(minute) ? 30 : minute;
+                            const cutoffTime = [validHour, validMinute, 0, 0]; // Always 4-element array
                             const earlyRoles = Array.from(document.querySelectorAll('input[name="early-roles"]:checked'))
                                 .map(input => input.value);
                             const configData = JSON.stringify({ cutoffTime, earlyRoles });
