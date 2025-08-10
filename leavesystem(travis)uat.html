@@ -1895,6 +1895,11 @@
             <form id="add-employee-form">
                 <input type="text" id="emp-name" placeholder="Agent Name" required>
                 <input type="text" id="emp-code" placeholder="Agent Code" required>
+                <p><strong>備註：</span></p>
+                <p><strong>Agent Name (Login ID) = Peter Chan</span></p>
+                <p><strong>Agent Code (Login PWD) = next + Agent code</span></p>
+                <p><strong>(Agent code 開頭字母大階)</span></p>
+
                 <label for="emp-role">Role position:</label>
                 <select id="emp-role" required>
                     <option value="Agent">Agent</option>
@@ -2422,9 +2427,6 @@
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date & Time</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                        
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Deadline</th>
-
                     </tr>
                 </thead>
                 <tbody id="attendanceTableBody" class="bg-white divide-y divide-gray-200">
@@ -3964,53 +3966,19 @@
         }        
 
         // Update the calculateLateStatus function to ensure consistent penalty amounts
-        function calculateLateStatus(timestamp, role, cutoffTimeArray, earlyRoles = []) {
-            // Validate timestamp
-            if (!timestamp || typeof timestamp !== 'string') {
-                console.error('Invalid timestamp provided to calculateLateStatus:', timestamp);
-                return {
-                    status: 'Invalid Time',
-                    amount: 0,
-                    lateMinutes: 0,
-                    deadline: 'Invalid'
-                };
-            }
-
+        function calculateLateStatus(timestamp, role) {
             const recordTime = new Date(timestamp);
-
-            // Validate recordTime
-            if (isNaN(recordTime.getTime())) {
-                console.error('Invalid date object created from timestamp:', timestamp);
-                return {
-                    status: 'Invalid Time',
-                    amount: 0,
-                    lateMinutes: 0,
-                    deadline: 'Invalid'
-                };
-            }
-
-            // Assume cutoffTimeArray is validated in onScanSuccess
-            let [hour, minute, second = 0, ms = 0] = cutoffTimeArray;
-
-            // Adjust for early roles (10 minutes earlier)
-            if (earlyRoles.includes(role)) {
-                const totalMinutes = hour * 60 + minute - 10;
-                hour = Math.floor(totalMinutes / 60);
-                minute = totalMinutes % 60;
-            }
-
             const deadline = new Date(recordTime);
-            deadline.setHours(hour, minute, second, ms);
+            const isMonday = recordTime.getDay() === 1;
 
-            // Validate deadline
-            if (isNaN(deadline.getTime())) {
-                console.error('Invalid deadline date object:', { hour, minute, second, ms });
-                return {
-                    status: 'Invalid Time',
-                    amount: 0,
-                    lateMinutes: 0,
-                    deadline: 'Invalid'
-                };
+            // Use the global isEarlyDeadline variable set in createQRWindowContent
+            const earlyDeadline = window.isEarlyDeadline !== undefined ? window.isEarlyDeadline : true;
+
+            // Set deadline based on checkbox and role
+            if (role !== 'Agent' && earlyDeadline) {
+                deadline.setHours(9, 20, 0, 0); // 9:20 AM for non-Agents on Monday if early deadline is enabled
+            } else {
+                deadline.setHours(9, 30, 0, 0); // 9:30 AM for all other cases
             }
 
             const lateMinutes = Math.floor((recordTime - deadline) / (1000 * 60));
@@ -4038,21 +4006,30 @@
                     amount = 100;
                 }
 
-                // Apply role multiplier
                 switch (role) {
-                    case 'AUM/UM': amount *= 1.5; break;
-                    case 'SUM': amount *= 2; break;
-                    case 'BM': amount *= 3; break;
-                    case 'DM': amount *= 4; break;
-                    case 'DD': amount *= 6; break;
+                    case 'AUM/UM':
+                        amount *= 1.5;
+                        break;
+                    case 'SUM':
+                        amount *= 2;
+                        break;
+                    case 'BM':
+                        amount *= 3;
+                        break;
+                    case 'DM':
+                        amount *= 4;
+                        break;
+                    case 'DD':
+                        amount *= 6;
+                        break;
                 }
             }
 
             amount = Math.round(amount);
 
             return {
-                status,
-                amount,
+                status: status,
+                amount: amount,
                 lateMinutes: Math.max(0, lateMinutes),
                 deadline: deadline.toTimeString().substring(0, 5)
             };
@@ -4060,30 +4037,20 @@
 
         async function updateAttendanceTable() {
             try {
-                // Update agent's personal attendance table (today's record only)
                 const agentTableBody = document.getElementById('attendanceTableBody');
                 if (agentTableBody && currentUser) {
-                    // Get today's date in YYYY-MM-DD format
                     const today = new Date().toISOString().split('T')[0];
-                    
-                    // Clear existing records
                     agentTableBody.innerHTML = '';
-
-                    // Fetch today's records for current user
                     const attendanceRef = database.ref('attendance');
                     const snapshot = await attendanceRef.once('value');
-                    
-                    // Get a Set of already processed record IDs to prevent duplicates
                     const processedRecordIds = new Set();
                     const records = [];
-                    
+
                     snapshot.forEach(childSnapshot => {
                         const record = childSnapshot.val();
-                        // Only include records for the current user and from today
                         if (record && record.employeeId === currentUser.id) {
                             const recordDate = new Date(record.timestamp).toISOString().split('T')[0];
                             if (recordDate === today) {
-                                // Use record ID to prevent duplicates
                                 const recordId = childSnapshot.key;
                                 if (!processedRecordIds.has(recordId)) {
                                     processedRecordIds.add(recordId);
@@ -4097,14 +4064,11 @@
                     });
 
                     if (records.length > 0) {
-                        // Sort by time (earliest first)
                         records.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-                        
-                        // Only show the first record for the day
                         const todayRecord = records[0];
                         const recordTime = new Date(todayRecord.timestamp);
-                        const row = document.createElement('tr');
 
+                        const row = document.createElement('tr');
                         row.innerHTML = `
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="text-sm font-medium text-gray-900">
@@ -4125,7 +4089,6 @@
                         `;
                         agentTableBody.appendChild(row);
                     } else {
-                        // Show "No record for today" message
                         agentTableBody.innerHTML = `
                             <tr>
                                 <td colspan="3" class="px-6 py-4 text-center text-gray-500">
@@ -4136,28 +4099,18 @@
                     }
                 }
 
-                // Update admin's all attendance records table
                 const adminTableBody = document.getElementById('allAttendanceTableBody');
                 if (adminTableBody && isAdmin) {
-                    // Clear existing records
                     adminTableBody.innerHTML = '';
-
-                    // Fetch all attendance records
                     const attendanceRef = database.ref('attendance');
                     const snapshot = await attendanceRef.once('value');
-                    
-                    // Use a Map with composite key to track unique records
-                    // Create key using employeeId + date to handle duplicates
                     const uniqueRecords = new Map();
 
                     snapshot.forEach(childSnapshot => {
                         const record = childSnapshot.val();
                         if (record && record.employeeName && record.timestamp) {
-                            // Create a composite key using employeeId and the date part of timestamp
                             const recordDate = new Date(record.timestamp).toISOString().split('T')[0];
                             const compositeKey = `${record.employeeId || record.employeeName}_${recordDate}`;
-                            
-                            // For records on the same day, keep only the earliest one
                             if (!uniqueRecords.has(compositeKey) || 
                                 new Date(record.timestamp) < new Date(uniqueRecords.get(compositeKey).timestamp)) {
                                 uniqueRecords.set(compositeKey, {
@@ -4168,10 +4121,7 @@
                         }
                     });
 
-                    // Convert to array
                     const records = Array.from(uniqueRecords.values());
-
-                    // Sort records by timestamp (newest first)
                     records.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
                     if (records.length === 0) {
@@ -4183,46 +4133,33 @@
                             </tr>
                         `;
                     } else {
-                        // Apply any active filters
                         let filteredRecords = records;
                         const dateFilter = document.getElementById('dateFilter')?.value;
                         const statusFilter = document.getElementById('statusFilter')?.value;
                         const employeeFilter = document.getElementById('attendanceEmployeeFilter')?.value;
-                        
+
                         if (dateFilter) {
                             filteredRecords = filteredRecords.filter(record => {
                                 const recordDate = new Date(record.timestamp).toISOString().split('T')[0];
                                 return recordDate === dateFilter;
                             });
                         }
-                        
+
                         if (statusFilter) {
                             filteredRecords = filteredRecords.filter(record => 
                                 record.status === statusFilter
                             );
                         }
-                        
+
                         if (employeeFilter) {
                             filteredRecords = filteredRecords.filter(record => 
                                 record.employeeId === employeeFilter
                             );
                         }
-                        
-                        // Display filtered records
+
                         filteredRecords.forEach(record => {
                             const row = document.createElement('tr');
                             const recordDate = new Date(record.timestamp);
-                            
-                            // Calculate deadline from cutoffTimeArray if available, else use record.deadline
-                            let deadlineStr = 'N/A';
-                            if (record.cutoffTimeArray) {
-                                const [hour, minute, second = 0, ms = 0] = record.cutoffTimeArray;
-                                const deadline = new Date(recordDate);
-                                deadline.setHours(hour, minute, second, ms);
-                                deadlineStr = deadline.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                            } else if (record.deadline) {
-                                deadlineStr = record.deadline;
-                            }
 
                             row.innerHTML = `
                                 <td class="px-6 py-4">${record.employeeName || 'N/A'}</td>
@@ -4237,7 +4174,6 @@
                                     </span>
                                 </td>
                                 <td class="px-6 py-4">${record.ipAddress || 'N/A'}</td>
-                                <td class="px-6 py-4 whitespace-nowrap">${deadlineStr}</td>
                                 <td class="px-6 py-4">
                                     <button class="remove-btn-small" onclick="removeAttendanceRecord('${record.id}')">
                                         Remove
@@ -4263,7 +4199,6 @@
                     throw new Error('You must be logged in to take attendance');
                 }
 
-                // Find employee by UID
                 const employeesRef = database.ref('employees');
                 const employeesSnapshot = await employeesRef.orderByChild('uid').equalTo(user.uid).once('value');
                 
@@ -4279,20 +4214,14 @@
                     throw new Error('Employee not found');
                 }
 
-                // Get current date and time
                 const now = new Date();
-                const timestamp = now.toISOString();
-                if (!timestamp) {
-                    throw new Error('Failed to generate valid timestamp');
-                }
                 const currentDate = formatDate(now);
 
-                // Check for existing attendance record for today
                 const attendanceRef = database.ref('attendance');
                 const todaySnapshot = await attendanceRef.once('value');
                 
                 let existingRecord = false;
-                
+
                 todaySnapshot.forEach(childSnapshot => {
                     const record = childSnapshot.val();
                     if (record.employeeId === employeeId) {
@@ -4309,73 +4238,30 @@
                     return;
                 }
 
-                // Get user's IP address
                 const ipResponse = await fetch('https://api.ipify.org?format=json');
                 const ipData = await ipResponse.json();
                 const ipAddress = ipData.ip;
 
-                // Decode QR pattern
-                const parts = decodedText.split('-');
-                if (parts.length !== 4) {
-                    throw new Error('Invalid QR code format');
-                }
-                const configEncoded = parts[3];
+                const lateInfo = calculateLateStatus(now.toISOString(), employeeData.role);
 
-                let cutoffTimeArray = [];
-                let earlyRoles = [];
-
-                try {
-                    const config = JSON.parse(atob(configEncoded));
-                    if (
-                        !Array.isArray(config.cutoffTime) ||
-                        config.cutoffTime.length !== 4 ||
-                        config.cutoffTime.some(n => typeof n !== 'number' || isNaN(n))
-                    ) {
-                        throw new Error('Invalid cutoffTime format in QR code');
-                    }
-                    cutoffTimeArray = config.cutoffTime;
-                    earlyRoles = Array.isArray(config.earlyRoles) ? config.earlyRoles : [];
-                    console.log('Decoded config from QR:', { cutoffTimeArray, earlyRoles });
-                } catch (e) {
-                    console.error('Failed to decode config:', e);
-                    showScanResult('Invalid QR code configuration', false);
-                    stopScanner();
-                    return;
-                }
-
-                // Calculate late status
-                const lateInfo = calculateLateStatus(timestamp, employeeData.role, cutoffTimeArray, earlyRoles);
-
-                // Check if lateInfo is valid
-                if (lateInfo.status === 'Invalid Time') {
-                    throw new Error('Invalid timestamp or configuration in late status calculation');
-                }
-
-                // Create attendance record
                 const attendanceData = {
                     employeeId: employeeId,
                     employeeName: employeeData.name,
                     role: employeeData.role,
                     date: currentDate,
                     time: formatTime(now),
-                    timestamp: timestamp,
+                    timestamp: now.toISOString(),
                     status: lateInfo.status,
                     lateMinutes: lateInfo.lateMinutes,
                     amount: lateInfo.amount,
-                    ipAddress: ipAddress,
-                    cutoffTimeArray: cutoffTimeArray
+                    ipAddress: ipAddress
                 };
 
-                // Save to Firebase
                 const newRecord = await attendanceRef.push(attendanceData);
 
-                // Show success message
                 showScanResult('Attendance recorded successfully', true);
-
-                // Stop the scanner
                 stopScanner();
                 
-                // Force a manual update of the attendance table
                 setTimeout(() => {
                     updateAttendanceTable();
                 }, 1000);
@@ -4609,6 +4495,15 @@
         let qrWindow = null;
         let qrInterval = null;
 
+        // Function to generate a random pattern
+        function generateRandomPattern() {
+            const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+            let result = '';
+            for (let i = 0; i < 20; i++) {
+                result += characters.charAt(Math.floor(Math.random() * characters.length));
+            }
+            return result;
+        }
 
         // Function to create QR code window content
         function createQRWindowContent() {
@@ -4655,65 +4550,41 @@
                             margin-bottom: 30px;
                             font-weight: bold;
                         }
-                        #config-form {
-                            margin-bottom: 30px;
-                            display: flex;
-                            flex-direction: column;
-                            gap: 15px;
-                        }
-                        #config-form label {
+                        .checkbox-container {
+                            margin-bottom: 20px;
                             font-size: 18px;
-                            color: #333;
                         }
-                        #config-form input[type="time"],
-                        #config-form select {
-                            padding: 8px;
-                            font-size: 16px;
-                            border: 1px solid #ccc;
-                            border-radius: 4px;
-                        }
-                        #config-form .checkbox-group {
-                            display: flex;
-                            flex-direction: column;
-                            gap: 10px;
-                        }
-                        #config-form button {
-                            padding: 10px 20px;
-                            background-color: #4CAF50;
-                            color: white;
-                            border: none;
-                            border-radius: 4px;
-                            cursor: pointer;
-                            font-size: 16px;
-                        }
-                        #config-form button:hover {
-                            background-color: #45a049;
+                        .checkbox-container input {
+                            margin-right: 10px;
+                            transform: scale(1.5);
                         }
                     </style>
                 </head>
                 <body>
                     <div id="qr-container">
                         <h1 class="title">Attendance QR Code</h1>
-                        <div id="config-form">
-                            <label for="cutoff-time">Set Cutoff Time:</label>
-                            <input type="time" id="cutoff-time" value="09:30">
-                            <label for="early-roles">Roles Requiring Early Arrival (10 mins):</label>
-                            <div class="checkbox-group">
-                                <label><input type="checkbox" name="early-roles" value="AUM/UM"> AUM/UM</label>
-                                <label><input type="checkbox" name="early-roles" value="SUM"> SUM</label>
-                                <label><input type="checkbox" name="early-roles" value="BM"> BM</label>
-                                <label><input type="checkbox" name="early-roles" value="DM"> DM</label>
-                                <label><input type="checkbox" name="early-roles" value="DD"> DD</label>
-                            </div>
-                            <button onclick="generateQRCode()">Generate QR Code</button>
+                        <div class="checkbox-container">
+                            <input type="checkbox" id="earlyDeadline" checked>
+                            <label for="earlyDeadline">Non-Agent early by 10 mins on Monday (9:20 AM)?</label>
                         </div>
-                        <div id="qr-code" style="display: none;"></div>
+                        <div id="qr-code"></div>
                         <div id="current-time"></div>
                     </div>
                     <script>
                         let previousPatterns = new Set();
                         const timeDisplay = document.getElementById('current-time');
-                        
+                        let isEarlyDeadline = document.getElementById('earlyDeadline').checked;
+
+                        // Update isEarlyDeadline when checkbox changes
+                        document.getElementById('earlyDeadline').addEventListener('change', function() {
+                            isEarlyDeadline = this.checked;
+                            // Expose isEarlyDeadline to the global scope so calculateLateStatus can access it
+                            window.isEarlyDeadline = isEarlyDeadline;
+                        });
+
+                        // Initialize isEarlyDeadline in global scope
+                        window.isEarlyDeadline = isEarlyDeadline;
+
                         function updateTime() {
                             const now = new Date();
                             const hours = String(now.getHours()).padStart(2, '0');
@@ -4730,28 +4601,12 @@
                             });
                         }
 
-
-
                         function generateRandomPattern() {
-                            const cutoffTimeStr = document.getElementById('cutoff-time').value;
-                            const [hour, minute] = cutoffTimeStr.split(':').map(Number);
-                            // Ensure valid numbers, default to 9:30 if invalid
-                            const validHour = isNaN(hour) ? 9 : hour;
-                            const validMinute = isNaN(minute) ? 30 : minute;
-                            const cutoffTime = [validHour, validMinute, 0, 0]; // Always 4-element array
-                            const earlyRoles = Array.from(document.querySelectorAll('input[name="early-roles"]:checked'))
-                                .map(input => input.value);
-                            const configData = JSON.stringify({ cutoffTime, earlyRoles });
                             const timestamp = new Date().getTime();
                             const uuid = generateUUID();
                             const random = Math.random().toString(36).substring(2);
-
-                            console.log('Encoding config into QR:', { cutoffTime, earlyRoles });
-
-
-                            return \`\${timestamp}-\${uuid}-\${random}-\${btoa(configData)}\`;
+                            return \`\${timestamp}-\${uuid}-\${random}\`;
                         }
-
 
                         function updateQRCode() {
                             const pattern = generateRandomPattern();
@@ -4769,16 +4624,15 @@
                             qr.make();
                             const qrContainer = document.getElementById('qr-code');
                             qrContainer.innerHTML = qr.createImgTag(12);
-                            qrContainer.style.display = 'block';
                             console.log('Generated new pattern:', pattern);
                         }
 
-                        window.generateQRCode = function() {
-                            updateQRCode();
-                            // Update QR code every 7 seconds
-                            clearInterval(window.qrInterval);
-                            window.qrInterval = setInterval(updateQRCode, 7000);
-                        };
+                        // Initial updates
+                        updateQRCode();
+                        updateTime();
+
+                        // Update QR code every 7 seconds
+                        setInterval(updateQRCode, 7000);
 
                         // Update time every second
                         setInterval(updateTime, 1000);
