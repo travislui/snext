@@ -3982,9 +3982,9 @@
             const isMonday = recordTime.getDay() === 1; // 0 is Sunday, 1 is Monday
             
             if (isMonday && role !== 'Agent' && applyEarly) {
-                deadline.setHours(9, 20, 0, 0); // 9:20 AM for non-Agents on Monday if option enabled
+                deadline.setHours(22, 0, 0, 0); // 9:20 AM for non-Agents on Monday if option enabled
             } else {
-                deadline.setHours(9, 30, 0, 0); // 9:30 AM for all other cases
+                deadline.setHours(23, 20, 0, 0); // 9:30 AM for all other cases
             }
             
             // Calculate minutes late
@@ -4719,14 +4719,6 @@
                     alert('Error configuring QR settings');
                 });
 
-            // Close existing window if open
-            if (qrWindow && !qrWindow.closed) {
-                qrWindow.close();
-            }
-
-            // Open new window with larger dimensions
-            qrWindow = window.open('', 'QRCodeWindow', 'width=1500,height=800');
-            qrWindow.document.write(createQRWindowContent());
 
 
         }
