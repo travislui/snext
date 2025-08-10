@@ -3967,82 +3967,99 @@
 
         // Update the calculateLateStatus function to ensure consistent penalty amounts
         async function calculateLateStatus(timestamp, role) {
-            const recordTime = new Date(timestamp);
-            
-            // Get the date in YYYY-MM-DD format for settings lookup
-            const recordDate = recordTime.toISOString().split('T')[0];
-            
-            // Fetch the applyEarly setting from Firebase (default to false if not set)
-            const settingsRef = database.ref(`settings/${recordDate}/applyEarly`);
-            const snapshot = await settingsRef.once('value');
-            const applyEarly = snapshot.val() ?? false;
-            
-            // Create deadline time based on day of week, role, and setting
-            const deadline = new Date(recordTime);
-            const isMonday = recordTime.getDay() === 1; // 0 is Sunday, 1 is Monday
-            
-            if (isMonday && role !== 'Agent' && applyEarly) {
-                deadline.setHours(22, 0, 0, 0); // 9:20 AM for non-Agents on Monday if option enabled
-            } else {
-                deadline.setHours(23, 20, 0, 0); // 9:30 AM for all other cases
-            }
-            
-            // Calculate minutes late
-            const lateMinutes = Math.floor((recordTime - deadline) / (1000 * 60));
-            
-            let status = '';
-            let amount = 0;
+            try {
+                const recordTime = new Date(timestamp);
+                if (isNaN(recordTime.getTime())) {
+                    throw new Error('Invalid timestamp provided');
+                }
 
-            if (lateMinutes <= 0) {
-                status = 'Punctual';
-                amount = 0;
-            } else {
-                if (lateMinutes >= 60) { // 1 hour or more (No Show)
-                    status = 'No Show';
-                    amount = 200;
-                } else if (lateMinutes <= 5) {
-                    status = 'Late ≤ 5 mins';
-                    amount = 20;
-                } else if (lateMinutes <= 10) {
-                    status = 'Late 6-10 mins';
-                    amount = 40;
-                } else if (lateMinutes <= 15) {
-                    status = 'Late 11-15 mins';
-                    amount = 60;
+                // Get the date in YYYY-MM-DD format for settings lookup
+                const recordDate = recordTime.toISOString().split('T')[0];
+                
+                // Fetch the applyEarly setting from Firebase (default to false if not set)
+                const settingsRef = database.ref(`settings/${recordDate}/applyEarly`);
+                const snapshot = await settingsRef.once('value');
+                const applyEarly = snapshot.val() ?? false;
+                
+                // Create deadline time based on day of week, role, and setting
+                const deadline = new Date(recordTime);
+                const isMonday = recordTime.getDay() === 1; // 0 is Sunday, 1 is Monday
+                
+                if (isMonday && role !== 'Agent' && applyEarly) {
+                    deadline.setHours(23, 20, 0, 0); // 9:20 AM for non-Agents on Monday if option enabled
                 } else {
-                    status = 'Late > 15 mins';
-                    amount = 100;
+                    deadline.setHours(23, 30, 0, 0); // 9:30 AM for all other cases
+                }
+                
+                // Calculate minutes late
+                const lateMinutes = Math.floor((recordTime - deadline) / (1000 * 60));
+                
+                let status = '';
+                let amount = 0;
+
+                if (lateMinutes <= 0) {
+                    status = 'Punctual';
+                    amount = 0;
+                } else {
+                    if (lateMinutes >= 60) { // 1 hour or more (No Show)
+                        status = 'No Show';
+                        amount = 200;
+                    } else if (lateMinutes <= 5) {
+                        status = 'Late ≤ 5 mins';
+                        amount = 20;
+                    } else if (lateMinutes <= 10) {
+                        status = 'Late 6-10 mins';
+                        amount = 40;
+                    } else if (lateMinutes <= 15) {
+                        status = 'Late 11-15 mins';
+                        amount = 60;
+                    } else {
+                        status = 'Late > 15 mins';
+                        amount = 100;
+                    }
+
+                    // Apply role multiplier
+                    switch (role) {
+                        case 'AUM/UM':
+                            amount *= 1.5;
+                            break;
+                        case 'SUM':
+                            amount *= 2;
+                            break;
+                        case 'BM':
+                            amount *= 3;
+                            break;
+                        case 'DM':
+                            amount *= 4;
+                            break;
+                        case 'DD':
+                            amount *= 6;
+                            break;
+                        default:
+                            if (!role) {
+                                console.warn('Role is undefined or invalid, using default multiplier');
+                            }
+                    }
                 }
 
-                // Apply role multiplier
-                switch (role) {
-                    case 'AUM/UM':
-                        amount *= 1.5;
-                        break;
-                    case 'SUM':
-                        amount *= 2;
-                        break;
-                    case 'BM':
-                        amount *= 3;
-                        break;
-                    case 'DM':
-                        amount *= 4;
-                        break;
-                    case 'DD':
-                        amount *= 6;
-                        break;
-                }
+                // Round the amount to nearest integer
+                amount = Math.round(amount);
+
+                return {
+                    status: status || 'Unknown', // Fallback to 'Unknown' if status is empty
+                    amount: amount,
+                    lateMinutes: Math.max(0, lateMinutes), // Ensure non-negative
+                    deadline: deadline.toTimeString().substring(0, 5) // Add deadline time for display/debugging
+                };
+            } catch (error) {
+                console.error('Error in calculateLateStatus:', error);
+                return {
+                    status: 'Error',
+                    amount: 0,
+                    lateMinutes: 0,
+                    deadline: '00:00'
+                };
             }
-
-            // Round the amount to nearest integer
-            amount = Math.round(amount);
-
-            return {
-                status: status,
-                amount: amount,
-                lateMinutes: Math.max(0, lateMinutes), // Ensure non-negative
-                deadline: deadline.toTimeString().substring(0, 5) // Add deadline time for display/debugging
-            };
         }
 
         async function updateAttendanceTable() {
@@ -4235,7 +4252,7 @@
             try {
                 const user = auth.currentUser;
                 if (!user) {
-                    throw new Error('You must be logged in to take attendance');
+                    throw new Error('You must be loed in to take attendance');
                 }
 
                 // Find employee by UID
@@ -4250,7 +4267,7 @@
                     employeeId = childSnapshot.key;
                 });
 
-                if (!employeeData) {
+                if (!employeeData || !employeeId) {
                     throw new Error('Employee not found');
                 }
 
@@ -4264,7 +4281,6 @@
                 
                 let existingRecord = false;
                 
-                // Check if there's already a record for this employee on this date
                 todaySnapshot.forEach(childSnapshot => {
                     const record = childSnapshot.val();
                     if (record.employeeId === employeeId) {
@@ -4282,18 +4298,27 @@
                 }
 
                 // Get user's IP address
-                const ipResponse = await fetch('https://api.ipify.org?format=json');
-                const ipData = await ipResponse.json();
-                const ipAddress = ipData.ip;
+                let ipAddress = 'Unknown';
+                try {
+                    const ipResponse = await fetch('https://api.ipify.org?format=json');
+                    const ipData = await ipResponse.json();
+                    ipAddress = ipData.ip;
+                } catch (error) {
+                    console.warn('Failed to fetch IP address:', error);
+                }
 
                 // Calculate late status
-                const lateInfo = await calculateLateStatus(now.toISOString(), employeeData.role);
+                const lateInfo = await calculateLateStatus(now.toISOString(), employeeData.role || 'Unknown');
+                if (!lateInfo.status) {
+                    console.error('lateInfo.status is undefined:', lateInfo);
+                    throw new Error('Failed to calculate late status');
+                }
 
                 // Create attendance record
                 const attendanceData = {
                     employeeId: employeeId,
-                    employeeName: employeeData.name,
-                    role: employeeData.role,
+                    employeeName: employeeData.name || 'Unknown',
+                    role: employeeData.role || 'Unknown',
                     date: currentDate,
                     time: formatTime(now),
                     timestamp: now.toISOString(),
@@ -4302,6 +4327,9 @@
                     amount: lateInfo.amount,
                     ipAddress: ipAddress
                 };
+
+                // Log attendanceData for debugging
+                console.log('Saving attendanceData:', attendanceData);
 
                 // Save to Firebase
                 const newRecord = await attendanceRef.push(attendanceData);
@@ -4312,10 +4340,8 @@
                 // Stop the scanner
                 stopScanner();
                 
-                // Important: Manually update the UI once without relying on listeners
-                // This avoids duplicate rendering
+                // Force a manual update of the attendance table
                 setTimeout(() => {
-                    // Force a manual update of the attendance table to show the new record
                     updateAttendanceTable();
                 }, 1000);
 
@@ -4706,6 +4732,8 @@
             // Get today's date in YYYY-MM-DD format
             const today = new Date().toISOString().split('T')[0];
             
+       
+
             // Store the setting in Firebase
             database.ref(`settings/${today}/applyEarly`).set(applyEarly)
                 .then(() => {
@@ -4718,9 +4746,6 @@
                     console.error('Error setting QR option:', error);
                     alert('Error configuring QR settings');
                 });
-
-
-
         }
 
         // Add event listener to the button
