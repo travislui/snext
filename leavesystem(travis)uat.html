@@ -4696,15 +4696,6 @@
 
         // Update the window opening function to create a larger window
         function openQRCodeWindow() {
-            // Close existing window if open
-            if (qrWindow && !qrWindow.closed) {
-                qrWindow.close();
-            }
-
-            // Open new window with larger dimensions
-            qrWindow = window.open('', 'QRCodeWindow', 'width=1500,height=800');
-            qrWindow.document.write(createQRWindowContent());
-
             if (!isAdmin) {
                 alert('Only admins can open the QR window');
                 return;
@@ -4727,6 +4718,17 @@
                     console.error('Error setting QR option:', error);
                     alert('Error configuring QR settings');
                 });
+
+            // Close existing window if open
+            if (qrWindow && !qrWindow.closed) {
+                qrWindow.close();
+            }
+
+            // Open new window with larger dimensions
+            qrWindow = window.open('', 'QRCodeWindow', 'width=1500,height=800');
+            qrWindow.document.write(createQRWindowContent());
+
+
         }
 
         // Add event listener to the button
