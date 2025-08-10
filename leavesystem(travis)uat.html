@@ -2,7 +2,7 @@
 <html lang="en">
 
 <head>
-    <title>S-Next 請假及賀金系統 UAT</title>
+    <title>S-Next 請假及賀金系統</title>
     
     <link href='https://cdn.jsdelivr.net/npm/@fullcalendar/core@6.1.10/main.min.css' rel='stylesheet' />
     <link href='https://cdn.jsdelivr.net/npm/@fullcalendar/daygrid@6.1.10/main.min.css' rel='stylesheet' />
@@ -1871,7 +1871,7 @@
 <body>
     <div id="sync-status" class="sync-status"></div>
     <header>
-    <h1>S-Next 請假及賀金系統 UAT</h1>
+    <h1>S-Next 請假及賀金系統 NEW UAT</h1>
     </header>
     <div class="container" id="home-page">
         <h3>Login</h3>
@@ -3966,22 +3966,30 @@
         }        
 
         // Update the calculateLateStatus function to ensure consistent penalty amounts
-        function calculateLateStatus(timestamp, role, isEarlyDeadline) {
+        async function calculateLateStatus(timestamp, role) {
             const recordTime = new Date(timestamp);
+            
+            // Get the date in YYYY-MM-DD format for settings lookup
+            const recordDate = recordTime.toISOString().split('T')[0];
+            
+            // Fetch the applyEarly setting from Firebase (default to false if not set)
+            const settingsRef = database.ref(`settings/${recordDate}/applyEarly`);
+            const snapshot = await settingsRef.once('value');
+            const applyEarly = snapshot.val() ?? false;
+            
+            // Create deadline time based on day of week, role, and setting
             const deadline = new Date(recordTime);
-            const isMonday = recordTime.getDay() === 1;
-
-            // Use the provided isEarlyDeadline value (default to true if not provided)
-            const earlyDeadline = isEarlyDeadline !== undefined ? isEarlyDeadline : true;
-
-            // Set deadline based on isEarlyDeadline and role
-            if (isMonday && role !== 'Agent' && earlyDeadline) {
-                deadline.setHours(22, 50, 0, 0); // 9:20 AM for non-Agents on Monday if early deadline
+            const isMonday = recordTime.getDay() === 1; // 0 is Sunday, 1 is Monday
+            
+            if (isMonday && role !== 'Agent' && applyEarly) {
+                deadline.setHours(9, 20, 0, 0); // 9:20 AM for non-Agents on Monday if option enabled
             } else {
-                deadline.setHours(23, 0, 0, 0); // 9:30 AM for all other cases
+                deadline.setHours(9, 30, 0, 0); // 9:30 AM for all other cases
             }
-
+            
+            // Calculate minutes late
             const lateMinutes = Math.floor((recordTime - deadline) / (1000 * 60));
+            
             let status = '';
             let amount = 0;
 
@@ -3989,7 +3997,7 @@
                 status = 'Punctual';
                 amount = 0;
             } else {
-                if (lateMinutes >= 60) {
+                if (lateMinutes >= 60) { // 1 hour or more (No Show)
                     status = 'No Show';
                     amount = 200;
                 } else if (lateMinutes <= 5) {
@@ -4006,6 +4014,7 @@
                     amount = 100;
                 }
 
+                // Apply role multiplier
                 switch (role) {
                     case 'AUM/UM':
                         amount *= 1.5;
@@ -4025,32 +4034,43 @@
                 }
             }
 
+            // Round the amount to nearest integer
             amount = Math.round(amount);
 
             return {
                 status: status,
                 amount: amount,
-                lateMinutes: Math.max(0, lateMinutes),
-                deadline: deadline.toTimeString().substring(0, 5)
+                lateMinutes: Math.max(0, lateMinutes), // Ensure non-negative
+                deadline: deadline.toTimeString().substring(0, 5) // Add deadline time for display/debugging
             };
         }
 
         async function updateAttendanceTable() {
             try {
+                // Update agent's personal attendance table (today's record only)
                 const agentTableBody = document.getElementById('attendanceTableBody');
                 if (agentTableBody && currentUser) {
+                    // Get today's date in YYYY-MM-DD format
                     const today = new Date().toISOString().split('T')[0];
+                    
+                    // Clear existing records
                     agentTableBody.innerHTML = '';
+
+                    // Fetch today's records for current user
                     const attendanceRef = database.ref('attendance');
                     const snapshot = await attendanceRef.once('value');
+                    
+                    // Get a Set of already processed record IDs to prevent duplicates
                     const processedRecordIds = new Set();
                     const records = [];
-
+                    
                     snapshot.forEach(childSnapshot => {
                         const record = childSnapshot.val();
+                        // Only include records for the current user and from today
                         if (record && record.employeeId === currentUser.id) {
                             const recordDate = new Date(record.timestamp).toISOString().split('T')[0];
                             if (recordDate === today) {
+                                // Use record ID to prevent duplicates
                                 const recordId = childSnapshot.key;
                                 if (!processedRecordIds.has(recordId)) {
                                     processedRecordIds.add(recordId);
@@ -4064,7 +4084,10 @@
                     });
 
                     if (records.length > 0) {
+                        // Sort by time (earliest first)
                         records.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+                        
+                        // Only show the first record for the day
                         const todayRecord = records[0];
                         const recordTime = new Date(todayRecord.timestamp);
 
@@ -4089,6 +4112,7 @@
                         `;
                         agentTableBody.appendChild(row);
                     } else {
+                        // Show "No record for today" message
                         agentTableBody.innerHTML = `
                             <tr>
                                 <td colspan="3" class="px-6 py-4 text-center text-gray-500">
@@ -4099,18 +4123,28 @@
                     }
                 }
 
+                // Update admin's all attendance records table
                 const adminTableBody = document.getElementById('allAttendanceTableBody');
                 if (adminTableBody && isAdmin) {
+                    // Clear existing records
                     adminTableBody.innerHTML = '';
+
+                    // Fetch all attendance records
                     const attendanceRef = database.ref('attendance');
                     const snapshot = await attendanceRef.once('value');
+                    
+                    // Use a Map with composite key to track unique records
+                    // Create key using employeeId + date to handle duplicates
                     const uniqueRecords = new Map();
 
                     snapshot.forEach(childSnapshot => {
                         const record = childSnapshot.val();
                         if (record && record.employeeName && record.timestamp) {
+                            // Create a composite key using employeeId and the date part of timestamp
                             const recordDate = new Date(record.timestamp).toISOString().split('T')[0];
                             const compositeKey = `${record.employeeId || record.employeeName}_${recordDate}`;
+                            
+                            // For records on the same day, keep only the earliest one
                             if (!uniqueRecords.has(compositeKey) || 
                                 new Date(record.timestamp) < new Date(uniqueRecords.get(compositeKey).timestamp)) {
                                 uniqueRecords.set(compositeKey, {
@@ -4121,7 +4155,10 @@
                         }
                     });
 
+                    // Convert to array
                     const records = Array.from(uniqueRecords.values());
+
+                    // Sort records by timestamp (newest first)
                     records.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
                     if (records.length === 0) {
@@ -4133,34 +4170,36 @@
                             </tr>
                         `;
                     } else {
+                        // Apply any active filters
                         let filteredRecords = records;
                         const dateFilter = document.getElementById('dateFilter')?.value;
                         const statusFilter = document.getElementById('statusFilter')?.value;
                         const employeeFilter = document.getElementById('attendanceEmployeeFilter')?.value;
-
+                        
                         if (dateFilter) {
                             filteredRecords = filteredRecords.filter(record => {
                                 const recordDate = new Date(record.timestamp).toISOString().split('T')[0];
                                 return recordDate === dateFilter;
                             });
                         }
-
+                        
                         if (statusFilter) {
                             filteredRecords = filteredRecords.filter(record => 
                                 record.status === statusFilter
                             );
                         }
-
+                        
                         if (employeeFilter) {
                             filteredRecords = filteredRecords.filter(record => 
                                 record.employeeId === employeeFilter
                             );
                         }
-
+                        
+                        // Display filtered records
                         filteredRecords.forEach(record => {
                             const row = document.createElement('tr');
                             const recordDate = new Date(record.timestamp);
-
+                            
                             row.innerHTML = `
                                 <td class="px-6 py-4">${record.employeeName || 'N/A'}</td>
                                 <td class="px-6 py-4">${record.role || 'N/A'}</td>
@@ -4191,6 +4230,7 @@
             }
         }
 
+        // Modify your onScanSuccess function to update the table
         async function onScanSuccess(decodedText, decodedResult) {
             try {
                 const user = auth.currentUser;
@@ -4224,6 +4264,7 @@
                 
                 let existingRecord = false;
                 
+                // Check if there's already a record for this employee on this date
                 todaySnapshot.forEach(childSnapshot => {
                     const record = childSnapshot.val();
                     if (record.employeeId === employeeId) {
@@ -4245,14 +4286,8 @@
                 const ipData = await ipResponse.json();
                 const ipAddress = ipData.ip;
 
-                // Retrieve isEarlyDeadline from the QR pattern in Firebase
-                const qrPatternRef = database.ref('qr_patterns/' + decodedText);
-                const qrSnapshot = await qrPatternRef.once('value');
-                const qrData = qrSnapshot.val();
-                const isEarlyDeadline = qrData ? qrData.isEarlyDeadline : true; // Default to true if not found
-
-                // Calculate late status using the stored isEarlyDeadline
-                const lateInfo = calculateLateStatus(now.toISOString(), employeeData.role, isEarlyDeadline);
+                // Calculate late status
+                const lateInfo = await calculateLateStatus(now.toISOString(), employeeData.role);
 
                 // Create attendance record
                 const attendanceData = {
@@ -4265,9 +4300,7 @@
                     status: lateInfo.status,
                     lateMinutes: lateInfo.lateMinutes,
                     amount: lateInfo.amount,
-                    ipAddress: ipAddress,
-                    qrPattern: decodedText,
-                    isEarlyDeadline: isEarlyDeadline // Store isEarlyDeadline with the record
+                    ipAddress: ipAddress
                 };
 
                 // Save to Firebase
@@ -4279,8 +4312,10 @@
                 // Stop the scanner
                 stopScanner();
                 
-                // Update the UI
+                // Important: Manually update the UI once without relying on listeners
+                // This avoids duplicate rendering
                 setTimeout(() => {
+                    // Force a manual update of the attendance table to show the new record
                     updateAttendanceTable();
                 }, 1000);
 
@@ -4568,36 +4603,18 @@
                             margin-bottom: 30px;
                             font-weight: bold;
                         }
-                        .checkbox-container {
-                            margin-bottom: 20px;
-                            font-size: 18px;
-                        }
-                        .checkbox-container input {
-                            margin-right: 10px;
-                            transform: scale(1.5);
-                        }
                     </style>
                 </head>
                 <body>
                     <div id="qr-container">
                         <h1 class="title">Attendance QR Code</h1>
-                        <div class="checkbox-container">
-                            <input type="checkbox" id="earlyDeadline" checked>
-                            <label for="earlyDeadline">Non-Agent early by 10 mins on Monday (9:20 AM)?</label>
-                        </div>
                         <div id="qr-code"></div>
                         <div id="current-time"></div>
                     </div>
                     <script>
                         let previousPatterns = new Set();
                         const timeDisplay = document.getElementById('current-time');
-                        let isEarlyDeadline = document.getElementById('earlyDeadline').checked;
-
-                        // Update isEarlyDeadline when checkbox changes
-                        document.getElementById('earlyDeadline').addEventListener('change', function() {
-                            isEarlyDeadline = this.checked;
-                        });
-
+                        
                         function updateTime() {
                             const now = new Date();
                             const hours = String(now.getHours()).padStart(2, '0');
@@ -4613,48 +4630,56 @@
                                 return v.toString(16);
                             });
                         }
-
+                        
                         function generateRandomPattern() {
+                            // Get current timestamp
                             const timestamp = new Date().getTime();
+                            
+                            // Generate a UUID
                             const uuid = generateUUID();
+                            
+                            // Generate additional random component
                             const random = Math.random().toString(36).substring(2);
+                            
+                            // Combine all components to ensure uniqueness
                             return \`\${timestamp}-\${uuid}-\${random}\`;
                         }
 
                         function updateQRCode() {
                             const pattern = generateRandomPattern();
+                            
+                            // Verify pattern is unique (although with timestamp it's guaranteed)
                             if (previousPatterns.has(pattern)) {
                                 console.log('Pattern collision detected, generating new pattern');
-                                return updateQRCode();
+                                return updateQRCode(); // Recursively try again
                             }
+                            
                             previousPatterns.add(pattern);
+                            
+                            // Limit set size to prevent memory issues
                             if (previousPatterns.size > 1000) {
                                 const iterator = previousPatterns.values();
                                 previousPatterns.delete(iterator.next().value);
                             }
+
                             const qr = qrcode(0, 'L');
                             qr.addData(pattern);
                             qr.make();
+                            
                             const qrContainer = document.getElementById('qr-code');
                             qrContainer.innerHTML = qr.createImgTag(12);
+
+                            // Log pattern for verification (can be removed in production)
                             console.log('Generated new pattern:', pattern);
-
-                            // Save the pattern and isEarlyDeadline to Firebase
-                            firebase.database().ref('qr_patterns/' + pattern).set({
-                                isEarlyDeadline: isEarlyDeadline,
-                                timestamp: new Date().toISOString()
-                            }).catch(error => {
-                                console.error('Error saving QR pattern:', error);
-                            });
                         }
-
+                        
                         // Initial updates
                         updateQRCode();
                         updateTime();
-
+                        
                         // Update QR code every 7 seconds
                         setInterval(updateQRCode, 7000);
-
+                        
                         // Update time every second
                         setInterval(updateTime, 1000);
 
@@ -4679,6 +4704,29 @@
             // Open new window with larger dimensions
             qrWindow = window.open('', 'QRCodeWindow', 'width=1500,height=800');
             qrWindow.document.write(createQRWindowContent());
+
+            if (!isAdmin) {
+                alert('Only admins can open the QR window');
+                return;
+            }
+
+            const applyEarly = confirm('Apply early deadline for non-agents (10 mins early on Mondays)?');
+            
+            // Get today's date in YYYY-MM-DD format
+            const today = new Date().toISOString().split('T')[0];
+            
+            // Store the setting in Firebase
+            database.ref(`settings/${today}/applyEarly`).set(applyEarly)
+                .then(() => {
+                    // Now open the QR window
+                    const qrWindow = window.open('', '_blank', 'width=600,height=800');
+                    qrWindow.document.write(createQRWindowContent());
+                    qrWindow.document.close();
+                })
+                .catch(error => {
+                    console.error('Error setting QR option:', error);
+                    alert('Error configuring QR settings');
+                });
         }
 
         // Add event listener to the button
