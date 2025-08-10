@@ -2,7 +2,7 @@
 <html lang="en">
 
 <head>
-    <title>S-Next 請假及賀金系統</title>
+    <title>S-Next 請假及賀金系統 UAT</title>
     
     <link href='https://cdn.jsdelivr.net/npm/@fullcalendar/core@6.1.10/main.min.css' rel='stylesheet' />
     <link href='https://cdn.jsdelivr.net/npm/@fullcalendar/daygrid@6.1.10/main.min.css' rel='stylesheet' />
@@ -3976,9 +3976,9 @@
 
             // Set deadline based on checkbox and role
             if (role !== 'Agent' && earlyDeadline) {
-                deadline.setHours(9, 20, 0, 0); // 9:20 AM for non-Agents on Monday if early deadline is enabled
+                deadline.setHours(22, 30, 0, 0); // 9:20 AM for non-Agents on Monday if early deadline is enabled
             } else {
-                deadline.setHours(9, 30, 0, 0); // 9:30 AM for all other cases
+                deadline.setHours(22, 45, 0, 0); // 9:30 AM for all other cases
             }
 
             const lateMinutes = Math.floor((recordTime - deadline) / (1000 * 60));
