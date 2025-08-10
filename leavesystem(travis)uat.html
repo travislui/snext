@@ -1871,7 +1871,7 @@
 <body>
     <div id="sync-status" class="sync-status"></div>
     <header>
-    <h1>S-Next 請假及賀金系統</h1>
+    <h1>S-Next 請假及賀金系統 UAT</h1>
     </header>
     <div class="container" id="home-page">
         <h3>Login</h3>
@@ -3966,19 +3966,19 @@
         }        
 
         // Update the calculateLateStatus function to ensure consistent penalty amounts
-        function calculateLateStatus(timestamp, role) {
+        function calculateLateStatus(timestamp, role, isEarlyDeadline) {
             const recordTime = new Date(timestamp);
             const deadline = new Date(recordTime);
             const isMonday = recordTime.getDay() === 1;
 
-            // Use the global isEarlyDeadline variable set in createQRWindowContent
-            const earlyDeadline = window.isEarlyDeadline !== undefined ? window.isEarlyDeadline : true;
+            // Use the provided isEarlyDeadline value (default to true if not provided)
+            const earlyDeadline = isEarlyDeadline !== undefined ? isEarlyDeadline : true;
 
-            // Set deadline based on checkbox and role
-            if (role !== 'Agent' && earlyDeadline) {
-                deadline.setHours(22, 30, 0, 0); // 9:20 AM for non-Agents on Monday if early deadline is enabled
+            // Set deadline based on isEarlyDeadline and role
+            if (isMonday && role !== 'Agent' && earlyDeadline) {
+                deadline.setHours(22, 50, 0, 0); // 9:20 AM for non-Agents on Monday if early deadline
             } else {
-                deadline.setHours(22, 45, 0, 0); // 9:30 AM for all other cases
+                deadline.setHours(23, 0, 0, 0); // 9:30 AM for all other cases
             }
 
             const lateMinutes = Math.floor((recordTime - deadline) / (1000 * 60));
@@ -4191,7 +4191,6 @@
             }
         }
 
-        // Modify your onScanSuccess function to update the table
         async function onScanSuccess(decodedText, decodedResult) {
             try {
                 const user = auth.currentUser;
@@ -4199,6 +4198,7 @@
                     throw new Error('You must be logged in to take attendance');
                 }
 
+                // Find employee by UID
                 const employeesRef = database.ref('employees');
                 const employeesSnapshot = await employeesRef.orderByChild('uid').equalTo(user.uid).once('value');
                 
@@ -4214,14 +4214,16 @@
                     throw new Error('Employee not found');
                 }
 
+                // Get current date and time
                 const now = new Date();
                 const currentDate = formatDate(now);
 
+                // Check for existing attendance record for today
                 const attendanceRef = database.ref('attendance');
                 const todaySnapshot = await attendanceRef.once('value');
                 
                 let existingRecord = false;
-
+                
                 todaySnapshot.forEach(childSnapshot => {
                     const record = childSnapshot.val();
                     if (record.employeeId === employeeId) {
@@ -4238,12 +4240,21 @@
                     return;
                 }
 
+                // Get user's IP address
                 const ipResponse = await fetch('https://api.ipify.org?format=json');
                 const ipData = await ipResponse.json();
                 const ipAddress = ipData.ip;
 
-                const lateInfo = calculateLateStatus(now.toISOString(), employeeData.role);
+                // Retrieve isEarlyDeadline from the QR pattern in Firebase
+                const qrPatternRef = database.ref('qr_patterns/' + decodedText);
+                const qrSnapshot = await qrPatternRef.once('value');
+                const qrData = qrSnapshot.val();
+                const isEarlyDeadline = qrData ? qrData.isEarlyDeadline : true; // Default to true if not found
 
+                // Calculate late status using the stored isEarlyDeadline
+                const lateInfo = calculateLateStatus(now.toISOString(), employeeData.role, isEarlyDeadline);
+
+                // Create attendance record
                 const attendanceData = {
                     employeeId: employeeId,
                     employeeName: employeeData.name,
@@ -4254,14 +4265,21 @@
                     status: lateInfo.status,
                     lateMinutes: lateInfo.lateMinutes,
                     amount: lateInfo.amount,
-                    ipAddress: ipAddress
+                    ipAddress: ipAddress,
+                    qrPattern: decodedText,
+                    isEarlyDeadline: isEarlyDeadline // Store isEarlyDeadline with the record
                 };
 
+                // Save to Firebase
                 const newRecord = await attendanceRef.push(attendanceData);
 
+                // Show success message
                 showScanResult('Attendance recorded successfully', true);
+
+                // Stop the scanner
                 stopScanner();
                 
+                // Update the UI
                 setTimeout(() => {
                     updateAttendanceTable();
                 }, 1000);
@@ -4578,12 +4596,7 @@
                         // Update isEarlyDeadline when checkbox changes
                         document.getElementById('earlyDeadline').addEventListener('change', function() {
                             isEarlyDeadline = this.checked;
-                            // Expose isEarlyDeadline to the global scope so calculateLateStatus can access it
-                            window.isEarlyDeadline = isEarlyDeadline;
                         });
-
-                        // Initialize isEarlyDeadline in global scope
-                        window.isEarlyDeadline = isEarlyDeadline;
 
                         function updateTime() {
                             const now = new Date();
@@ -4625,6 +4638,14 @@
                             const qrContainer = document.getElementById('qr-code');
                             qrContainer.innerHTML = qr.createImgTag(12);
                             console.log('Generated new pattern:', pattern);
+
+                            // Save the pattern and isEarlyDeadline to Firebase
+                            firebase.database().ref('qr_patterns/' + pattern).set({
+                                isEarlyDeadline: isEarlyDeadline,
+                                timestamp: new Date().toISOString()
+                            }).catch(error => {
+                                console.error('Error saving QR pattern:', error);
+                            });
                         }
 
                         // Initial updates
