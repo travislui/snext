@@ -3997,9 +3997,9 @@
 
                 // Apply early deadline (9:20 AM) for non-Agents on Monday if enabled
                 if (role !== 'Agent' && earlyDeadlineEnabled) {
-                    deadline.setHours(22, 25, 0, 0); // 9:20 AM for non-Agents on Monday
+                    deadline.setHours(22, 35, 0, 0); // 9:20 AM for non-Agents on Monday
                 } else {
-                    deadline.setHours(22, 35, 0, 0); // 9:30 AM for all other cases
+                    deadline.setHours(22, 45, 0, 0); // 9:30 AM for all other cases
                 }
 
                 // Validate the deadline
@@ -6619,8 +6619,8 @@
                 const ipResponse = await fetch('https://api.ipify.org?format=json');
                 const ipData = await ipResponse.json();
 
-                // Calculate late status
-                const lateInfo = calculateLateStatus(now.toISOString(), employeeData.role);
+                // Calculate late status (await since it's async)
+                const lateInfo = await calculateLateStatus(now.toISOString(), employeeData.role);
 
                 // Create attendance record
                 const attendanceData = {
