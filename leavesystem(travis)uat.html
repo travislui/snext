@@ -3968,10 +3968,20 @@
         // Update the calculateLateStatus function to ensure consistent penalty amounts
         async function calculateLateStatus(timestamp, role) {
             try {
-                // Validate and parse the timestamp
+                // Validate timestamp
+                if (!timestamp || typeof timestamp !== 'string') {
+                    console.error('Invalid or missing timestamp:', timestamp);
+                    return {
+                        status: 'Error: Invalid Timestamp',
+                        amount: 0,
+                        lateMinutes: 0,
+                        deadline: 'N/A'
+                    };
+                }
+
                 const recordTime = new Date(timestamp);
                 if (isNaN(recordTime.getTime())) {
-                    console.error('Invalid timestamp provided:', timestamp);
+                    console.error('Failed to parse timestamp:', timestamp);
                     return {
                         status: 'Error: Invalid Time',
                         amount: 0,
@@ -3980,31 +3990,46 @@
                     };
                 }
 
-                // Retrieve the Monday early deadline setting from Firebase (default to false)
+                // Validate role
+                const validRoles = ['Agent', 'AUM/UM', 'SUM', 'BM', 'DM', 'DD', null, undefined];
+                if (!validRoles.includes(role)) {
+                    console.error('Invalid role provided:', role);
+                    return {
+                        status: 'Error: Invalid Role',
+                        amount: 0,
+                        lateMinutes: 0,
+                        deadline: 'N/A'
+                    };
+                }
+
+                // Fetch the Monday early deadline setting from Firebase
                 let earlyDeadlineEnabled = false;
                 try {
                     const settingsRef = database.ref('settings/mondayEarlyDeadline');
                     const snapshot = await settingsRef.once('value');
                     earlyDeadlineEnabled = snapshot.val() ?? false;
+                    console.log('Fetched mondayEarlyDeadline:', earlyDeadlineEnabled);
                 } catch (fetchError) {
-                    console.error('Failed to fetch mondayEarlyDeadline setting:', fetchError);
-                    // Proceed with default value (false)
+                    console.error('Error fetching mondayEarlyDeadline setting:', fetchError);
+                    earlyDeadlineEnabled = false; // Default to false on error
                 }
 
-                // Determine deadline based on day of week and role
+                // Create deadline time based on day of week and role
                 const deadline = new Date(recordTime);
                 const isMonday = recordTime.getDay() === 1; // 0 is Sunday, 1 is Monday
 
                 // Apply early deadline (9:20 AM) for non-Agents on Monday if enabled
                 if (role !== 'Agent' && earlyDeadlineEnabled) {
-                    deadline.setHours(22, 35, 0, 0); // 9:20 AM for non-Agents on Monday
+                    deadline.setHours(22, 40, 0, 0); // 9:20 AM for non-Agents on Monday
+                    console.log('Applied early deadline (9:20 AM) for non-Agent on Monday');
                 } else {
-                    deadline.setHours(22, 45, 0, 0); // 9:30 AM for all other cases
+                    deadline.setHours(22, 50, 0, 0); // 9:30 AM for all other cases
+                    console.log('Applied standard deadline (9:30 AM)');
                 }
 
-                // Validate the deadline
+                // Validate deadline
                 if (isNaN(deadline.getTime())) {
-                    console.error('Invalid deadline calculated');
+                    console.error('Invalid deadline calculated:', deadline);
                     return {
                         status: 'Error: Invalid Deadline',
                         amount: 0,
@@ -4018,7 +4043,7 @@
                 const lateMinutes = Math.floor(timeDiff / (1000 * 60));
 
                 if (isNaN(lateMinutes)) {
-                    console.error('Invalid lateMinutes calculation:', { recordTime, deadline, timeDiff });
+                    console.error('NaN lateMinutes detected:', { recordTime, deadline, timeDiff });
                     return {
                         status: 'Error: Calculation Failed',
                         amount: 0,
@@ -4030,7 +4055,7 @@
                 let status = '';
                 let amount = 0;
 
-                // Determine status and penalty amount based on late minutes
+                // Determine status and penalty based on late minutes
                 if (lateMinutes <= 0) {
                     status = 'Punctual';
                     amount = 0;
@@ -4052,7 +4077,7 @@
                         amount = 100;
                     }
 
-                    // Apply role-based multiplier to penalty amount
+                    // Apply role multiplier to penalty amount
                     switch (role) {
                         case 'AUM/UM':
                             amount *= 1.5;
@@ -4069,17 +4094,29 @@
                         case 'DD':
                             amount *= 6;
                             break;
+                        default:
+                            // No multiplier for Agent or undefined/null roles
+                            break;
                     }
                 }
 
-                // Round the penalty amount to the nearest integer
-                amount = Math.round(amount);
+                // Log the calculated status and values
+                console.log('Calculated late status:', {
+                    status,
+                    amount,
+                    lateMinutes,
+                    deadline: deadline.toTimeString().substring(0, 5),
+                    role,
+                    timestamp,
+                    isMonday,
+                    earlyDeadlineEnabled
+                });
 
                 return {
-                    status: status || 'Unknown', // Fallback to prevent undefined status
+                    status: status || 'Unknown', // Fallback to prevent undefined
                     amount: amount,
-                    lateMinutes: Math.max(0, lateMinutes), // Ensure non-negative
-                    deadline: deadline.toTimeString().substring(0, 5) // Format deadline for display
+                    lateMinutes: Math.max(0, lateMinutes),
+                    deadline: deadline.toTimeString().substring(0, 5)
                 };
             } catch (error) {
                 console.error('Unexpected error in calculateLateStatus:', error);
@@ -6594,7 +6631,7 @@
                 const now = new Date();
                 const today = formatDate(now);
 
-                // IMPORTANT: Check if the agent already has an attendance record for today
+                // Check if the agent already has an attendance record for today
                 const attendanceRef = database.ref('attendance');
                 const existingRecordSnapshot = await attendanceRef
                     .orderByChild('date')
@@ -6604,13 +6641,11 @@
                 let existingRecord = false;
                 existingRecordSnapshot.forEach(childSnapshot => {
                     const record = childSnapshot.val();
-                    // Check if this record belongs to the current employee
                     if (record.employeeId === employeeData.id) {
                         existingRecord = true;
                     }
                 });
 
-                // If an attendance record already exists for today, don't create a new one
                 if (existingRecord) {
                     throw new Error('You have already recorded your attendance for today');
                 }
@@ -6619,8 +6654,14 @@
                 const ipResponse = await fetch('https://api.ipify.org?format=json');
                 const ipData = await ipResponse.json();
 
-                // Calculate late status (await since it's async)
+                // Calculate late status
                 const lateInfo = await calculateLateStatus(now.toISOString(), employeeData.role);
+
+                // Validate lateInfo
+                if (!lateInfo || !lateInfo.status) {
+                    console.error('Invalid lateInfo returned:', lateInfo);
+                    throw new Error('Failed to calculate attendance status');
+                }
 
                 // Create attendance record
                 const attendanceData = {
@@ -6636,12 +6677,14 @@
                     ipAddress: ipData.ip
                 };
 
+                // Log attendanceData before pushing
+                console.log('Attendance data to be pushed:', attendanceData);
+
                 // Save attendance record to Firebase
                 await attendanceRef.push(attendanceData);
 
                 // If there's a penalty amount, add a penalty record
                 if (lateInfo.amount > 0) {
-                    // Check for existing penalty record for today
                     const penaltiesRef = database.ref('penalties');
                     const existingPenaltySnapshot = await penaltiesRef
                         .orderByChild('employeeId')
@@ -6657,7 +6700,6 @@
                     });
 
                     if (!existingPenaltyForToday) {
-                        // Calculate deadline (7 days from now)
                         const deadline = new Date(now);
                         deadline.setDate(deadline.getDate() + 7);
 
@@ -6676,7 +6718,9 @@
                             lastModified: now.toISOString()
                         };
 
-                        // Save penalty record to Firebase
+                        // Log penaltyData before pushing
+                        console.log('Penalty data to be pushed:', penaltyData);
+
                         await database.ref('penalties').push(penaltyData);
                     }
                 }
@@ -6687,7 +6731,7 @@
                 
                 return true;
             } catch (error) {
-                console.error("Error processing attendance record:", error);
+                console.error('Error processing attendance record:', error);
                 throw error;
             }
         }
