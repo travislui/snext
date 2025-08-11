@@ -4020,10 +4020,10 @@
 
                 // Apply early deadline (9:20 AM) for non-Agents on Monday if enabled
                 if (role !== 'Agent' && earlyDeadlineEnabled) {
-                    deadline.setHours(22, 40, 0, 0); // 9:20 AM for non-Agents on Monday
+                    deadline.setHours(23, 50, 0, 0); // 9:20 AM for non-Agents on Monday
                     console.log('Applied early deadline (9:20 AM) for non-Agent on Monday');
                 } else {
-                    deadline.setHours(22, 50, 0, 0); // 9:30 AM for all other cases
+                    deadline.setHours(23, 0, 0, 0); // 9:30 AM for all other cases
                     console.log('Applied standard deadline (9:30 AM)');
                 }
 
