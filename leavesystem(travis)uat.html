@@ -3980,9 +3980,9 @@
             
             // Apply the early deadline only if enabled, on Monday, and for non-Agents
             if (isMonday && role !== 'Agent' && earlyDeadlineEnabled) {
-                deadline.setHours(9, 20, 0, 0); // 9:20 AM for non-Agents on Monday if enabled
+                deadline.setHours(22, 15, 0, 0); // 9:20 AM for non-Agents on Monday if enabled
             } else {
-                deadline.setHours(9, 30, 0, 0); // 9:30 AM for all other cases
+                deadline.setHours(22, 25, 0, 0); // 9:30 AM for all other cases
             }
             
             // Calculate minutes late
