@@ -2,7 +2,7 @@
 <html lang="en">
 
 <head>
-    <title>S-Next 請假及賀金系統</title>
+    <title>S-Next 請假及賀金系統 11/8 UAT</title>
     
     <link href='https://cdn.jsdelivr.net/npm/@fullcalendar/core@6.1.10/main.min.css' rel='stylesheet' />
     <link href='https://cdn.jsdelivr.net/npm/@fullcalendar/daygrid@6.1.10/main.min.css' rel='stylesheet' />
@@ -4020,10 +4020,10 @@
 
                 // Apply early deadline (9:20 AM) for non-Agents on Monday if enabled
                 if (role !== 'Agent' && earlyDeadlineEnabled) {
-                    deadline.setHours(22, 55, 0, 0); // 9:20 AM for non-Agents on Monday
+                    deadline.setHours(23, 10, 0, 0); // 9:20 AM for non-Agents on Monday
                     console.log('Applied early deadline (9:20 AM) for non-Agent on Monday');
                 } else {
-                    deadline.setHours(23, 5, 0, 0); // 9:30 AM for all other cases
+                    deadline.setHours(23, 20, 0, 0); // 9:30 AM for all other cases
                     console.log('Applied standard deadline (9:30 AM)');
                 }
 
@@ -4780,7 +4780,7 @@
 
         // Update the window opening function to create a larger window
         function openQRCodeWindow() {
-            const applyEarly = confirm('Non-agent early 10 mins? (Apply 9:20 AM deadline for non-Agents on Mondays)');
+            const applyEarly = confirm('Non-agent early 10 mins? (Apply 9:20 AM deadline for non-Agents)');
                 
                 // Save the setting to Firebase
                 database.ref('settings/mondayEarlyDeadline').set(applyEarly)
