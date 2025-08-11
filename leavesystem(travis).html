@@ -3966,32 +3966,101 @@
         }        
 
         // Update the calculateLateStatus function to ensure consistent penalty amounts
-        function calculateLateStatus(timestamp, role) {
+        async function calculateLateStatus(timestamp, role) {
+            try {
+                // Validate timestamp
+                if (!timestamp || typeof timestamp !== 'string') {
+                    console.error('Invalid or missing timestamp:', timestamp);
+                    return {
+                        status: 'Error: Invalid Timestamp',
+                        amount: 0,
+                        lateMinutes: 0,
+                        deadline: 'N/A'
+                    };
+                }
+
             const recordTime = new Date(timestamp);
+                if (isNaN(recordTime.getTime())) {
+                    console.error('Failed to parse timestamp:', timestamp);
+                    return {
+                        status: 'Error: Invalid Time',
+                        amount: 0,
+                        lateMinutes: 0,
+                        deadline: 'N/A'
+                    };
+                }
+
+                // Validate role
+                const validRoles = ['Agent', 'AUM/UM', 'SUM', 'BM', 'DM', 'DD', null, undefined];
+                if (!validRoles.includes(role)) {
+                    console.error('Invalid role provided:', role);
+                    return {
+                        status: 'Error: Invalid Role',
+                        amount: 0,
+                        lateMinutes: 0,
+                        deadline: 'N/A'
+                    };
+                }
+
+                // Fetch the Monday early deadline setting from Firebase
+                let earlyDeadlineEnabled = false;
+                try {
+                    const settingsRef = database.ref('settings/mondayEarlyDeadline');
+                    const snapshot = await settingsRef.once('value');
+                    earlyDeadlineEnabled = snapshot.val() ?? false;
+                    console.log('Fetched mondayEarlyDeadline:', earlyDeadlineEnabled);
+                } catch (fetchError) {
+                    console.error('Error fetching mondayEarlyDeadline setting:', fetchError);
+                    earlyDeadlineEnabled = false; // Default to false on error
+                }
             
             // Create deadline time based on day of week and role
             const deadline = new Date(recordTime);
             const isMonday = recordTime.getDay() === 1; // 0 is Sunday, 1 is Monday
             
-            // Set different deadline for non-Agents on Mondays (9:20 AM)
-            // Standard deadline for everyone else (9:30 AM)
-            if (isMonday && role !== 'Agent') {
-                deadline.setHours(9, 20, 0, 0); // 9:20 AM for non-Agents on Monday
+                // Apply early deadline (9:20 AM) for non-Agents on Monday if enabled
+                if (role !== 'Agent' && earlyDeadlineEnabled) {
+                    deadline.setHours(23, 0, 0, 0); // 9:20 AM for non-Agents on Monday
+                    console.log('Applied early deadline (9:20 AM) for non-Agent on Monday');
             } else {
-                deadline.setHours(9, 30, 0, 0); // 9:30 AM for all other cases
+                    deadline.setHours(23, 10, 0, 0); // 9:30 AM for all other cases
+                    console.log('Applied standard deadline (9:30 AM)');
+                }
+
+                // Validate deadline
+                if (isNaN(deadline.getTime())) {
+                    console.error('Invalid deadline calculated:', deadline);
+                    return {
+                        status: 'Error: Invalid Deadline',
+                        amount: 0,
+                        lateMinutes: 0,
+                        deadline: 'N/A'
+                    };
             }
             
             // Calculate minutes late
-            const lateMinutes = Math.floor((recordTime - deadline) / (1000 * 60));
+                const timeDiff = recordTime.getTime() - deadline.getTime();
+                const lateMinutes = Math.floor(timeDiff / (1000 * 60));
+
+                if (isNaN(lateMinutes)) {
+                    console.error('NaN lateMinutes detected:', { recordTime, deadline, timeDiff });
+                    return {
+                        status: 'Error: Calculation Failed',
+                        amount: 0,
+                        lateMinutes: 0,
+                        deadline: deadline.toTimeString().substring(0, 5)
+                    };
+                }
             
             let status = '';
             let amount = 0;
 
+                // Determine status and penalty based on late minutes
             if (lateMinutes <= 0) {
                 status = 'Punctual';
                 amount = 0;
             } else {
-                if (lateMinutes >= 60) { // 1 hours or more (No Show)
+                    if (lateMinutes >= 60) {
                     status = 'No Show';
                     amount = 200;
                 } else if (lateMinutes <= 5) {
@@ -4008,7 +4077,7 @@
                     amount = 100;
                 }
 
-                // Apply role multiplier
+                    // Apply role multiplier to penalty amount
                 switch (role) {
                     case 'AUM/UM':
                         amount *= 1.5;
@@ -4025,18 +4094,39 @@
                     case 'DD':
                         amount *= 6;
                         break;
+                        default:
+                            // No multiplier for Agent or undefined/null roles
+                            break;
                 }
             }
 
-            // Round the amount to nearest integer
-            amount = Math.round(amount);
+                // Log the calculated status and values
+                console.log('Calculated late status:', {
+                    status,
+                    amount,
+                    lateMinutes,
+                    deadline: deadline.toTimeString().substring(0, 5),
+                    role,
+                    timestamp,
+                    isMonday,
+                    earlyDeadlineEnabled
+                });
 
             return {
-                status: status,
+                status: status || 'Unknown', // Fallback to prevent undefined
                 amount: amount,
-                lateMinutes: Math.max(0, lateMinutes), // Ensure non-negative
-                deadline: deadline.toTimeString().substring(0, 5) // Add deadline time for display/debugging
+                lateMinutes: Math.max(0, lateMinutes),
+                deadline: deadline.toTimeString().substring(0, 5)
+                };
+            } catch (error) {
+                console.error('Unexpected error in calculateLateStatus:', error);
+                return {
+                    status: 'Error: Unknown',
+                    amount: 0,
+                    lateMinutes: 0,
+deadline: 'N/A'
             };
+}
         }
 
         async function updateAttendanceTable() {
@@ -4250,7 +4340,7 @@
 
                 // Get current date and time
                 const now = new Date();
-                const currentDate = formatDate(now);
+                const currentDate = now.toISOString().split('T')[0]; // Use ISO for consistency
 
                 // Check for existing attendance record for today
                 const attendanceRef = database.ref('attendance');
@@ -4280,8 +4370,8 @@
                 const ipData = await ipResponse.json();
                 const ipAddress = ipData.ip;
 
-                // Calculate late status
-                const lateInfo = calculateLateStatus(now.toISOString(), employeeData.role);
+                // Calculate late status (now async)
+                const lateInfo = await calculateLateStatus(now.toISOString(), employeeData.role);
 
                 // Create attendance record
                 const attendanceData = {
@@ -4690,14 +4780,24 @@
 
         // Update the window opening function to create a larger window
         function openQRCodeWindow() {
-            // Close existing window if open
-            if (qrWindow && !qrWindow.closed) {
-                qrWindow.close();
-            }
-
-            // Open new window with larger dimensions
-            qrWindow = window.open('', 'QRCodeWindow', 'width=1500,height=800');
+            const applyEarly = confirm('Non-agent early 10 mins? (Apply 9:20 AM deadline for non-Agents)');
+                
+                // Save the setting to Firebase
+                database.ref('settings/mondayEarlyDeadline').set(applyEarly)
+                    .then(() => {
+                        // Open the QR window after setting is saved
+                        const qrWindow = window.open('', '_blank', 'width=600,height=800');
+                        if (qrWindow) {
             qrWindow.document.write(createQRWindowContent());
+                            qrWindow.document.close();
+                        } else {
+                            alert('Failed to open QR window. Please allow popups.');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error setting deadline option:', error);
+                        alert('Error setting option. Please try again.');
+                    });
         }
 
         // Add event listener to the button
@@ -6531,7 +6631,7 @@
                 const now = new Date();
                 const today = formatDate(now);
 
-                // IMPORTANT: Check if the agent already has an attendance record for today
+                // Check if the agent already has an attendance record for today
                 const attendanceRef = database.ref('attendance');
                 const existingRecordSnapshot = await attendanceRef
                     .orderByChild('date')
@@ -6557,7 +6657,13 @@
                 const ipData = await ipResponse.json();
 
                 // Calculate late status
-                const lateInfo = calculateLateStatus(now.toISOString(), employeeData.role);
+                const lateInfo = await calculateLateStatus(now.toISOString(), employeeData.role);
+
+                // Validate lateInfo
+                if (!lateInfo || !lateInfo.status) {
+                    console.error('Invalid lateInfo returned:', lateInfo);
+                    throw new Error('Failed to calculate attendance status');
+                }
 
                 // Create attendance record
                 const attendanceData = {
@@ -6572,6 +6678,9 @@
                     amount: lateInfo.amount,
                     ipAddress: ipData.ip
                 };
+
+                // Log attendanceData before pushing
+                console.log('Attendance data to be pushed:', attendanceData);
 
                 // Save attendance record to Firebase
                 await attendanceRef.push(attendanceData);
@@ -6613,7 +6722,9 @@
                             lastModified: now.toISOString()
                         };
 
-                        // Save penalty record to Firebase
+                        // Log penaltyData before pushing
+                        console.log('Penalty data to be pushed:', penaltyData);
+
                         await database.ref('penalties').push(penaltyData);
                     }
                 }
@@ -6624,7 +6735,7 @@
                 
                 return true;
             } catch (error) {
-                console.error("Error processing attendance record:", error);
+                console.error('Error processing attendance record:', error);
                 throw error;
             }
         }
