@@ -3967,80 +3967,129 @@
 
         // Update the calculateLateStatus function to ensure consistent penalty amounts
         async function calculateLateStatus(timestamp, role) {
-            const recordTime = new Date(timestamp);
-            
-            // Fetch the setting from Firebase (default to false if not set)
-            const settingsRef = database.ref('settings/mondayEarlyDeadline');
-            const snapshot = await settingsRef.once('value');
-            const earlyDeadlineEnabled = snapshot.val() ?? false;
-            
-            // Create deadline time based on day of week and role
-            const deadline = new Date(recordTime);
-            const isMonday = recordTime.getDay() === 1; // 0 is Sunday, 1 is Monday
-            
-            // Apply the early deadline only if enabled, on Monday, and for non-Agents
-            if (isMonday && role !== 'Agent' && earlyDeadlineEnabled) {
-                deadline.setHours(22, 15, 0, 0); // 9:20 AM for non-Agents on Monday if enabled
-            } else {
-                deadline.setHours(22, 25, 0, 0); // 9:30 AM for all other cases
-            }
-            
-            // Calculate minutes late
-            const lateMinutes = Math.floor((recordTime - deadline) / (1000 * 60));
-            
-            let status = '';
-            let amount = 0;
+            try {
+                // Validate and parse the timestamp
+                const recordTime = new Date(timestamp);
+                if (isNaN(recordTime.getTime())) {
+                    console.error('Invalid timestamp provided:', timestamp);
+                    return {
+                        status: 'Error: Invalid Time',
+                        amount: 0,
+                        lateMinutes: 0,
+                        deadline: 'N/A'
+                    };
+                }
 
-            if (lateMinutes <= 0) {
-                status = 'Punctual';
-                amount = 0;
-            } else {
-                if (lateMinutes >= 60) { // 1 hour or more (No Show)
-                    status = 'No Show';
-                    amount = 200;
-                } else if (lateMinutes <= 5) {
-                    status = 'Late ≤ 5 mins';
-                    amount = 20;
-                } else if (lateMinutes <= 10) {
-                    status = 'Late 6-10 mins';
-                    amount = 40;
-                } else if (lateMinutes <= 15) {
-                    status = 'Late 11-15 mins';
-                    amount = 60;
+                // Retrieve the Monday early deadline setting from Firebase (default to false)
+                let earlyDeadlineEnabled = false;
+                try {
+                    const settingsRef = database.ref('settings/mondayEarlyDeadline');
+                    const snapshot = await settingsRef.once('value');
+                    earlyDeadlineEnabled = snapshot.val() ?? false;
+                } catch (fetchError) {
+                    console.error('Failed to fetch mondayEarlyDeadline setting:', fetchError);
+                    // Proceed with default value (false)
+                }
+
+                // Determine deadline based on day of week and role
+                const deadline = new Date(recordTime);
+                const isMonday = recordTime.getDay() === 1; // 0 is Sunday, 1 is Monday
+
+                // Apply early deadline (9:20 AM) for non-Agents on Monday if enabled
+                if (role !== 'Agent' && earlyDeadlineEnabled) {
+                    deadline.setHours(22, 25, 0, 0); // 9:20 AM for non-Agents on Monday
                 } else {
-                    status = 'Late > 15 mins';
-                    amount = 100;
+                    deadline.setHours(22, 35, 0, 0); // 9:30 AM for all other cases
                 }
 
-                // Apply role multiplier
-                switch (role) {
-                    case 'AUM/UM':
-                        amount *= 1.5;
-                        break;
-                    case 'SUM':
-                        amount *= 2;
-                        break;
-                    case 'BM':
-                        amount *= 3;
-                        break;
-                    case 'DM':
-                        amount *= 4;
-                        break;
-                    case 'DD':
-                        amount *= 6;
-                        break;
+                // Validate the deadline
+                if (isNaN(deadline.getTime())) {
+                    console.error('Invalid deadline calculated');
+                    return {
+                        status: 'Error: Invalid Deadline',
+                        amount: 0,
+                        lateMinutes: 0,
+                        deadline: 'N/A'
+                    };
                 }
+
+                // Calculate minutes late
+                const timeDiff = recordTime.getTime() - deadline.getTime();
+                const lateMinutes = Math.floor(timeDiff / (1000 * 60));
+
+                if (isNaN(lateMinutes)) {
+                    console.error('Invalid lateMinutes calculation:', { recordTime, deadline, timeDiff });
+                    return {
+                        status: 'Error: Calculation Failed',
+                        amount: 0,
+                        lateMinutes: 0,
+                        deadline: deadline.toTimeString().substring(0, 5)
+                    };
+                }
+
+                let status = '';
+                let amount = 0;
+
+                // Determine status and penalty amount based on late minutes
+                if (lateMinutes <= 0) {
+                    status = 'Punctual';
+                    amount = 0;
+                } else {
+                    if (lateMinutes >= 60) {
+                        status = 'No Show';
+                        amount = 200;
+                    } else if (lateMinutes <= 5) {
+                        status = 'Late ≤ 5 mins';
+                        amount = 20;
+                    } else if (lateMinutes <= 10) {
+                        status = 'Late 6-10 mins';
+                        amount = 40;
+                    } else if (lateMinutes <= 15) {
+                        status = 'Late 11-15 mins';
+                        amount = 60;
+                    } else {
+                        status = 'Late > 15 mins';
+                        amount = 100;
+                    }
+
+                    // Apply role-based multiplier to penalty amount
+                    switch (role) {
+                        case 'AUM/UM':
+                            amount *= 1.5;
+                            break;
+                        case 'SUM':
+                            amount *= 2;
+                            break;
+                        case 'BM':
+                            amount *= 3;
+                            break;
+                        case 'DM':
+                            amount *= 4;
+                            break;
+                        case 'DD':
+                            amount *= 6;
+                            break;
+                    }
+                }
+
+                // Round the penalty amount to the nearest integer
+                amount = Math.round(amount);
+
+                return {
+                    status: status || 'Unknown', // Fallback to prevent undefined status
+                    amount: amount,
+                    lateMinutes: Math.max(0, lateMinutes), // Ensure non-negative
+                    deadline: deadline.toTimeString().substring(0, 5) // Format deadline for display
+                };
+            } catch (error) {
+                console.error('Unexpected error in calculateLateStatus:', error);
+                return {
+                    status: 'Error: Unknown',
+                    amount: 0,
+                    lateMinutes: 0,
+                    deadline: 'N/A'
+                };
             }
-
-            // Round the amount to nearest integer
-            amount = Math.round(amount);
-
-            return {
-                status: status,
-                amount: amount,
-                lateMinutes: Math.max(0, lateMinutes), // Ensure non-negative
-                deadline: deadline.toTimeString().substring(0, 5) // Add deadline time for display/debugging
-            };
         }
 
         async function updateAttendanceTable() {
