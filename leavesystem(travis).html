@@ -4780,7 +4780,7 @@
 
         // Update the window opening function to create a larger window
         function openQRCodeWindow() {
-            const applyEarly = confirm('Non-agent early 10 mins? (Apply 9:20 AM deadline for non-Agents)');
+            const applyEarly = confirm('Apply rule: AUM or Above: Arrive 10 mins earlier');
                 
                 // Save the setting to Firebase
                 database.ref('settings/mondayEarlyDeadline').set(applyEarly)
