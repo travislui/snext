@@ -4815,14 +4815,14 @@
             const today = new Date().toISOString().split('T')[0];
 
                 // Prompt for standard deadline time (HH:MM)
-                let standardTime = prompt('Enter standard deadline time (HH:MM, default 09:30):', '09:30');
+                let standardTime = prompt('Enter standard deadline time (HH:MM):', '09:30');
                 if (!standardTime || !/^\d{2}:\d{2}$/.test(standardTime)) {
                     alert('Invalid time format. Using default 09:30.');
                     standardTime = '09:30';
                 }
 
                 // Confirm apply early for non-agents
-                const applyEarly = confirm('Apply early 10 mins deadline for non-Agents?');
+                const applyEarly = confirm('Apply rule: AUM or Above: Arrive 10 mins earlier?');
 
                 // Save settings to Firebase under date-specific path
                 const settingsRef = database.ref(`settings/attendance/${today}`);
