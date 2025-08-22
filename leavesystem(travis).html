@@ -2,7 +2,7 @@
 <html lang="en">
 
 <head>
-    <title>S-Next 請假及賀金系統</title>
+    <title>S-Next 請假及賀金系統 22/8 UAT</title>
     
     <link href='https://cdn.jsdelivr.net/npm/@fullcalendar/core@6.1.10/main.min.css' rel='stylesheet' />
     <link href='https://cdn.jsdelivr.net/npm/@fullcalendar/daygrid@6.1.10/main.min.css' rel='stylesheet' />
@@ -1871,7 +1871,7 @@
 <body>
     <div id="sync-status" class="sync-status"></div>
     <header>
-    <h1>S-Next 請假及賀金系統</h1>
+    <h1>S-Next 請假及賀金系統 22/8 UAT</h1>
     </header>
     <div class="container" id="home-page">
         <h3>Login</h3>
@@ -4811,8 +4811,100 @@
         }
 
         // Update the window opening function to create a larger window
-        function openQRCodeWindow() {
+        async function openQRCodeWindow() {
             const today = new Date().toISOString().split('T')[0];
+
+            // Function to show the modal popup container and get response
+            function showConfirmModal() {
+                    return new Promise((resolve) => {
+                        // Create modal elements if they don't exist
+                        let modal = document.getElementById('confirmModal');
+                        if (!modal) {
+                            modal = document.createElement('div');
+                            modal.id = 'confirmModal';
+                            modal.style.position = 'fixed';
+                            modal.style.top = '0';
+                            modal.style.left = '0';
+                            modal.style.width = '100%';
+                            modal.style.height = '100%';
+                            modal.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+                            modal.style.display = 'flex';
+                            modal.style.justifyContent = 'center';
+                            modal.style.alignItems = 'center';
+                            modal.style.zIndex = '1000';
+
+                            const modalContent = document.createElement('div');
+                            modalContent.style.backgroundColor = '#f8f8f8';
+                            modalContent.style.padding = '20px';
+                            modalContent.style.borderRadius = '5px';
+                            modalContent.style.textAlign = 'center';
+                            modalContent.style.maxWidth = '400px';
+
+                            // Create heading container with two paragraphs for separate lines
+                            const headingContainer = document.createElement('div');
+                            headingContainer.style.marginBottom = '20px';
+
+                            const headingLine1 = document.createElement('p');
+                            headingLine1.textContent = 'Apply rule:';
+                            headingLine1.style.margin = '0';
+                            headingLine1.style.fontSize = '1.2em';
+                            headingLine1.style.fontWeight = 'bold';
+
+                            const headingLine2 = document.createElement('p');
+                            headingLine2.textContent = 'AUM or Above: Arrive 10 mins earlier?';
+                            headingLine2.style.margin = '5px 0 0 0';
+                            headingLine2.style.fontSize = '1.2em';
+                            headingLine2.style.fontWeight = 'bold';
+
+                            const yesBtn = document.createElement('button');
+                            yesBtn.id = 'yesBtn';
+                            yesBtn.textContent = 'Yes';
+                            yesBtn.style.backgroundColor = 'white';
+                            yesBtn.style.color = 'black';
+                            yesBtn.style.border = '1px solid #ccc';
+                            yesBtn.style.padding = '10px 20px';
+                            yesBtn.style.margin = '0 10px';
+                            yesBtn.style.cursor = 'pointer';
+                            yesBtn.style.borderRadius = '5px';
+                            yesBtn.onmouseover = () => { yesBtn.style.backgroundColor = '#f0f0f0'; };
+                            yesBtn.onmouseout = () => { yesBtn.style.backgroundColor = 'white'; };
+
+                            const noBtn = document.createElement('button');
+                            noBtn.id = 'noBtn';
+                            noBtn.textContent = 'No';
+                            noBtn.style.backgroundColor = 'white';
+                            noBtn.style.color = 'black';
+                            noBtn.style.border = '1px solid #ccc';
+                            noBtn.style.padding = '10px 20px';
+                            noBtn.style.margin = '0 10px';
+                            noBtn.style.cursor = 'pointer';
+                            noBtn.style.borderRadius = '5px';
+                            noBtn.onmouseover = () => { noBtn.style.backgroundColor = '#f0f0f0'; };
+                            noBtn.onmouseout = () => { noBtn.style.backgroundColor = 'white'; };
+
+                            headingContainer.appendChild(headingLine1);
+                            headingContainer.appendChild(headingLine2);
+                            modalContent.appendChild(headingContainer);
+                            modalContent.appendChild(yesBtn);
+                            modalContent.appendChild(noBtn);
+                            modal.appendChild(modalContent);
+                            document.body.appendChild(modal);
+
+                            // Event listeners
+                            yesBtn.onclick = () => {
+                                modal.style.display = 'none';
+                                resolve(true);
+                            };
+
+                            noBtn.onclick = () => {
+                                modal.style.display = 'none';
+                                resolve(false);
+                            };
+                        } else {
+                            modal.style.display = 'flex';
+                        }
+                    });
+                }
 
                 // Prompt for standard deadline time (HH:MM)
                 let standardTime = prompt('Enter standard deadline time (HH:MM):', '09:30');
@@ -4822,7 +4914,7 @@
                 }
 
                 // Confirm apply early for non-agents
-                const applyEarly = confirm('Apply rule: AUM or Above: Arrive 10 mins earlier?');
+                const applyEarly = await showConfirmModal();
 
                 // Save settings to Firebase under date-specific path
                 const settingsRef = database.ref(`settings/attendance/${today}`);
