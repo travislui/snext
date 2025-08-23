@@ -3004,7 +3004,7 @@
 
             for (const [id, penalty] of sortedPenalties) {
                 const row = document.createElement('tr');
-                const isOverdue = new Date() > new Date(penalty.deadline) && penalty.status !== 'Submitted';
+                const isOverdue = new Date() > new Date(penalty.deadline);
                 const displayAmount = isOverdue && !penalty.doubleAmountCancelled ? penalty.amount * 2 : penalty.amount;
 
                 // Add to total if not submitted
@@ -3499,7 +3499,7 @@
 
             for (const [id, penalty] of sortedPenalties) {
                 const row = document.createElement('tr');
-                const isOverdue = new Date() > new Date(penalty.deadline) && penalty.status !== 'Submitted';
+                const isOverdue = new Date() > new Date(penalty.deadline);
                 const displayAmount = isOverdue ? penalty.amount * 2 : penalty.amount;
 
                 row.innerHTML = `
@@ -6553,7 +6553,7 @@
 
             for (const [id, penalty] of sortedPenalties) {
                 const row = document.createElement('tr');
-                const isOverdue = new Date() > new Date(penalty.deadline) && penalty.status !== 'Submitted';
+                const isOverdue = new Date() > new Date(penalty.deadline);
                 const displayAmount = isOverdue && !penalty.doubleAmountCancelled ? penalty.amount * 2 : penalty.amount;
 
                 // Add overdue class to row if penalty is overdue and double amount is not cancelled
