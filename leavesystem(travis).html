@@ -1907,6 +1907,7 @@
                     <option value="SUM">SUM</option>
                     <option value="BM">BM</option>
                     <option value="DM">DM</option>
+                    <option value="SDM">SDM</option>
                     <option value="DD">DD</option>
                 </select>
                 <label for="emp-mdrt">Clubs & Awards</label>
@@ -3427,6 +3428,9 @@
                         case 'DM':
                             amount *= 4;
                             break;
+                        case 'SDM':
+                            amount *= 5;
+                            break;                            
                         case 'DD':
                             amount *= 6;
                             break;
@@ -3780,6 +3784,9 @@
                         case 'DM':
                             amount *= 4;
                             break;
+                        case 'SDM':
+                            amount *= 5;
+                            break;                               
                         case 'DD':
                             amount *= 6;
                             break;
@@ -4109,6 +4116,9 @@
                         case 'DM':
                             amount *= 4;
                             break;
+                        case 'SDM':
+                            amount *= 5;
+                            break;                               
                         case 'DD':
                             amount *= 6;
                             break;
@@ -4358,7 +4368,7 @@
                 }
 
                 // Validate employee role
-                const validRoles = ['Agent', 'AUM/UM', 'SUM', 'BM', 'DM', 'DD', null, undefined];
+                const validRoles = ['Agent', 'AUM/UM', 'SUM', 'BM', 'DM', 'SDM', 'DD', null, undefined];
                 if (!validRoles.includes(employeeData.role)) {
                     console.error('Invalid employee role:', employeeData.role);
                     throw new Error('Invalid employee role');
@@ -6766,7 +6776,7 @@
                 }
 
                 // Validate employee role
-                const validRoles = ['Agent', 'AUM/UM', 'SUM', 'BM', 'DM', 'DD', null, undefined];
+                const validRoles = ['Agent', 'AUM/UM', 'SUM', 'BM', 'DM', 'SDM', 'DD', null, undefined];
                 if (!validRoles.includes(employeeData.role)) {
                     console.error('Invalid employee role:', employeeData.role);
                     throw new Error('Invalid employee role');
@@ -7191,7 +7201,7 @@
                     const roleSelect = `
                         <select class="edit-select" style="display: none;" 
                                 onchange="updateEmployeeField('${id}', 'role', this.value)">
-                            ${['Agent', 'AUM/UM', 'SUM', 'BM', 'DM', 'DD']
+                            ${['Agent', 'AUM/UM', 'SUM', 'BM', 'DM', 'SDM', 'DD']
                                 .map(role => `<option value="${role}" ${emp.role === role ? 'selected' : ''}>${role}</option>`)
                                 .join('')}
                         </select>
@@ -7579,6 +7589,9 @@
                         case 'DM':
                             amount *= 4;
                             break;
+                        case 'SDM':
+                            amount *= 5;
+                            break;                               
                         case 'DD':
                             amount *= 6;
                             break;
