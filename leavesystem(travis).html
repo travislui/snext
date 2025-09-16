@@ -2852,32 +2852,29 @@
             initializeAttendanceTable();
         });
 
-        function loadEmployeeDetails() {
-            // Show the reminder
+        async function loadEmployeeDetails() {
             const reminder = document.getElementById("reminderText");
             reminder.classList.remove("hidden");
 
-            // Simulate delay before loading data
-            setTimeout(() => {
-                // Load employee-specific data
-                loadEmployeeApplications(currentUser.id);
-                loadEmployeePenalties(currentUser.id);
-
-                // Dynamically get the teams visible to the current user
+            try {
                 const visibleTeams = getVisibleTeamsForLeader(currentUser);
+                // Run all data fetches in parallel
+                await Promise.all([
+                    loadEmployeeApplications(currentUser.id),
+                    loadEmployeePenalties(currentUser.id),
+                    visibleTeams.length > 0 ? loadTeamLeaveRecords(visibleTeams) : Promise.resolve()
+                ]);
 
-                // If there are visible teams, load the leave records
-                if (visibleTeams.length > 0) {
-                    loadTeamLeaveRecords(visibleTeams);
-                }
-
-                // Update the UI to reflect completion
                 reminder.textContent = "Data loaded successfully!";
                 setTimeout(() => {
                     reminder.classList.add("hidden");
                     reminder.textContent = "This may take a few minutes...";
-                }, 120000);
-            }, 120000); // You can adjust this delay time as needed
+                }, 2000);
+            } catch (error) {
+                console.error("Error loading data:", error);
+                reminder.textContent = "Failed to load data.";
+                setTimeout(() => reminder.classList.add("hidden"), 2000);
+            }
         }
 
         // Function to change admin password
