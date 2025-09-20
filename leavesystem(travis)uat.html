@@ -6971,7 +6971,6 @@
                         }
                     });
 
-                    if (!existingPenaltyForToday) {
                         const deadline = new Date(now);
                         deadline.setDate(deadline.getDate() + 7);
 
@@ -6993,7 +6992,7 @@
                         // Log penaltyData before pushing
                         console.log('Penalty data to be pushed:', penaltyData);
                         await database.ref('penalties').push(penaltyData);
-                    }
+                    
                 }
 
                 // Update both attendance and penalty tables
