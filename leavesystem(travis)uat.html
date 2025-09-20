@@ -6902,32 +6902,24 @@
                 const now = new Date();
                 const today = formatDate(now);
 
-                // Check if the agent already has an attendance record for today
+                // Check if the agent already has an attendance record within the last 15 minutes
                 const attendanceRef = database.ref('attendance');
+                const fifteenMinsAgo = new Date(now.getTime() - 15 * 60 * 1000).toISOString();
                 const existingRecordSnapshot = await attendanceRef
-                    .orderByChild('date')
-                    .equalTo(today)
+                    .orderByChild('timestamp')
+                    .startAt(fifteenMinsAgo)
                     .once('value');
                 
                 let existingRecord = false;
-                
-                todaySnapshot.forEach(childSnapshot => {
+                existingRecordSnapshot.forEach(childSnapshot => {
                     const record = childSnapshot.val();
-                    if (record.employeeId === employeeId) {
-                        const recordTime = new Date(record.timestamp);
-                        const currentTime = new Date();
-                        const timeDiff = (currentTime - recordTime) / (1000 * 60); // Difference in minutes
-                        
-                        if (timeDiff <= 15) { // Check if within 15 minutes
-                            existingRecord = true;
-                        }
+                    if (record.employeeId === employeeData.id) {
+                        existingRecord = true;
                     }
                 });
 
                 if (existingRecord) {
-                    showScanResult('Attendance already recorded within the last 15 minutes', false);
-                    stopScanner();
-                    return;
+                    throw new Error('You have already recorded your attendance within the last 15 minutes');
                 }
 
                 // Get IP address
