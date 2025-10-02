@@ -1725,6 +1725,10 @@
             width: 100%;
             border-collapse: separate;
             border-spacing: 0;
+            /* Ensure the table is in a scrollable container */
+            display: block;
+            max-height: 800px; /* Adjust as needed for scrollable content */
+            overflow-y: auto; /* Enable vertical scrolling */
         }
 
         #employee-table thead th {
@@ -1745,7 +1749,7 @@
         }
 
         #employee-table td {
-            padding: 12px;
+            padding: 5px;
             vertical-align: middle;
         }
 
@@ -1759,8 +1763,28 @@
         }
 
         #employee-table th:nth-child(4), #employee-table td:nth-child(4) { /* Clubs & Awards column */
-            width: 100px !important; /* Adjust as needed */
-            min-width: 100px !important; /* Ensure minimum width */
+            width: 30px !important; /* Adjust as needed */
+            min-width: 30px !important; /* Ensure minimum width */
+        }
+
+        #employee-table th:nth-child(7), #employee-table td:nth-child(7) { /* Team */
+            width: 50px !important; /* Adjust as needed */
+            min-width: 50px !important; /* Ensure minimum width */
+        }
+
+        #employee-table th:nth-child(8), #employee-table td:nth-child(8) { /* Team Leader */
+            width: 30px !important; /* Adjust as needed */
+            min-width: 30px !important; /* Ensure minimum width */
+        }
+
+        #employee-table th:nth-child(9), #employee-table td:nth-child(9) { /* 需要出席區會？ */
+            width: 75px !important; /* Adjust as needed */
+            min-width: 75px !important; /* Ensure minimum width */
+        }
+
+        #employee-table th:nth-child(10), #employee-table td:nth-child(10) { /* Action */
+            width: 140px !important; /* Adjust as needed */
+            min-width: 140px !important; /* Ensure minimum width */
         }
 
         #agentListContainer::-webkit-scrollbar {
@@ -1790,7 +1814,7 @@
         }
 
         #agentListContainer.expanded {
-            max-height: 2000px; /* Adjust this value based on your needs */
+            max-height: 1500px; /* Adjust this value based on your needs */
             opacity: 1;
             margin-bottom: 20px;
         }
@@ -1929,8 +1953,11 @@
                     <option value="Giant">Giant</option>
                 </select>
                 <label for="emp-team-leader">
-                    <input type="checkbox" id="emp-team-leader"> Team Leader?????????
+                    <input type="checkbox" id="emp-team-leader"> 是不是營業單位主管？
                 </label>
+                <label for="emp-attenddistrictmeeting">
+                    <input type="checkbox" id="emp-attenddistrictmeeting"> 是否需要出席區會？
+                </label>                
                 <button type="button" id="add-employee-btn" class="add-btn">Add Agent</button>
             </form>
     
@@ -1988,9 +2015,12 @@
                 <input type="date" id="penalty-date" required>
                 <select id="penalty-reason" required>
                     <option value="Meeting">Meeting</option>
+                    <option value="Inactive">Inactive</option>
                 </select>
-                <input type="number" id="penalty-minutes" placeholder="Late Minutes" min="0" required>
+                <input type="number" id="penalty-minutes" placeholder="Late Minutes (Inactive 請輸入0)" min="0" required>
+
                 <p><strong>備註：No Show請輸入500</span></p>
+                <p><strong>Inactive 請輸入0</span></p>
                 <button type="submit">Add 賀金</button>
             </form>
         </div>
@@ -2014,6 +2044,7 @@
                             <th>Remaining Annual Leaves (黃金事假)</th>
                             <th>Team</th>
                             <th>Team Leader</th>
+                            <th>需要出席區會？</th>
                             <th>Action</th>
                         </tr>
                     </thead>
@@ -2024,6 +2055,23 @@
             </div>
         </div>
         
+        <div class="container">
+            <h3>Attend Today Meeting List</h3>
+            <div id="todayAttendanceContainer" class="table-container">
+                <table id="attendance-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Date & Time</th>
+                        </tr>
+                    </thead>
+                    <tbody id="attendance-list">
+                        <!-- Rows will be dynamically added here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
         <!-- Section 3: Agent Leave Application Record -->
         <div class="container">
             <h3>Agent Leave Application Record</h3>
@@ -2256,7 +2304,7 @@
             Load All Data
         </button>
         <span id="reminderText" class="mt-2 text-sm text-gray-600 hidden">
-            This may take a few minutes...
+            Loading Data, Please wait (around 3-5 minutes)
         </span>
         
     </div>
@@ -2593,6 +2641,7 @@
                             // Show admin interface and load all data
                             showAdminInterface();
                             loadEmployees();
+                            loadTodayAttendance();
                             loadAllApplications();
                             loadAllPenalties();
                             
@@ -2853,27 +2902,124 @@
         });
 
         async function loadEmployeeDetails() {
+            // Show the initial loading reminder
             const reminder = document.getElementById("reminderText");
             reminder.classList.remove("hidden");
 
-            try {
-                const visibleTeams = getVisibleTeamsForLeader(currentUser);
-                // Run all data fetches in parallel
-                await Promise.all([
-                    loadEmployeeApplications(currentUser.id),
-                    loadEmployeePenalties(currentUser.id),
-                    visibleTeams.length > 0 ? loadTeamLeaveRecords(visibleTeams) : Promise.resolve()
-                ]);
+            // Simulate initial delay (optional, but kept for your setup)
+            await new Promise(resolve => setTimeout(resolve, 2000));
 
+            try {
+                // Start loading employee-specific data in parallel
+                const appPromise = loadEmployeeApplications(currentUser.id);  // Assume this returns a Promise
+                const penaltyPromise = loadEmployeePenalties(currentUser.id);  // Assume this returns a Promise
+
+                // Get visible teams (assuming this is synchronous; if async, await it here)
+                const visibleTeams = getVisibleTeamsForLeader(currentUser);
+
+                // Conditionally add team leave promise if teams exist
+                let teamPromise = Promise.resolve();  // Default to a resolved Promise if no teams
+                if (visibleTeams.length > 0) {
+                    teamPromise = loadTeamLeaveRecords(visibleTeams);  // Assume this returns a Promise
+                }
+
+                // Wait for all relevant loads to complete
+                await Promise.all([appPromise, penaltyPromise, teamPromise]);
+
+                // Add 5-second buffer before showing success message
+                await new Promise(resolve => setTimeout(resolve, 1500));
+
+                // Now that everything is loaded, update the UI to reflect success
                 reminder.textContent = "Data loaded successfully!";
+
+                const modal = document.createElement('div');
+                modal.id = 'successModal';
+                modal.style.position = 'fixed';
+                modal.style.top = '0';
+                modal.style.left = '0';
+                modal.style.width = '100%';
+                modal.style.height = '100%';
+                modal.style.backgroundColor = 'rgba(0, 0, 0, 0.7)'; // Darker backdrop as per your preference
+                modal.style.display = 'flex';
+                modal.style.justifyContent = 'center';
+                modal.style.alignItems = 'center'; // Centers vertically; adjust to 'flex-start' for top positioning
+                modal.style.zIndex = '1000';
+
+                // Create modal content
+                const modalContent = document.createElement('div');
+                modalContent.style.backgroundColor = '#ffffff'; // White background as requested
+                modalContent.style.padding = '40px'; // Increased padding for bigger size
+                modalContent.style.borderRadius = '8px';
+                modalContent.style.textAlign = 'center';
+                modalContent.style.maxWidth = '400px';
+                modalContent.style.width = '400px'; // Fixed width for bigger size
+                modalContent.style.position = 'relative'; // For positioning the cancel icon
+                modalContent.style.boxShadow = '0 4px 8px rgba(0,0,0,0.2)'; // Subtle shadow
+
+                // Add cancel icon (top right corner)
+                const cancelIcon = document.createElement('span');
+                cancelIcon.style.position = 'absolute';
+                cancelIcon.style.top = '10px';
+                cancelIcon.style.right = '10px';
+                cancelIcon.style.fontSize = '20px';
+                cancelIcon.style.cursor = 'pointer';
+                cancelIcon.style.color = '#000';
+                cancelIcon.innerHTML = '&times;'; // × symbol
+                cancelIcon.addEventListener('click', () => {
+                    if (modal) {
+                        modal.remove();
+                    }
+                });
+                modalContent.appendChild(cancelIcon);
+
+                // Create heading container with two paragraphs for separate lines (adapted for success message)
+                const headingContainer = document.createElement('div');
+                headingContainer.style.marginBottom = '20px';
+
+                const headingLine1 = document.createElement('p');
+                headingLine1.textContent = 'Data loaded';
+                headingLine1.style.margin = '0';
+                headingLine1.style.fontSize = '1.2em';
+                headingLine1.style.fontWeight = 'bold';
+                headingLine1.style.color = 'rgba(0, 0, 0)'; 
+
+                const headingLine2 = document.createElement('p');
+                headingLine2.textContent = 'successfully!';
+                headingLine2.style.margin = '5px 0 0 0';
+                headingLine2.style.fontSize = '1.2em';
+                headingLine2.style.fontWeight = 'bold';
+                headingLine2.style.color = 'rgba(0, 0, 0)'; 
+
+                // Add green tick icon (larger for bigger popup)
+                const tickIcon = document.createElement('span');
+                tickIcon.style.color = '#28a745';
+                tickIcon.style.fontSize = '32px';
+                tickIcon.innerHTML = '✅';
+
+                headingContainer.appendChild(tickIcon);
+                headingContainer.appendChild(headingLine1);
+                headingContainer.appendChild(headingLine2);
+                modalContent.appendChild(headingContainer);
+
+                // No buttons needed for success modal; it stays until dismissed
+
+                modal.appendChild(modalContent);
+                document.body.appendChild(modal);
+
+
+                // Hide reminder after 3 seconds (popup and backdrop remain until manually closed)
                 setTimeout(() => {
                     reminder.classList.add("hidden");
-                    reminder.textContent = "This may take a few minutes...";
-                }, 2000);
+                    reminder.textContent = "Loading Data, Please wait (around 3-5 minutes)";
+                }, 3000);
             } catch (error) {
+                // Handle errors gracefully (e.g., show an error message)
                 console.error("Error loading data:", error);
-                reminder.textContent = "Failed to load data.";
-                setTimeout(() => reminder.classList.add("hidden"), 2000);
+                reminder.textContent = "Error loading data. Please try again.";
+                setTimeout(() => {
+                    reminder.classList.add("hidden");
+                    reminder.textContent = "Loading Data, Please wait (around 3-5 minutes)";
+                }, 5000);  // Longer display for error
             }
         }
 
@@ -3002,7 +3148,8 @@
 
             for (const [id, penalty] of sortedPenalties) {
                 const row = document.createElement('tr');
-                const isOverdue = new Date() > new Date(penalty.deadline);
+                const currentDateStr = new Date().toISOString().split('T')[0];
+                const isOverdue = currentDateStr > penalty.deadline && penalty.status !== 'Submitted' || penalty.proofDate > (penalty.deadline + 'T23:59:59.999Z');
                 const displayAmount = isOverdue && !penalty.doubleAmountCancelled ? penalty.amount * 2 : penalty.amount;
 
                 // Add to total if not submitted
@@ -3260,6 +3407,7 @@
                 const mdrt = document.getElementById('emp-mdrt').value;
                 const team = document.getElementById('emp-team').value;
                 const isTeamLeader = document.getElementById('emp-team-leader').checked;
+                const attenddistrictmeeting = document.getElementById('emp-attenddistrictmeeting').checked;
 
                 // Validation
                 if (!name || !code || !role || !mdrt || !team) {
@@ -3306,6 +3454,7 @@
                     mdrt: mdrt,
                     team: team,
                     isTeamLeader: isTeamLeader,
+                    attenddistrictmeeting: attenddistrictmeeting,
                     normalLeaves: normalLeaves,
                     goldenLeaves: goldenLeaves,
                     remainingNormalLeaves: normalLeaves,
@@ -3379,9 +3528,10 @@
                 const employeeId = document.getElementById('penalty-employee').value;
                 const date = document.getElementById('penalty-date').value;
                 const reason = document.getElementById('penalty-reason').value;
-                const lateMinutes = parseInt(document.getElementById('penalty-minutes').value);
+                const lateMinutesInput = document.getElementById('penalty-minutes').value;
+                const lateMinutes = reason === 'Inactive' ? 0 : parseInt(lateMinutesInput);
 
-                if (!employeeId || !date || !reason || !lateMinutes) {
+                if (!employeeId || !date || !reason || (reason !== 'Inactive' && !lateMinutesInput)) {
                     throw new Error('Please fill in all fields');
                 }
 
@@ -3427,7 +3577,7 @@
                             break;
                         case 'SDM':
                             amount *= 5;
-                            break;                            
+                            break;
                         case 'DD':
                             amount *= 6;
                             break;
@@ -3435,7 +3585,9 @@
                             // No multiplier for other roles
                             break;
                     }
-                }
+                } else if (reason === 'Inactive') {
+                    amount = 10;
+                }    
 
                 // Round amount to nearest integer
                 amount = Math.round(amount);
@@ -3445,14 +3597,6 @@
                 deadlineDate.setDate(deadlineDate.getDate() + 7);
                 const deadline = deadlineDate.toISOString().split('T')[0];
 
-                // Calculate current date
-                const currentDate = new Date();
-                const penaltyDate = new Date(date);
-                const daysPassed = Math.floor((currentDate - penaltyDate + 1) / (1000 * 60 * 60 * 24));
-
-                // Double the amount if past deadline
-                const finalAmount = daysPassed > 8 ? amount * 2 : amount;
-
                 const newPenalty = {
                     employeeId: employeeId,  // Make sure this is the correct Firebase key
                     employeeName: employeeName,
@@ -3461,9 +3605,8 @@
                     reason: reason,
                     minutes: lateMinutes,
                     baseAmount: amount,
-                    amount: finalAmount,
+                    amount: amount,
                     deadline: deadline,
-                    isOverdue: daysPassed > 8,
                     status: 'Not Submitted',
                     createdAt: new Date().toISOString(),
                     lastModified: new Date().toISOString(),
@@ -3484,37 +3627,6 @@
             } catch (error) {
                 console.error('Error adding penalty:', error);
                 alert('Error adding 賀金: ' + error.message);
-            }
-        }
-
-        // Update the penalty table display function
-        function updatePenaltyTable() {
-            const tableBody = document.getElementById('penalty-list');
-            if (!tableBody) return;
-
-            tableBody.innerHTML = '';
-
-            // Sort penalties by date (newest first)
-            const sortedPenalties = Object.entries(penaltyData || {})
-                .sort(([, a], [, b]) => new Date(b.date) - new Date(a.date));
-
-            for (const [id, penalty] of sortedPenalties) {
-                const row = document.createElement('tr');
-                const isOverdue = new Date() > new Date(penalty.deadline);
-                const displayAmount = isOverdue ? penalty.amount * 2 : penalty.amount;
-
-                row.innerHTML = `
-                    <td>${penalty.employeeName}</td>
-                    <td>${penalty.date}</td>
-                    <td>${penalty.reason}</td>
-                    <td>${penalty.minutes}</td>
-                    <td>$${displayAmount}${isOverdue ? ' (Doubled)' : ''}</td>
-                    <td>${penalty.deadline}${isOverdue ? ' (Overdue)' : ''}</td>
-                    <td class="${penalty.status === 'Submitted' ? 'status-submitted' : 'status-not-submitted'}">
-                        ${penalty.status}
-                    </td>
-                `;
-                tableBody.appendChild(row);
             }
         }
 
@@ -3783,7 +3895,7 @@
                             break;
                         case 'SDM':
                             amount *= 5;
-                            break;                               
+                            break;
                         case 'DD':
                             amount *= 6;
                             break;
@@ -4115,7 +4227,7 @@
                             break;
                         case 'SDM':
                             amount *= 5;
-                            break;                               
+                            break;
                         case 'DD':
                             amount *= 6;
                             break;
@@ -4384,15 +4496,18 @@
                 todaySnapshot.forEach(childSnapshot => {
                     const record = childSnapshot.val();
                     if (record.employeeId === employeeId) {
-                        const recordDate = new Date(record.timestamp).toISOString().split('T')[0];
-                        if (recordDate === currentDate) {
+                        const recordTime = new Date(record.timestamp);
+                        const currentTime = new Date();
+                        const timeDiff = (currentTime - recordTime) / (1000 * 60); // Difference in minutes
+                        
+                        if (timeDiff <= 15) { // Check if within 15 minutes
                             existingRecord = true;
                         }
                     }
                 });
 
                 if (existingRecord) {
-                    showScanResult('Attendance already recorded for today', false);
+                    showScanResult('Attendance already recorded within the last 15 minutes', false);
                     stopScanner();
                     return;
                 }
@@ -5466,6 +5581,7 @@
             window.penaltyData = {};
 
             loadEmployees();
+            loadTodayAttendance();
             loadAllPenalties();
             loadAllApplications();
             updateAllEmployeeSelects();
@@ -6490,6 +6606,7 @@
             console.log("Loading employee data:", employee);
             console.log("Team:", employee.team);
             console.log("Is Team Leader:", employee.isTeamLeader);
+            console.log("attenddistrictmeeting:", employee.attenddistrictmeeting);
             try {
                 if (employee) {
                     document.getElementById('employee-name').textContent = employee.name || 'N/A';
@@ -6498,6 +6615,7 @@
                     document.getElementById('employee-mdrt').textContent = employee.mdrt || 'N/A';
                     document.getElementById('emp-team').textContent = employee.team || 'N/A';
                     document.getElementById('emp-team-leader').textContent = employee.isTeamLeader ? 'Yes' : 'No';
+                    document.getElementById('emp-attenddistrictmeeting').textContent = employee.attenddistrictmeeting ? 'Yes' : 'No';
                     
                     // Format leave displays
                     const normalLeaves = employee.normalLeaves === 999 ? "∞" : (employee.normalLeaves || '0');
@@ -6547,7 +6665,7 @@
             });
         }
 
-        // Update the penalty table display function
+        // Update the admin page penalty table display function
         function updatePenaltyTable(penalties) {
             const tableBody = document.getElementById('penalty-list');
             if (!tableBody) return;
@@ -6560,7 +6678,8 @@
 
             for (const [id, penalty] of sortedPenalties) {
                 const row = document.createElement('tr');
-                const isOverdue = new Date() > new Date(penalty.deadline);
+                const currentDateStr = new Date().toISOString().split('T')[0];
+                const isOverdue = currentDateStr > penalty.deadline && penalty.status !== 'Submitted' || penalty.proofDate > (penalty.deadline + 'T23:59:59.999Z');
                 const displayAmount = isOverdue && !penalty.doubleAmountCancelled ? penalty.amount * 2 : penalty.amount;
 
                 // Add overdue class to row if penalty is overdue and double amount is not cancelled
@@ -6783,11 +6902,12 @@
                 const now = new Date();
                 const today = formatDate(now);
 
-                // Check if the agent already has an attendance record for today
+                // Check if the agent already has an attendance record within the last 15 minutes
                 const attendanceRef = database.ref('attendance');
+                const fifteenMinsAgo = new Date(now.getTime() - 15 * 60 * 1000).toISOString();
                 const existingRecordSnapshot = await attendanceRef
-                    .orderByChild('date')
-                    .equalTo(today)
+                    .orderByChild('timestamp')
+                    .startAt(fifteenMinsAgo)
                     .once('value');
                 
                 let existingRecord = false;
@@ -6799,7 +6919,7 @@
                 });
 
                 if (existingRecord) {
-                    throw new Error('You have already recorded your attendance for today');
+                    throw new Error('You have already recorded your attendance within the last 15 minutes');
                 }
 
                 // Get IP address
@@ -6851,7 +6971,6 @@
                         }
                     });
 
-                    if (!existingPenaltyForToday) {
                         const deadline = new Date(now);
                         deadline.setDate(deadline.getDate() + 7);
 
@@ -6873,7 +6992,7 @@
                         // Log penaltyData before pushing
                         console.log('Penalty data to be pushed:', penaltyData);
                         await database.ref('penalties').push(penaltyData);
-                    }
+                    
                 }
 
                 // Update both attendance and penalty tables
@@ -7233,6 +7352,13 @@
                         <span class="display-text">${emp.isTeamLeader ? 'Yes' : 'No'}</span>
                     `;
 
+                    const attenddistrictmeetingCheckbox = `
+                        <input type="checkbox" class="edit-checkbox1" style="display: none;" 
+                            ${emp.attenddistrictmeeting ? 'checked' : ''} 
+                            onchange="updateEmployeeField('${id}', 'attenddistrictmeeting', this.checked)">
+                        <span class="display-text">${emp.attenddistrictmeeting ? 'Yes' : 'No'}</span>
+                    `;                    
+
                     row.innerHTML = `
                         <td class="drag-handle">
                             <div class="drag-handle-inner">${emp.name}</div>
@@ -7244,6 +7370,7 @@
                         <td>${goldenLeavesDisplay}</td>
                         <td class="editable-cell">${teamSelect}</td>
                         <td class="editable-cell">${teamLeaderCheckbox}</td>
+                        <td class="editable-cell">${attenddistrictmeetingCheckbox}</td>
                         <td class="action-column">
                             <div class="button-stack">
                                 <button class="adjust-btn action-btn" onclick="toggleAdjustMode(this)">Adjust</button>
@@ -7270,6 +7397,72 @@
             });
         }
 
+        function loadTodayAttendance() {
+            const today = new Date().toISOString().split('T')[0];
+            const attendanceRef = database.ref('attendance');
+            const employeeRef = database.ref('employees');
+
+            // Listen for changes in employees and attendance
+            const updateTable = () => {
+                employeeRef.once('value').then(empSnapshot => {
+                    const employees = empSnapshot.val() || {};
+                    attendanceRef.orderByChild('date').equalTo(today).once('value').then(attSnapshot => {
+                        const attendances = attSnapshot.val() || {};
+                        const attendanceMap = new Map();
+                        Object.values(attendances).forEach(att => {
+                            if (att.date === today) {
+                                attendanceMap.set(att.employeeId, att);
+                            }
+                        });
+
+                        const attendanceList = document.getElementById('attendance-list');
+                        if (!attendanceList) return;
+                        attendanceList.innerHTML = '';
+
+                        let needingAttend = Object.entries(employees).filter(([id, emp]) => emp.attenddistrictmeeting);
+                        needingAttend.sort(([, a], [, b]) => a.name.localeCompare(b.name));
+
+                        if (needingAttend.length === 0) {
+                            const row = document.createElement('tr');
+                            row.innerHTML = `<td colspan="3" class="text-center py-4 text-gray-500">No agents required to attend today</td>`;
+                            attendanceList.appendChild(row);
+                            return;
+                        }
+
+                        needingAttend.forEach(([id, emp]) => {
+                            const row = document.createElement('tr');
+                            const att = attendanceMap.get(id);
+                            let dateTime = 'N/A';
+                            let status = 'Overdue';
+
+                            if (att) {
+                                dateTime = `${att.date} ${att.time}`;
+                                status = att.status;
+                            }
+
+                            row.innerHTML = `
+                                <td>${emp.name}</td>
+                                <td>${dateTime}</td>
+                            `;
+
+                            if (!att) {
+                                row.classList.add('overdue-row');
+                            }
+
+                            attendanceList.appendChild(row);
+                        });
+                    });
+                });
+            };
+
+            // Initial load
+            updateTable();
+
+            // Listen for real-time updates
+            employeeRef.on('value', updateTable);
+            attendanceRef.on('value', updateTable);
+        }
+
         // Add this new function to handle adjust mode
         function toggleAdjustMode(button) {
             const row = button.closest('tr');
@@ -7280,6 +7473,7 @@
                 const input = cell.querySelector('.edit-input');
                 const select = cell.querySelector('.edit-select');
                 const checkbox = cell.querySelector('.edit-checkbox');
+                const checkbox1 = cell.querySelector('.edit-checkbox1');
                 const displayText = cell.querySelector('.display-text');
                 
                 if (isAdjusting) {
@@ -7293,6 +7487,14 @@
                             updateEmployeeField(employeeId, 'isTeamLeader', this.checked);
                         };
                     }
+                    if (checkbox1) {
+                        checkbox1.style.display = 'block';
+                        // Add onchange event for checkbox
+                        checkbox1.onchange = function() {
+                            const employeeId = row.dataset.id;
+                            updateEmployeeField(employeeId, 'attenddistrictmeeting', this.checked);
+                        };
+                    }                                       
                     if (displayText) displayText.style.display = 'none';
                     button.textContent = 'Save';
                     button.classList.add('save-btn');
@@ -7309,6 +7511,10 @@
                         checkbox.style.display = 'none';
                         displayText.textContent = checkbox.checked ? 'Yes' : 'No';
                     }
+                    if (checkbox1) {
+                        checkbox1.style.display = 'none';
+                        displayText.textContent = checkbox1.checked ? 'Yes' : 'No';
+                    }                    
                     button.textContent = 'Adjust';
                     button.classList.remove('save-btn');
                 }
@@ -7588,7 +7794,7 @@
                             break;
                         case 'SDM':
                             amount *= 5;
-                            break;                               
+                            break;
                         case 'DD':
                             amount *= 6;
                             break;
