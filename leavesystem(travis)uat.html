@@ -2,7 +2,7 @@
 <html lang="en">
 
 <head>
-    <title>S-Next 請假及賀金系統 13/9 UAT</title>
+    <title>S-Next 請假及賀金系統 UAT 9/10</title>
     
     <link href='https://cdn.jsdelivr.net/npm/@fullcalendar/core@6.1.10/main.min.css' rel='stylesheet' />
     <link href='https://cdn.jsdelivr.net/npm/@fullcalendar/daygrid@6.1.10/main.min.css' rel='stylesheet' />
@@ -156,9 +156,12 @@
         /* Improve table scrolling on mobile */
         .table-container {
             width: 100%;
-            overflow-x: auto;
+            overflow-x: auto; /* Enables horizontal scroll on overflow */
             margin: 20px 0;
-            padding-bottom: 10px; /* For scroll bar space */
+            padding-bottom: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius);
+            -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
         }
 
         /* Add visual indication of scrollable tables */
@@ -1622,6 +1625,21 @@
             background-color: #fff000 ;
         }
 
+        .addorreducequota-btn {
+            background-color: #800080;
+            padding: 4px 8px;
+            font-size: 12px;
+            border-radius: 4px;
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .addorreducequota-btn:hover {
+            background-color: #6a006a;
+        }
+
         .filter-container {
             background-color: #ffffff;
             padding: 1rem;
@@ -1719,6 +1737,11 @@
             padding-bottom: 10px;
             border: 1px solid #dee2e6;
             border-radius: 8px;
+        }
+        /* Specific for your agent list container */
+        #agentListContainer {
+            overflow-x: auto; /* Ensure scroll if content overflows */
+            width: 100%;
         }
 
         #employee-table {
@@ -1895,7 +1918,7 @@
 <body>
     <div id="sync-status" class="sync-status"></div>
     <header>
-    <h1>S-Next 請假及賀金系統 13/9 UAT</h1>
+    <h1>S-Next 請假及賀金系統 UAT 9/10</h1>
     </header>
     <div class="container" id="home-page">
         <h3>Login</h3>
@@ -1980,7 +2003,7 @@
                     <option value="不可抗力因素">不可抗力因素</option>
                     <option value="離港">離港</option>
                     <option value="Special Approve">Special Approve</option>
-                    <option value="活動請假">活動請假</option>
+                    <option value="活動請假">活動請假 (注意：會產生賀金)</option>
                 </select>
                 <div id="admin-force-majeure-options" style="display: none;">
                     <label for="admin-force-majeure-reason">Reason:</label>
@@ -2056,7 +2079,7 @@
         </div>
         
         <div class="container">
-            <h3>Attend Today Meeting List</h3>
+            <h3>區會Attendance List</h3>
             <div id="todayAttendanceContainer" class="table-container">
                 <table id="attendance-table">
                     <thead>
@@ -2248,7 +2271,7 @@
                     <thead>
                         <tr>
                             <th>Agent Name</th>
-                            <th>Date</th>
+                            <th>遲到/缺席日子</th>
                             <th>Reason</th>
                             <th>Late Minutes</th>
                             <th>Amount</th>
@@ -2387,7 +2410,7 @@
             <option value="不可抗力因素">不可抗力因素</option>
             <option value="離港">離港</option>
             <option value="Special Approve">Special Approve</option>
-            <option value="活動請假">活動請假</option>
+            <option value="活動請假">活動請假 (注意：會產生賀金)</option>
         </select>
         <div id="force-majeure-options" style="display: none;">
             <label for="force-majeure-reason">Reason:</label>
@@ -2491,7 +2514,7 @@
             <table id="employee-penalty-table">
                 <thead>
                     <tr>
-                        <th>Date</th>
+                        <th>遲到/缺席日子</th>
                         <th>Reason</th>
                         <th>Late Minutes</th>
                         <th>Amount</th>
@@ -3526,7 +3549,11 @@
                 }
 
                 const employeeId = document.getElementById('penalty-employee').value;
-                const date = document.getElementById('penalty-date').value;
+                const dateElement = document.getElementById('penalty-date');
+                const todaytoday = new Date();
+                const formattedDate = todaytoday.toISOString().split('T')[0]; // Formats to YYYY-MM-DD
+                dateElement.value = formattedDate;
+                const date = dateElement.value;
                 const reason = document.getElementById('penalty-reason').value;
                 const lateMinutesInput = document.getElementById('penalty-minutes').value;
                 const lateMinutes = reason === 'Inactive' ? 0 : parseInt(lateMinutesInput);
@@ -7377,6 +7404,7 @@
                                 <button class="remove-btn action-btn" onclick="removeAgent('${id}', this.parentElement.parentElement.parentElement)">Remove</button>
                                 <button class="compensate-btn action-btn" onclick="addCompensationLeave('${id}')">補假</button>
                                 <button class="reduce-btn action-btn" onclick="reduceLeave('${id}')">扣假</button>
+                                <button class="addorreducequota-btn action-btn" onclick="addorreducemondayquota('${id}')">區會假</button>
                             </div>
                         </td>
                     `;
@@ -8649,6 +8677,160 @@
                 }
             } catch (error) {
                 console.error('Error reducing leave:', error);
+                await Swal.fire({
+                    icon: 'error',
+                    title: '錯誤',
+                    text: error.message,
+                    width: '400px',
+                    customClass: {
+                        popup: 'custom-swal-popup',
+                        title: 'custom-swal-title',
+                        confirmButton: 'custom-swal-confirm-button'
+                    }
+                });
+            }
+        }
+
+        async function addorreducemondayquota(employeeId) {
+            try {
+                // Check if user is authenticated
+                const auth = firebase.auth();
+                const currentUser = auth.currentUser;
+                
+                if (!currentUser || !currentUser.email) {
+                    throw new Error('請先登入');
+                }
+
+                // Get employee data
+                const employeeSnapshot = await database.ref(`employees/${employeeId}`).once('value');
+                const employeeData = employeeSnapshot.val();
+
+                if (!employeeData) {
+                    throw new Error('Employee not found');
+                }
+
+                // Create custom dialog with adjusted size and styling
+                const quotaAction = await Swal.fire({
+                    title: '調整配額',
+                    html: `
+                        <div style="margin-bottom: 20px;">
+                            <p style="font-size: 14px;">Agent: ${employeeData.name}</p>
+                            <p style="font-size: 14px;">Current usedMondayLeaves: ${employeeData.usedMondayLeaves || 0}</p>
+                        </div>
+                        <select id="action-type-select" class="swal2-select" style="
+                            width: 80%; 
+                            padding: 8px; 
+                            margin-bottom: 15px;
+                            font-size: 14px;
+                            border: 1px solid #ddd;
+                            border-radius: 4px;
+                        ">
+                            <option value="add">Add (增加)</option>
+                            <option value="reduce">Reduce (減少)</option>
+                        </select>
+                        <input type="number" id="quota-days" class="swal2-input" placeholder="輸入天數" min="0.5" step="0.5" style="
+                            width: 80%;
+                            padding: 8px;
+                            font-size: 14px;
+                            border: 1px solid #ddd;
+                            border-radius: 4px;
+                        ">
+                        <textarea id="quota-reason" class="swal2-textarea" placeholder="調整原因" style="
+                            width: 80%;
+                            margin-top: 15px;
+                            padding: 8px;
+                            font-size: 14px;
+                            border: 1px solid #ddd;
+                            border-radius: 4px;
+                            resize: vertical;
+                        "></textarea>
+                    `,
+                    showCancelButton: true,
+                    confirmButtonText: '確認',
+                    cancelButtonText: '取消',
+                    width: '400px',
+                    customClass: {
+                        container: 'custom-swal-container',
+                        popup: 'custom-swal-popup',
+                        header: 'custom-swal-header',
+                        title: 'custom-swal-title',
+                        closeButton: 'custom-swal-close-button',
+                        content: 'custom-swal-content',
+                        input: 'custom-swal-input',
+                        actions: 'custom-swal-actions',
+                        confirmButton: 'custom-swal-confirm-button',
+                        cancelButton: 'custom-swal-cancel-button'
+                    },
+                    preConfirm: () => {
+                        const action = document.getElementById('action-type-select').value;
+                        const days = parseFloat(document.getElementById('quota-days').value);
+                        const reason = document.getElementById('quota-reason').value.trim();
+
+                        if (!days || days < 0.5) {
+                            Swal.showValidationMessage('請輸入有效的天數 (最少0.5天)');
+                            return false;
+                        }
+                        if (!reason) {
+                            Swal.showValidationMessage('請輸入調整原因');
+                            return false;
+                        }
+                        return { action, days, reason };
+                    }
+                });
+
+                if (quotaAction.isConfirmed) {
+                    const { action, days, reason } = quotaAction.value;
+                    const updates = {};
+
+                    // Calculate new usedMondayLeaves
+                    let currentQuota = employeeData.usedMondayLeaves || 0;
+                    let newQuota;
+                    if (action === 'add') {
+                        newQuota = currentQuota + days;
+                    } else if (action === 'reduce') {
+                        newQuota = Math.max(0, currentQuota - days);
+                    }
+                    updates[`employees/${employeeId}/usedMondayLeaves`] = newQuota;
+
+                    // Add adjustment record (using a new path for quota adjustments to keep separate from leave reductions)
+                    const adjustmentRef = database.ref(`quotaAdjustmentRecords/${employeeId}`).push();
+                    const timestamp = new Date().toISOString();
+                    
+                    const adjustmentRecord = {
+                        action: action,
+                        days: days,
+                        reason: reason,
+                        timestamp: timestamp,
+                        adjustedBy: currentUser.email,
+                        previousValue: currentQuota,
+                        newValue: newQuota
+                    };
+
+                    updates[`quotaAdjustmentRecords/${employeeId}/${adjustmentRef.key}`] = adjustmentRecord;
+
+                    // Update the database
+                    if (Object.keys(updates).length > 0) {
+                        await database.ref().update(updates);
+
+                        // Show success message
+                        await Swal.fire({
+                            icon: 'success',
+                            title: '調整完成',
+                            text: `已成功${action === 'add' ? '增加' : '減少'} ${days} 天 usedMondayLeaves`,
+                            width: '400px',
+                            customClass: {
+                                popup: 'custom-swal-popup',
+                                title: 'custom-swal-title',
+                                confirmButton: 'custom-swal-confirm-button'
+                            }
+                        });
+
+                        // Refresh the employee table
+                        loadEmployees();
+                    }
+                }
+            } catch (error) {
+                console.error('Error adjusting quota:', error);
                 await Swal.fire({
                     icon: 'error',
                     title: '錯誤',
