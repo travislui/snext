@@ -29,8 +29,6 @@
 
             /* Table responsiveness */
             table {
-                display: block;
-                overflow-x: auto;
                 white-space: nowrap;
             }
 
@@ -89,6 +87,7 @@
 
             /* Adjust cell padding for better touch targets */
             th, td {
+                white-space: nowrap;
                 padding: 8px;
             }
 
@@ -1747,12 +1746,11 @@
 
         #employee-table {
             width: 100%;
+            min-width: 1000px;
             border-collapse: separate;
             border-spacing: 0;
-            /* Ensure the table is in a scrollable container */
-            display: block;
-            max-height: 800px; /* Adjust as needed for scrollable content */
-            overflow-y: auto; /* Enable vertical scrolling */
+            max-height: none; /* Remove if present; let the container handle max-height */
+            overflow-y: none; /* Remove; container handles it */
         }
 
         #employee-table thead th {
