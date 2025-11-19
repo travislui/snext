@@ -2,7 +2,7 @@
 <html lang="en">
 
 <head>
-    <title>S-Next 請假及賀金系統</title>
+    <title>S-Next 請假及賀金系統 UAT 12/11</title>
     
     <link href='https://cdn.jsdelivr.net/npm/@fullcalendar/core@6.1.10/main.min.css' rel='stylesheet' />
     <link href='https://cdn.jsdelivr.net/npm/@fullcalendar/daygrid@6.1.10/main.min.css' rel='stylesheet' />
@@ -156,9 +156,12 @@
         /* Improve table scrolling on mobile */
         .table-container {
             width: 100%;
-            overflow-x: auto;
+            overflow-x: auto; /* Enables horizontal scroll on overflow */
             margin: 20px 0;
-            padding-bottom: 10px; /* For scroll bar space */
+            padding-bottom: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius);
+            -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
         }
 
         /* Add visual indication of scrollable tables */
@@ -1088,7 +1091,8 @@
         .status-approved,
         .status-rejected,
         .status-pending,
-        .status-not-submitted {
+        .status-not-submitted,
+        .status-pending-proof {
             padding: 0.4rem 0.8rem;
             border-radius: 20px;
             font-size: 0.875rem;
@@ -1622,6 +1626,21 @@
             background-color: #fff000 ;
         }
 
+        .addorreducequota-btn {
+            background-color: #800080;
+            padding: 4px 8px;
+            font-size: 12px;
+            border-radius: 4px;
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .addorreducequota-btn:hover {
+            background-color: #6a006a;
+        }
+
         .filter-container {
             background-color: #ffffff;
             padding: 1rem;
@@ -1720,13 +1739,17 @@
             border: 1px solid #dee2e6;
             border-radius: 8px;
         }
+        /* Specific for your agent list container */
+        #agentListContainer {
+            overflow-x: auto; /* Ensure scroll if content overflows */
+            width: 100%;
+        }
 
         #employee-table {
             width: 100%;
             border-collapse: separate;
             border-spacing: 0;
             /* Ensure the table is in a scrollable container */
-            display: block;
             max-height: 800px; /* Adjust as needed for scrollable content */
             overflow-y: auto; /* Enable vertical scrolling */
         }
@@ -1889,13 +1912,37 @@
             background-color: #e6ffe6;
         }
 
+        .status-pending-proof {
+            background-color: #ff9900e3;
+            color: white;
+        }
+
+        .submit-proof-btn {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-left: 5px;
+        }
+
+        .submit-proof-btn:hover {
+            background-color: #45a049;
+        }
+
+        .submit-proof-btn:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
     </style>
 </head>
 
 <body>
     <div id="sync-status" class="sync-status"></div>
     <header>
-    <h1>S-Next 請假及賀金系統</h1>
+    <h1>S-Next 請假及賀金系統 UAT 12/11</h1>
     </header>
     <div class="container" id="home-page">
         <h3>Login</h3>
@@ -1980,7 +2027,7 @@
                     <option value="不可抗力因素">不可抗力因素</option>
                     <option value="離港">離港</option>
                     <option value="Special Approve">Special Approve</option>
-                    <option value="活動請假">活動請假</option>
+                    <option value="活動請假">活動請假 (注意：會產生賀金)</option>
                 </select>
                 <div id="admin-force-majeure-options" style="display: none;">
                     <label for="admin-force-majeure-reason">Reason:</label>
@@ -2056,7 +2103,7 @@
         </div>
         
         <div class="container">
-            <h3>Attend Today Meeting List</h3>
+            <h3>區會Attendance List</h3>
             <div id="todayAttendanceContainer" class="table-container">
                 <table id="attendance-table">
                     <thead>
@@ -2248,7 +2295,7 @@
                     <thead>
                         <tr>
                             <th>Agent Name</th>
-                            <th>Date</th>
+                            <th>遲到/缺席日子</th>
                             <th>Reason</th>
                             <th>Late Minutes</th>
                             <th>Amount</th>
@@ -2387,7 +2434,7 @@
             <option value="不可抗力因素">不可抗力因素</option>
             <option value="離港">離港</option>
             <option value="Special Approve">Special Approve</option>
-            <option value="活動請假">活動請假</option>
+            <option value="活動請假">活動請假 (注意：會產生賀金)</option>
         </select>
         <div id="force-majeure-options" style="display: none;">
             <label for="force-majeure-reason">Reason:</label>
@@ -2408,9 +2455,16 @@
             </select>
         </div>
         <div id="proof-container" style="display: none;">
-            <label for="proof-file">Proof:</label>
+            <label for="proof-file">Option 1 ：我選擇立即提供證明 （Admin會預設Approved)</label>
             <input type="file" id="proof-file" accept="image/*">
         </div>
+        <div id="deferred-proof-option" style="display: none; margin-top: 10px;">
+            <label style="display: flex; align-items: center; cursor: pointer;">
+                <input type="checkbox" id="deferred-proof-checkbox" style="margin-right: 8px;">
+                <span style="font-size: 14px;">我決定在請假當天23:59 前提供證明 (Admin 會預設Rejected, 直至你在限期前提供證明)</span>
+            </label>
+        </div>
+        <span style="font-size: 14px;">注意：如果不能在限期前提供證明，是次請假申請將不被承認。</span>       
         <button type="submit" id="apply-button">Apply</button>
     </form>
     <div id="success-notice" style="display: none; color: green; margin-top: 10px;">
@@ -2491,7 +2545,7 @@
             <table id="employee-penalty-table">
                 <thead>
                     <tr>
-                        <th>Date</th>
+                        <th>遲到/缺席日子</th>
                         <th>Reason</th>
                         <th>Late Minutes</th>
                         <th>Amount</th>
@@ -2585,18 +2639,6 @@
         document.getElementById('apply-leave-form')?.addEventListener('submit', function(e) {
             e.preventDefault();
             applyLeave();
-        });
-
-        // Show/hide force majeure options based on leave type
-        document.getElementById('leave-type')?.addEventListener('change', function() {
-            const forceMajeureOptions = document.getElementById('force-majeure-options');
-            const proofContainer = document.getElementById('proof-container');
-            
-            forceMajeureOptions.style.display = 
-                this.value === '不可抗力因素' ? 'block' : 'none';
-            
-            proofContainer.style.display = 
-                ['Sick Leave', '不可抗力因素'].includes(this.value) ? 'block' : 'none';
         });
 
         // Initialize Firebase Auth
@@ -3276,12 +3318,26 @@
                     const formattedStartDate = formatDate(startDate);
                     const formattedEndDate = formatDate(endDate);
 
+                    // Check if proof submission deadline has passed
+                    let showSubmitButton = false;
+                    if (application.isDeferredProof && application.status === 'Pending Proof') {
+                        const deadline = new Date(application.leaveStartDate + 'T23:59:59');
+                        showSubmitButton = new Date() <= deadline;
+                    }
+
                     row.innerHTML = `
                         <td>${formattedApplyDate}</td>
                         <td>${formattedStartDate}</td>
                         <td>${formattedEndDate}</td>
                         <td>${application.leaveType || 'N/A'}</td>
-                        <td><span class="status-${application.status.toLowerCase()}">${application.status || 'Pending'}</span></td>
+                        <td>
+                            <span class="status-${application.status.toLowerCase().replace(' ', '-')}">${application.status || 'Pending'}</span>
+                            ${showSubmitButton ? `
+                                <button type="button" class="submit-proof-btn" onclick="submitProofLater('${id}', '${currentUser.id}')">
+                                    Submit Proof
+                                </button>
+                            ` : ''}
+                        </td>
                     `;
                 }
 
@@ -3526,7 +3582,11 @@
                 }
 
                 const employeeId = document.getElementById('penalty-employee').value;
-                const date = document.getElementById('penalty-date').value;
+                const dateElement = document.getElementById('penalty-date');
+                const todaytoday = new Date();
+                const formattedDate = todaytoday.toISOString().split('T')[0]; // Formats to YYYY-MM-DD
+                dateElement.value = formattedDate;
+                const date = dateElement.value;
                 const reason = document.getElementById('penalty-reason').value;
                 const lateMinutesInput = document.getElementById('penalty-minutes').value;
                 const lateMinutes = reason === 'Inactive' ? 0 : parseInt(lateMinutesInput);
@@ -3662,9 +3722,15 @@
             const proofFileInput = document.getElementById('proof-file');
             const forceMajeureOptions = document.getElementById('force-majeure-options');
             const forceMajeureReasonSelect = document.getElementById('force-majeure-reason');
+            const deferredProofOption = document.getElementById('deferred-proof-option');
+            const deferredProofCheckbox = document.getElementById('deferred-proof-checkbox');
             const startDateInput = document.getElementById('leave-start-date');
             const endDateInput = document.getElementById('leave-end-date');
             const applyDateInput = document.getElementById('apply-date');
+
+            // Reset checkbox state
+            deferredProofCheckbox.checked = false;
+            proofFileInput.value = ''; // Clear file input
 
             // Add Special Approve to the types requiring proof
             if (this.value === 'Sick Leave' || 
@@ -3672,23 +3738,23 @@
                 this.value === '離港' ||
                 this.value === 'Special Approve') {
                 proofContainer.style.display = 'block';
+                deferredProofOption.style.display = 'block';
                 proofFileInput.disabled = false;
+                
+                // Initially set required = true (will be handled by checkbox)
                 proofFileInput.required = true;
 
                 // Special handling for Special Approve
                 if (this.value === 'Special Approve') {
-                    // Set today's date
                     const today = new Date().toISOString().split('T')[0];
                     applyDateInput.value = today;
                     startDateInput.value = today;
                     endDateInput.value = today;
                     
-                    // Disable date inputs for Special Approve
                     applyDateInput.disabled = true;
                     startDateInput.disabled = true;
                     endDateInput.disabled = true;
                 } else {
-                    // Re-enable date inputs for other types
                     applyDateInput.disabled = false;
                     startDateInput.disabled = false;
                     endDateInput.disabled = false;
@@ -3703,12 +3769,12 @@
                 }
             } else {
                 proofContainer.style.display = 'none';
+                deferredProofOption.style.display = 'none';
                 proofFileInput.disabled = true;
                 proofFileInput.required = false;
                 forceMajeureOptions.style.display = 'none';
                 forceMajeureReasonSelect.required = false;
                 
-                // Re-enable date inputs
                 applyDateInput.disabled = false;
                 startDateInput.disabled = false;
                 endDateInput.disabled = false;
@@ -3783,21 +3849,46 @@
 
             // Process leave application based on type
             if (leaveType === 'Sick Leave' || leaveType === '不可抗力因素' || leaveType === '離港' || leaveType === 'Special Approve') {
+                const deferredProofCheckbox = document.getElementById('deferred-proof-checkbox');
                 const proofFile = document.getElementById('proof-file').files[0];
-                if (!proofFile) {
-                    alert(`Please submit proof for ${leaveType}.`);
-                    return;
+                
+                if (deferredProofCheckbox.checked) {
+                    // ✅ DEFERRED PROOF: No proof required NOW
+                    // Clear any existing file to avoid validation issues
+                    document.getElementById('proof-file').value = '';
+                    
+                    // Process WITHOUT proof
+                    processLeaveApplication(applyDate, leaveStartDate, leaveEndDate, leaveType, null, true);
+                } else {
+                    // ❌ IMMEDIATE PROOF REQUIRED
+                    if (!proofFile) {
+                        alert(`Please submit proof for ${leaveType} or select deferred proof option.`);
+                        return;
+                    }
+                    
+                    // Convert proof file to base64 and process application
+                    const reader = new FileReader();
+                    reader.onloadend = function() {
+                        const proofDataUrl = reader.result;
+                        processLeaveApplication(applyDate, leaveStartDate, leaveEndDate, leaveType, proofDataUrl, false);
+                    };
+                    reader.readAsDataURL(proofFile);
                 }
-
-                // Convert proof file to base64 and process application
-                const reader = new FileReader();
-                reader.onloadend = function() {
-                    const proofDataUrl = reader.result;
-                    processLeaveApplication(applyDate, leaveStartDate, leaveEndDate, leaveType, proofDataUrl);
-                };
-                reader.readAsDataURL(proofFile);
             } else {
-                processLeaveApplication(applyDate, leaveStartDate, leaveEndDate, leaveType, null);
+                processLeaveApplication(applyDate, leaveStartDate, leaveEndDate, leaveType, null, false);
+            }
+        });
+
+        document.getElementById('deferred-proof-checkbox')?.addEventListener('change', function() {
+            const proofFileInput = document.getElementById('proof-file');
+            
+            if (this.checked) {
+                // Remove required and clear file when checkbox is ticked
+                proofFileInput.required = false;
+                proofFileInput.value = '';
+            } else {
+                // Add required back when checkbox is unticked
+                proofFileInput.required = true;
             }
         });
 
@@ -3822,7 +3913,7 @@
             });
         }
 
-        async function processLeaveApplication(applyDate, leaveStartDate, leaveEndDate, leaveType, proofDataUrl) {
+        async function processLeaveApplication(applyDate, leaveStartDate, leaveEndDate, leaveType, proofDataUrl, isDeferredProof = false) {
             const applyButton = document.getElementById('apply-button');
             const successNotice = document.getElementById('success-notice');
 
@@ -3993,9 +4084,10 @@
                     leaveEndDate: formattedEndDate,
                     leaveType: leaveType,
                     leaveDays: leaveDays,
-                    status: 'Approved',
+                    status: isDeferredProof ? 'Pending Proof' : 'Approved', // Default to Pending Proof if deferred
                     proof: proofDataUrl,
-                    createdAt: new Date().toISOString() // This will store the exact timestamp
+                    isDeferredProof: isDeferredProof, // Track deferred proof status
+                    createdAt: new Date().toISOString()
                 };
 
                 // Add application to Firebase
@@ -4053,6 +4145,66 @@
                 }, 1000); // Wait 1 second before re-enabling
             }
         }
+
+        // Add this new function for submitting proof later
+        window.submitProofLater = async function(applicationId, employeeId) {
+            // Dynamically create a file input to prompt for selection
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'image/*';
+            
+            // Trigger the file dialog immediately
+            input.click();
+            
+            // Wait for user to select a file
+            input.addEventListener('change', async function() {
+                const proofFile = input.files[0];
+                if (!proofFile) {
+                    alert('No file selected.');
+                    return;
+                }
+
+                // Check if deadline has passed
+                const applicationsRef = database.ref(`applications/${applicationId}`);
+                const snapshot = await applicationsRef.once('value');
+                const application = snapshot.val();
+                
+                if (!application || !application.leaveStartDate) {
+                    alert('Application not found.');
+                    return;
+                }
+
+                const startDate = new Date(application.leaveStartDate + 'T23:59:59');
+                const now = new Date();
+                
+                if (now > startDate) {
+                    alert('Deadline has passed. Cannot submit proof after 23:59 of leave start date.');
+                    return;
+                }
+
+                try {
+                    // Convert proof to base64
+                    const reader = new FileReader();
+                    reader.onloadend = async function() {
+                        const proofDataUrl = reader.result;
+                        
+                        // Update application with proof and change status to Approved
+                        await applicationsRef.update({
+                            proof: proofDataUrl,
+                            status: 'Approved',
+                            proofSubmittedAt: new Date().toISOString()
+                        });
+
+                        showSyncStatus('Proof submitted successfully. Application is now Approved.');
+                        await loadEmployeeApplications(employeeId);
+                    };
+                    reader.readAsDataURL(proofFile);
+                } catch (error) {
+                    console.error('Error submitting proof:', error);
+                    alert('Error submitting proof: ' + error.message);
+                }
+            });
+        };
 
         async function updateRemainingLeaves(employeeId, leaveType, leaveDays) {
             const employeeRef = database.ref(`employees/${employeeId}`);
@@ -5166,18 +5318,29 @@
                             <td>${formattedEndDate}</td>
                             <td>${application.leaveType}</td>
                             <td>
-                                <span class="status-${application.status.toLowerCase()}">${application.status}</span>
+                                <span class="status-${application.status === 'Pending Proof' ? 'rejected' : application.status.toLowerCase().replace(' ', '-')}">
+                                    ${application.status === 'Pending Proof' ? 'Rejected' : application.status}
+                                </span>
                                 ${application.status === 'Approved' ? `
                                     <button type="button" class="reject-btn" onclick="rejectApplication('${id}', '${application.employeeId}', '${application.leaveType}')">
                                         Reject
                                     </button>
                                 ` : ''}
+                                ${(application.status === 'Pending Proof' && application.isDeferredProof) ? `
+                                    <br><small>Pending for Valid Proof</small>
+                                ` : (application.proof ? `
+                                    <br><small>Proof Submitted</small>
+                                ` : '')}
                             </td>
                             <td>
-                                ${(application.leaveType === 'Sick Leave' || 
-                                application.leaveType === '不可抗力因素' || 
-                                application.leaveType === '離港') && application.proof ? 
-                                    `<button type="button" class="show-proof-btn" onclick="showProof('${id}')">View Proof</button>` : 
+                                ${((application.leaveType === 'Sick Leave' || 
+                                    application.leaveType === '不可抗力因素' || 
+                                    application.leaveType === '離港' || 
+                                    application.leaveType === 'Special Approve') && 
+                                    (application.proof || (application.status === 'Pending Proof' && application.isDeferredProof))) ?
+                                    ((application.status === 'Pending Proof' && application.isDeferredProof) ?
+                                        `<span style="color: orange;">Pending for Valid Proof</span>` :
+                                        `<button type="button" class="show-proof-btn" onclick="showProof('${id}')">View Proof</button>`) : 
                                     'N/A'}
                             </td>
                             <td>
@@ -7377,6 +7540,7 @@
                                 <button class="remove-btn action-btn" onclick="removeAgent('${id}', this.parentElement.parentElement.parentElement)">Remove</button>
                                 <button class="compensate-btn action-btn" onclick="addCompensationLeave('${id}')">補假</button>
                                 <button class="reduce-btn action-btn" onclick="reduceLeave('${id}')">扣假</button>
+                                <button class="addorreducequota-btn action-btn" onclick="addorreducemondayquota('${id}')">區會假</button>
                             </div>
                         </td>
                     `;
@@ -8649,6 +8813,160 @@
                 }
             } catch (error) {
                 console.error('Error reducing leave:', error);
+                await Swal.fire({
+                    icon: 'error',
+                    title: '錯誤',
+                    text: error.message,
+                    width: '400px',
+                    customClass: {
+                        popup: 'custom-swal-popup',
+                        title: 'custom-swal-title',
+                        confirmButton: 'custom-swal-confirm-button'
+                    }
+                });
+            }
+        }
+
+        async function addorreducemondayquota(employeeId) {
+            try {
+                // Check if user is authenticated
+                const auth = firebase.auth();
+                const currentUser = auth.currentUser;
+                
+                if (!currentUser || !currentUser.email) {
+                    throw new Error('請先登入');
+                }
+
+                // Get employee data
+                const employeeSnapshot = await database.ref(`employees/${employeeId}`).once('value');
+                const employeeData = employeeSnapshot.val();
+
+                if (!employeeData) {
+                    throw new Error('Employee not found');
+                }
+
+                // Create custom dialog with adjusted size and styling
+                const quotaAction = await Swal.fire({
+                    title: '調整配額',
+                    html: `
+                        <div style="margin-bottom: 20px;">
+                            <p style="font-size: 14px;">Agent: ${employeeData.name}</p>
+                            <p style="font-size: 14px;">Current usedMondayLeaves: ${employeeData.usedMondayLeaves || 0}</p>
+                        </div>
+                        <select id="action-type-select" class="swal2-select" style="
+                            width: 80%; 
+                            padding: 8px; 
+                            margin-bottom: 15px;
+                            font-size: 14px;
+                            border: 1px solid #ddd;
+                            border-radius: 4px;
+                        ">
+                            <option value="add">Add (增加)</option>
+                            <option value="reduce">Reduce (減少)</option>
+                        </select>
+                        <input type="number" id="quota-days" class="swal2-input" placeholder="輸入天數" min="0.5" step="0.5" style="
+                            width: 80%;
+                            padding: 8px;
+                            font-size: 14px;
+                            border: 1px solid #ddd;
+                            border-radius: 4px;
+                        ">
+                        <textarea id="quota-reason" class="swal2-textarea" placeholder="調整原因" style="
+                            width: 80%;
+                            margin-top: 15px;
+                            padding: 8px;
+                            font-size: 14px;
+                            border: 1px solid #ddd;
+                            border-radius: 4px;
+                            resize: vertical;
+                        "></textarea>
+                    `,
+                    showCancelButton: true,
+                    confirmButtonText: '確認',
+                    cancelButtonText: '取消',
+                    width: '400px',
+                    customClass: {
+                        container: 'custom-swal-container',
+                        popup: 'custom-swal-popup',
+                        header: 'custom-swal-header',
+                        title: 'custom-swal-title',
+                        closeButton: 'custom-swal-close-button',
+                        content: 'custom-swal-content',
+                        input: 'custom-swal-input',
+                        actions: 'custom-swal-actions',
+                        confirmButton: 'custom-swal-confirm-button',
+                        cancelButton: 'custom-swal-cancel-button'
+                    },
+                    preConfirm: () => {
+                        const action = document.getElementById('action-type-select').value;
+                        const days = parseFloat(document.getElementById('quota-days').value);
+                        const reason = document.getElementById('quota-reason').value.trim();
+
+                        if (!days || days < 0.5) {
+                            Swal.showValidationMessage('請輸入有效的天數 (最少0.5天)');
+                            return false;
+                        }
+                        if (!reason) {
+                            Swal.showValidationMessage('請輸入調整原因');
+                            return false;
+                        }
+                        return { action, days, reason };
+                    }
+                });
+
+                if (quotaAction.isConfirmed) {
+                    const { action, days, reason } = quotaAction.value;
+                    const updates = {};
+
+                    // Calculate new usedMondayLeaves
+                    let currentQuota = employeeData.usedMondayLeaves || 0;
+                    let newQuota;
+                    if (action === 'add') {
+                        newQuota = currentQuota + days;
+                    } else if (action === 'reduce') {
+                        newQuota = Math.max(0, currentQuota - days);
+                    }
+                    updates[`employees/${employeeId}/usedMondayLeaves`] = newQuota;
+
+                    // Add adjustment record (using a new path for quota adjustments to keep separate from leave reductions)
+                    const adjustmentRef = database.ref(`quotaAdjustmentRecords/${employeeId}`).push();
+                    const timestamp = new Date().toISOString();
+                    
+                    const adjustmentRecord = {
+                        action: action,
+                        days: days,
+                        reason: reason,
+                        timestamp: timestamp,
+                        adjustedBy: currentUser.email,
+                        previousValue: currentQuota,
+                        newValue: newQuota
+                    };
+
+                    updates[`quotaAdjustmentRecords/${employeeId}/${adjustmentRef.key}`] = adjustmentRecord;
+
+                    // Update the database
+                    if (Object.keys(updates).length > 0) {
+                        await database.ref().update(updates);
+
+                        // Show success message
+                        await Swal.fire({
+                            icon: 'success',
+                            title: '調整完成',
+                            text: `已成功${action === 'add' ? '增加' : '減少'} ${days} 天 usedMondayLeaves`,
+                            width: '400px',
+                            customClass: {
+                                popup: 'custom-swal-popup',
+                                title: 'custom-swal-title',
+                                confirmButton: 'custom-swal-confirm-button'
+                            }
+                        });
+
+                        // Refresh the employee table
+                        loadEmployees();
+                    }
+                }
+            } catch (error) {
+                console.error('Error adjusting quota:', error);
                 await Swal.fire({
                     icon: 'error',
                     title: '錯誤',
