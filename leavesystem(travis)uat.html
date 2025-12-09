@@ -4677,7 +4677,6 @@
                 const settingsSnapshot = await database.ref(`settings/attendance/${today}`).once('value');
                 const settings = settingsSnapshot.val() || {}; // Fallback to empty object to prevent undefined errors
 
-                const meetingName = settings.meetingName || `Meeting (${today})`;
 
                 // Calculate late status
                 const lateInfo = await calculateLateStatus(now.toISOString(), employeeData.role);
@@ -4694,7 +4693,6 @@
                     employeeName: employeeData.name,
                     role: employeeData.role,
                     date: currentDate,
-                    meetingName: meetingName,
                     time: formatTime(now),
                     timestamp: now.toISOString(),
                     status: lateInfo.status,
@@ -7143,7 +7141,6 @@
                 const ipData = await ipResponse.json();
 
                 // Get meeting name
-                const meetingName = settings.meetingname || `Meeting (${today})`;
 
                 // Calculate late status
                 const lateInfo = await calculateLateStatus(now.toISOString(), employeeData.role);
@@ -7159,7 +7156,6 @@
                     employeeId: employeeData.id,
                     employeeName: employeeData.name,
                     role: employeeData.role,
-                    meetingName: meetingName,
                     date: today,
                     time: formatTime(now),
                     timestamp: now.toISOString(),
@@ -7199,7 +7195,6 @@
                             employeeName: employeeData.name,
                             employeeRole: employeeData.role,
                             date: today,
-                            reason: meetingName,
                             minutes: lateInfo.lateMinutes,
                             amount: lateInfo.amount,
                             baseAmount: lateInfo.amount,
