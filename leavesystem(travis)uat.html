@@ -4676,7 +4676,7 @@
                 const lateInfo = await calculateLateStatus(now.toISOString(), employeeData.role);
 
                 // Get today's meeting name from Firebase
-                let meetingName = `Meeting (${today})`; // Default value
+                let meetingName = `Meeting (${currentDate})`; // Default value
 
                 try {
                     const settingsSnapshot = await database.ref(`settings/attendance/${today}`).once('value');
@@ -7150,7 +7150,21 @@
                 const ipData = await ipResponse.json();
 
                 // Get meeting name
-                const meetingName = settings.meetingname || `Meeting (${today})`;
+                let meetingName = `Meeting (${today})`; // Default value
+
+                try {
+                    const settingsSnapshot = await database.ref(`settings/attendance/${todayISO}`).once('value');
+                    const settingsData = settingsSnapshot.val();
+                    
+                    if (settingsData && settingsData.meetingName) {
+                        meetingName = settingsData.meetingName;
+                    }
+                    
+                    console.log('Retrieved meeting name:', meetingName);
+                } catch (settingsError) {
+                    console.error('Error fetching meeting settings:', settingsError);
+                    // Will use default meetingName
+                }
 
                 // Calculate late status
                 const lateInfo = await calculateLateStatus(now.toISOString(), employeeData.role);
