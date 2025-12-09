@@ -4672,15 +4672,15 @@
                 const ipData = await ipResponse.json();
                 const ipAddress = ipData.ip;
 
-                // Calculate late status
-                const lateInfo = await calculateLateStatus(now.toISOString(), employeeData.role);
-
-                // Get today's meeting name from Firebase
+                // Get today's settings from Firebase (including meeting name)
                 const today = new Date().toISOString().split('T')[0];
                 const settingsSnapshot = await database.ref(`settings/attendance/${today}`).once('value');
-                const settings = settingsSnapshot.val();
+                const settings = settingsSnapshot.val() || {}; // Fallback to empty object to prevent undefined errors
 
-                const meetingName = settings?.meetingName || `Meeting (${today})`;
+                const meetingName = settings.meetingName || `Meeting (${today})`;
+
+                // Calculate late status
+                const lateInfo = await calculateLateStatus(now.toISOString(), employeeData.role);
 
                 // Validate lateInfo
                 if (!lateInfo || !lateInfo.status) {
@@ -5098,8 +5098,9 @@
                     console.error('Error setting attendance options:', error);
                     alert('Error setting options. Please try again.');
                 });
-            }
-
+        }    
+        
+        
         // Function to create QR code window content
         function createQRWindowContent(meetingName) {        
             // Use the passed meetingName, fallback to default if somehow missing
