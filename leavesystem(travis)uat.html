@@ -2,7 +2,7 @@
 <html lang="en">
 
 <head>
-    <title>S-Next 請假及賀金系統 UAT 28/11</title>
+    <title>S-Next 請假及賀金系統 UAT 09/12</title>
     
     <link href='https://cdn.jsdelivr.net/npm/@fullcalendar/core@6.1.10/main.min.css' rel='stylesheet' />
     <link href='https://cdn.jsdelivr.net/npm/@fullcalendar/daygrid@6.1.10/main.min.css' rel='stylesheet' />
@@ -1967,7 +1967,7 @@
 <body>
     <div id="sync-status" class="sync-status"></div>
     <header>
-    <h1>S-Next 請假及賀金系統 UAT 28/11</h1>
+    <h1>S-Next 請假及賀金系統 UAT 09/12</h1>
     </header>
     <div class="container" id="home-page">
         <h3>Login</h3>
@@ -1987,6 +1987,9 @@
             <button id="show-qr-code" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mt-4">
                 Show Attendance QR Code
             </button>
+            <button id="load-all-data-btn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mt-4">
+                Load All Data
+            </button>       
             <h3>Add Agents</h3>
             <form id="add-employee-form">
                 <input type="text" id="emp-name" placeholder="Agent Name" required>
@@ -2688,7 +2691,7 @@
             if (event) {
                 event.preventDefault();
             }
-            
+
             const username = document.getElementById('username').value;
             const password = document.getElementById('password').value;
 
@@ -2698,69 +2701,62 @@
             }
 
             try {
-                // Admin login
+                // ====================== ADMIN LOGIN ======================
                 if (username === 'admin@snext.com') {
                     try {
                         const userCredential = await auth.signInWithEmailAndPassword(username, password);
                         const user = userCredential.user;
-                        
-                        // Check if user is admin
-                        const adminSnapshot = await database.ref(`users/${user.uid}/isAdmin`).once('value');
-                        if (adminSnapshot.val() === true) {
-                            isAdmin = true;
-                            currentUser = { 
-                                uid: user.uid,
-                                username: 'admin',
-                                email: username
-                            };
-                            
-                            // Update last login timestamp
-                            await database.ref(`users/${user.uid}`).update({
-                                lastLogin: new Date().toISOString()
-                            });
 
-                            // Show admin interface and load all data
-                            showAdminInterface();
-                            loadEmployees();
-                            loadTodayAttendance();
-                            loadAllApplications();
-                            loadAllPenalties();
-                            
-                            // Explicitly load and initialize attendance records
-                            await updateAttendanceTable(); // Initial fetch
-                            initializeAttendanceTable();   // Set up real-time listener
-                            
-                            // Show success message
-                            showSyncStatus('Admin login successful');
-                        } else {
+                        // Check if this user is actually an admin
+                        const adminSnapshot = await database.ref(`users/${user.uid}/isAdmin`).once('value');
+                        if (adminSnapshot.val() !== true) {
                             await auth.signOut();
                             throw new Error('Not authorized as admin');
                         }
+
+                        // Set global admin state
+                        isAdmin = true;
+                        currentUser = {
+                            uid: user.uid,
+                            username: 'admin',
+                            email: username
+                        };
+
+                        // Update last login time
+                        await database.ref(`users/${user.uid}`).update({
+                            lastLogin: new Date().toISOString()
+                        });
+
+                        // ONLY show the interface — DO NOT load any data yet!
+                        showAdminInterface();
+
+                        // Success message
+                        showSyncStatus('Admin logged in successfully');
+
                     } catch (error) {
                         console.error('Admin login error:', error);
                         if (error.code === 'auth/user-not-found') {
-                            // If admin doesn't exist, create it
                             await initializeAdmin();
-                            // Try login again
-                            await handleLogin();
+                            await handleLogin(); // retry once
                         } else {
                             throw error;
                         }
                     }
+
+                // ====================== EMPLOYEE LOGIN (unchanged) ======================
                 } else {
-                    // Employee login logic (unchanged for brevity)
+                    // ... (your full employee login code stays exactly the same)
+                    // Just make sure you DON'T call showAdminInterface() here
                     try {
                         console.log("Attempting employee login for:", username);
-                        
-                        // First, find the employee in the database by name
+
                         const employeeRef = database.ref('employees');
                         const snapshot = await employeeRef.once('value');
                         const employees = snapshot.val() || {};
-                        
+
                         let employeeData = null;
                         let employeeId = null;
 
-                        // Find the employee by name
                         Object.entries(employees).forEach(([id, data]) => {
                             if (data.name === username) {
                                 employeeData = data;
@@ -2768,45 +2764,23 @@
                             }
                         });
 
-                        if (!employeeData) {
-                            throw new Error('Employee not found');
-                        }
+                        if (!employeeData) throw new Error('Employee not found');
+                        if (password !== employeeData.code) throw new Error('Invalid password');
 
-                        // Verify the password matches the current code
-                        if (password !== employeeData.code) {
-                            throw new Error('Invalid password');
-                        }
-
-                        // Format email
                         const employeeEmail = `${username.replace(/[^a-zA-Z0-9]/g, '')}@snext.com`.toLowerCase();
 
                         try {
-                            // Attempt to sign in
                             const userCredential = await auth.signInWithEmailAndPassword(employeeEmail, password);
-                            currentUser = {
-                                ...employeeData,
-                                id: employeeId,
-                                uid: userCredential.user.uid
-                            };
+                            currentUser = { ...employeeData, id: employeeId, uid: userCredential.user.uid };
                         } catch (authError) {
-                            // If authentication fails, create new account
-                            console.log('Auth error, creating new account:', authError);
-                            const newUserCredential = await auth.createUserWithEmailAndPassword(employeeEmail, password);
-                            currentUser = {
-                                ...employeeData,
-                                id: employeeId,
-                                uid: newUserCredential.user.uid
-                            };
+                            const newUser = await auth.createUserWithEmailAndPassword(employeeEmail, password);
+                            currentUser = { ...employeeData, id: employeeId, uid: newUser.user.uid };
                         }
 
-                        // Update employee record with UID if needed
                         if (currentUser.uid && (!employeeData.uid || employeeData.uid !== currentUser.uid)) {
-                            await employeeRef.child(employeeId).update({
-                                uid: currentUser.uid
-                            });
+                            await employeeRef.child(employeeId).update({ uid: currentUser.uid });
                         }
 
-                        console.log("Login successful, showing employee interface");
                         showEmployeeInterface();
                         loadEmployeeData(currentUser);
                         showSyncStatus('Login successful');
@@ -2817,7 +2791,7 @@
                     }
                 }
 
-                // Clear login form
+                // Clear form
                 document.getElementById('login-form').reset();
 
             } catch (error) {
@@ -5793,57 +5767,59 @@
             document.getElementById('home-page').style.display = 'none';
             document.getElementById('admin-page').style.display = 'block';
             document.getElementById('employee-page').style.display = 'none';
-            
-            window.employeeData = {};
-            window.penaltyData = {};
 
-            loadEmployees();
-            loadTodayAttendance();
-            loadAllPenalties();
-            loadAllApplications();
-            updateAllEmployeeSelects();
-            initializeFilters(); // Initialize the simplified filter
+            // Hide or clear all tables
+            document.querySelectorAll('tbody').forEach(tbody => {
+                tbody.innerHTML = '<tr><td colspan="20" style="text-align:center; color:#666; padding:40px;">Click "Load All Data" to load everything</td></tr>';
+            });
 
-            // Explicitly fetch the latest attendance data directly from Firebase
-            fetchLatestAttendanceData().then(() => {
-                console.log('Latest attendance data fetched successfully');
-            }).catch(error => {
-                console.error('Error fetching latest attendance data:', error);
-                showSyncStatus('Error loading attendance data', 'error');
-            });            
-            
-            // Then set up real-time listeners for ongoing updates
-            initializeAttendanceTable();
+            // Make sure the button is visible and ready
+            const btn = document.getElementById('load-all-data-btn');
+            btn.style.display = 'inline-block';
+            btn.disabled = false;
+            btn.innerHTML = 'Load All Data';
 
-            // Add event listeners for logout buttons
-            document.getElementById('logout-btn').addEventListener('click', logout);
-            document.getElementById('export-applications-btn').addEventListener('click', exportApplicationsToExcel);
-            document.getElementById('export-penalties-btn').addEventListener('click', exportPenaltiesToExcel);
-
-            // Initialize the collapse state
-            const container = document.getElementById('agentListContainer');
-            const toggleButton = document.getElementById('toggleAgentList');
-            const isCollapsed = localStorage.getItem('agentListCollapsed') === 'true';
-            
-            if (container && toggleButton) {
-                if (isCollapsed) {
-                    container.classList.remove('expanded');
-                    container.classList.add('collapsed');
-                    toggleButton.classList.add('collapsed');
-                    toggleButton.innerHTML = '<span class="collapse-icon">▼</span> Expand Agent List';
-                } else {
-                    container.classList.add('expanded');
-                    container.classList.remove('collapsed');
-                    toggleButton.classList.remove('collapsed');
-                    toggleButton.innerHTML = '<span class="collapse-icon">▼</span> Collapse Agent List';
-                }
+            // Remove old real-time listeners if any
+            if (window.attendanceListener) {
+                window.attendanceListener();
+                window.attendanceListener = null;
             }
-            // Initialize attendance records table and filters
-            loadAllAttendanceRecords();
-            setupAttendanceFilters();
 
-            // Show success message
-            showSyncStatus('Admin interface loaded with latest data');            
+            showSyncStatus('Admin logged in – Ready');
+        }
+
+        document.getElementById('load-all-data-btn').addEventListener('click', loadAllData);
+
+        //Only one that loads data
+        async function loadAllData() {
+            const btn = document.getElementById('load-all-data-btn');
+            btn.disabled = true;
+            btn.innerHTML = 'Loading...';
+
+            try {
+                showSyncStatus('Loading all data...', 'loading');
+
+                await Promise.all([
+                    loadEmployees(),
+                    loadTodayAttendance(),
+                    loadAllApplications(),
+                    loadAllPenalties(),
+                    loadAllAttendanceRecords?.() || fetchLatestAttendanceData?.(),
+                ]);
+
+                await updateAttendanceTable();
+                initializeAttendanceTable(); // real-time listener
+
+                // Done → hide the button
+                btn.style.display = 'none';
+
+                showSyncStatus('All data loaded!', 'success');
+            } catch (err) {
+                console.error(err);
+                showSyncStatus('Load failed: ' + err.message, 'error');
+                btn.disabled = false;
+                btn.innerHTML = 'Load All Data';
+            }
         }
 
         //Directly fetch the latest attendance data from Firebase
