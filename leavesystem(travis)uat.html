@@ -7159,7 +7159,7 @@
                 let meetingName = `Meeting (${today})`; // Default value
 
                 try {
-                    const settingsSnapshot = await database.ref(`settings/attendance/${todayISO}`).once('value');
+                    const settingsSnapshot = await database.ref(`settings/attendance/${today}`).once('value');
                     const settingsData = settingsSnapshot.val();
                     
                     if (settingsData && settingsData.meetingName) {
