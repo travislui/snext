@@ -4685,7 +4685,7 @@
                 let meetingName = `Meeting (${currentDate})`; // Default value
 
                 try {
-                    const settingsSnapshot = await database.ref(`settings/attendance/${today}`).once('value');
+                    const settingsSnapshot = await database.ref(`settings/attendance/${currentDate}`).once('value');
                     const settingsData = settingsSnapshot.val();
                     
                     if (settingsData && settingsData.meetingName) {  // ✅ Checks if meetingName exists
