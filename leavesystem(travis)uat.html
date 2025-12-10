@@ -2277,10 +2277,10 @@
                                             Date & Time
                                         </th>
                                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Status
+                                            Meeting Name
                                         </th>
                                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            IP Address
+                                            Status
                                         </th>
                                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                             Action
@@ -2570,6 +2570,7 @@
                     <tr>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date & Time</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Meeting Name</th>                        
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                     </tr>
                 </thead>
@@ -2952,9 +2953,9 @@
         });
 
         // Call this when the page loads
-        document.addEventListener('DOMContentLoaded', () => {
-            initializeAttendanceTable();
-        });
+        //document.addEventListener('DOMContentLoaded', () => {
+            //initializeAttendanceTable();
+        //});
 
         async function loadEmployeeDetails() {
             // Show the initial loading reminder
@@ -4492,6 +4493,11 @@
                                     </div>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm font-medium text-gray-900">
+                                        ${todayRecord.meetingName}
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
                                     <span class="status-badge ${todayRecord.status.toLowerCase()}">
                                         ${todayRecord.status}
                                         ${todayRecord.amount > 0 ? ` (-$${todayRecord.amount})` : ''}
@@ -4583,13 +4589,13 @@
                                 <td class="px-6 py-4">
                                     ${formatDate(recordDate)} ${formatTime(recordDate)}
                                 </td>
+                                <td class="px-6 py-4">${record.meetingName || 'N/A'}</td>
                                 <td class="px-6 py-4">
                                     <span class="status-badge ${record.status?.toLowerCase() || 'unknown'}">
                                         ${record.status || 'N/A'}
                                         ${record.amount > 0 ? ` (-$${record.amount})` : ''}
                                     </span>
                                 </td>
-                                <td class="px-6 py-4">${record.ipAddress || 'N/A'}</td>
                                 <td class="px-6 py-4">
                                     <button class="remove-btn-small" onclick="removeAttendanceRecord('${record.id}')">
                                         Remove
@@ -5812,11 +5818,11 @@
                     loadTodayAttendance(),
                     loadAllApplications(),
                     loadAllPenalties(),
+                    //initializeAttendanceTable(),
                     loadAllAttendanceRecords?.() || fetchLatestAttendanceData?.(),
                 ]);
 
                 await updateAttendanceTable();
-                initializeAttendanceTable(); // real-time listener
 
                 // Done → hide the button
                 btn.style.display = 'none';
