@@ -1989,7 +1989,10 @@
             </button>
             <button id="load-all-data-btn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mt-4">
                 Load All Data
-            </button>       
+            </button>
+            <button id="reset-leave-limit-btn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mt-4">
+                Reset Leave Limit
+            </button>                   
             <h3>Add Agents</h3>
             <form id="add-employee-form">
                 <input type="text" id="emp-name" placeholder="Agent Name" required>
@@ -5793,6 +5796,11 @@
             btn.disabled = false;
             btn.innerHTML = 'Load All Data';
 
+            const btn1 = document.getElementById('reset-leave-limit-btn');
+            btn1.style.display = 'inline-block';
+            btn1.disabled = false;
+            btn1.innerHTML = 'Reset Leave Limit';
+
             // Remove old real-time listeners if any
             if (window.attendanceListener) {
                 window.attendanceListener();
@@ -5803,6 +5811,40 @@
         }
 
         document.getElementById('load-all-data-btn').addEventListener('click', loadAllData);
+
+        document.getElementById('reset-leave-limit-btn').addEventListener('click', function() {
+        if (confirm('Are you sure you want to reset the leave limits for employees with role SDM?')) {
+            const employeesRef = firebase.database().ref('employees');
+            employeesRef.once('value').then(snapshot => {
+            const updates = {};
+            snapshot.forEach(child => {
+                const key = child.key;
+                const data = child.val();
+                if (data.role === 'SDM') {
+                updates[`${key}/sickLeaveDays`] = 0;
+                updates[`${key}/remainingNormalLeaves`] = 10;
+                updates[`${key}/remainingGoldenLeaves`] = 3;
+                updates[`${key}/overseasDays`] = 0;
+                updates[`${key}/normalLeaves`] = 10;
+                updates[`${key}/goldenLeaves`] = 3;
+                updates[`${key}/forceMajeureDays`] = 0;
+                updates[`${key}/usedForceMajeureDays`] = 0;
+                updates[`${key}/usedMondayLeaves`] = 0;
+                updates[`${key}/usedOverseasDays`] = 0;
+                updates[`${key}/usedSickLeaveDays`] = 0;
+                }
+            });
+            employeesRef.update(updates)
+                .then(() => {
+                alert('Leave limits reset successfully for SDM roles!');
+                })
+                .catch(error => {
+                console.error('Error resetting leave limits:', error);
+                alert('Failed to reset leave limits.');
+                });
+            });
+        }
+        });
 
         //Only one that loads data
         async function loadAllData() {
