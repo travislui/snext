@@ -3168,21 +3168,22 @@
             }
 
             try {
-                const penaltiesRef = database.ref('penalties');
+                const penaltiesRef = database.ref('penalties').orderByChild('employeeId').equalTo(employeeId);
                 // Remove any existing listeners
                 penaltiesRef.off('value');
                 
-                // Set up a new real-time listener for penalties
-                penaltiesRef.on('value', (snapshot) => {
-                    const allPenalties = snapshot.val() || {};
-                    
-                    // Filter penalties for this employee
-                    const employeePenalties = Object.entries(allPenalties)
-                        .filter(([_, penalty]) => penalty.employeeId === employeeId)
-                        .reduce((acc, [key, value]) => ({...acc, [key]: value}), {});
-                    
-                    // Update the employee's penalty table
-                    updateEmployeePenaltyTable(employeePenalties);
+                // Set up a new real-time listener for penalties (with initial await)
+                await new Promise((resolve, reject) => {
+                    penaltiesRef.on('value', (snapshot) => {
+                        const employeePenalties = snapshot.val() || {};
+                        
+                        // Update the employee's penalty table
+                        updateEmployeePenaltyTable(employeePenalties);
+                        
+                        resolve();  // Resolve after first data load
+                    }, (error) => {
+                        reject(error);
+                    });
                 });
             } catch (error) {
                 console.error('Error loading penalties:', error);
@@ -6615,22 +6616,35 @@
                 agentFilter.innerHTML = '<option value="">All Agents</option>';
 
                 const employeesRef = database.ref('employees');
-                const employeesSnapshot = await employeesRef.once('value');
-
+                const isAllTeams = teamList.includes('*');
                 const teamMembers = {};
                 const uniqueAgentNames = new Set();
 
-                employeesSnapshot.forEach(childSnapshot => {
-                    const employee = childSnapshot.val();
-                    const belongsToTeam = teamList.includes('*') || teamList.includes(employee.team);
-                    if (belongsToTeam) {
+                // Fetch employees with server-side filtering (parallel for multiple teams)
+                if (isAllTeams) {
+                    const employeesSnapshot = await employeesRef.once('value');
+                    employeesSnapshot.forEach(childSnapshot => {
+                        const employee = childSnapshot.val();
                         teamMembers[childSnapshot.key] = employee;
-
                         if (employee.name && typeof employee.name === 'string') {
                             uniqueAgentNames.add(employee.name.trim());
                         }
-                    }
-                });
+                    });
+                } else {
+                    const employeePromises = teamList.map(team => 
+                        employeesRef.orderByChild('team').equalTo(team).once('value')
+                    );
+                    const teamSnapshots = await Promise.all(employeePromises);
+                    teamSnapshots.forEach(snapshot => {
+                        snapshot.forEach(childSnapshot => {
+                            const employee = childSnapshot.val();
+                            teamMembers[childSnapshot.key] = employee;
+                            if (employee.name && typeof employee.name === 'string') {
+                                uniqueAgentNames.add(employee.name.trim());
+                            }
+                        });
+                    });
+                }
 
                 // Populate agent filter dropdown
                 agentFilter.innerHTML = '<option value="">All Agents</option>';
@@ -6643,21 +6657,24 @@
                         agentFilter.appendChild(option);
                     });
 
-                // Fetch and filter applications
+                // Fetch applications with server-side filtering per employeeId (parallel)
                 const applicationsRef = database.ref('applications');
-                const applicationsSnapshot = await applicationsRef.once('value');
-
                 const applications = [];
-                applicationsSnapshot.forEach(childSnapshot => {
-                    const application = childSnapshot.val();
-                    const applicationId = childSnapshot.key;
-
-                    if (application.employeeId in teamMembers) {
+                const employeeIds = Object.keys(teamMembers);
+                const appPromises = employeeIds.map(empId => 
+                    applicationsRef.orderByChild('employeeId').equalTo(empId).once('value')
+                );
+                const appSnapshots = await Promise.all(appPromises);
+                appSnapshots.forEach(snapshot => {
+                    snapshot.forEach(childSnapshot => {
+                        const application = childSnapshot.val();
                         applications.push({
-                            id: applicationId,
-                            ...application
+                            id: childSnapshot.key,
+                            ...application,
+                            // Ensure employeeName is available (add from teamMembers if missing)
+                            employeeName: application.employeeName || (teamMembers[application.employeeId]?.name || 'Unknown')
                         });
-                    }
+                    });
                 });
 
                 applyFilters(applications);
@@ -6672,7 +6689,7 @@
             }
         }
 
-        // Function to apply date and agent filters
+        // Function to apply date and agent filters (unchanged)
         function applyFilters(applications) {
             const tableBody = document.getElementById('team-leave-list');
             const dateFilter = document.getElementById('date-filter').value;
