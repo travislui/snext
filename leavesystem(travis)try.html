@@ -9806,7 +9806,7 @@
                 toast.onclick = (e) => { if (e.target === toast) toast.remove(); };
             }
 
-            navigator.serviceWorker.register('/sw.js')
+            navigator.serviceWorker.register('/sw-success.js')
                 .then(reg => {
                     registration = reg;
                     console.log('Service Worker registered:', reg.scope);
