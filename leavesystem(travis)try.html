@@ -9712,7 +9712,9 @@
                 btn.innerHTML = '⏳ 檢查中...';
 
                 try {
-                    const reg = await navigator.serviceWorker.getRegistration();
+                    // Specify the scope to match your SW registration
+                    const reg = await navigator.serviceWorker.getRegistration('/snext/');
+                    
                     if (reg) {
                         await reg.update();
                         showMessage("已檢查最新版本！若有更新會自動提示", "success");

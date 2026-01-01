@@ -1,7 +1,7 @@
 // GaiChin PWA Service Worker
 // Version: 1.5.1   <-- Change this number every time you deploy a new version!
 
-const CACHE_NAME = 'gaichin-cache 31-12-2025-總儲蓄';  // Change this when you want to force cache refresh
+const CACHE_NAME = 'gaichin-cache 01-01-2026';  // Change this when you want to force cache refresh
 
 const urlsToCache = [
   '/',
