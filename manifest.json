@@ -9,13 +9,13 @@
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "snext.hk.jpg",
+      "src": "snext.jpg",
       "sizes": "192x192",
       "type": "image/jpg",
       "purpose": "any"
     },
     {
-      "src": "snext.hk.jpg",
+      "src": "snext.jpg",
       "sizes": "512x512",
       "type": "image/jpg",
       "purpose": "any maskable"
