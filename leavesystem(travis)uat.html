@@ -3,7 +3,7 @@
 
 <head>
     <title>S-Next 請假及賀金系統 UAT</title>
-    
+    <link rel="manifest" href="/manifest.json">
     <link href='https://cdn.jsdelivr.net/npm/@fullcalendar/core@6.1.10/main.min.css' rel='stylesheet' />
     <link href='https://cdn.jsdelivr.net/npm/@fullcalendar/daygrid@6.1.10/main.min.css' rel='stylesheet' />
     <script src='https://cdn.jsdelivr.net/npm/@fullcalendar/core@6.1.10/main.min.js'></script>
@@ -1987,7 +1987,7 @@
             <button id="show-qr-code" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mt-4">
                 Show Attendance QR Code
             </button>
-            <button id="load-all-data-btn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mt-4">
+            <button id="load-all-data-btn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mt-4 ">
                 Load All Data
             </button>
             <button id="reset-leave-limit-btn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mt-4">
@@ -2029,6 +2029,7 @@
                     <option value="Ride">Ride</option>
                     <option value="Ark">Ark</option>
                     <option value="Giant">Giant</option>
+                    <option value="Core">Core</option>
                 </select>
                 <label for="emp-team-leader">
                     <input type="checkbox" id="emp-team-leader"> 是不是營業單位主管？
@@ -2390,7 +2391,7 @@
         </button>
 
         <button onclick="loadEmployeeDetails()" class="bg-green-500 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg text-lg shadow-lg">
-            Load All Data
+            Load All Data (This Year)
         </button>
         <span id="reminderText" class="mt-2 text-sm text-gray-600 hidden">
             Loading Data, Please wait (around 3-5 minutes)
@@ -2499,13 +2500,13 @@
         </div>
         <div id="proof-container" style="display: none;">
             <input type="checkbox" id="instant-proof-checkbox" style="margin-right: 8px;">
-            <label for="proof-file">Option 1 ：我選擇立即提供證明 （Admin會預設Approved)</label>
+            <label for="proof-file" style="font-size: 16px;">Option 1 ：我選擇立即提供證明 （Admin會預設Approved)</label>
             <input type="file" id="proof-file" accept="image/*">
         </div>
         <div id="deferred-proof-option" style="display: none; margin-top: 10px;">
             <label style="display: flex; align-items: center; cursor: pointer;">
                 <input type="checkbox" id="deferred-proof-checkbox" style="margin-right: 11px;">
-                <span style="font-size: 16px;"> Option 2 ：我決定在請假當天23:59 前提供證明 (Admin 會預設Rejected, 直至你在限期前提供證明)</span>
+                <span style="font-size: 16px;">Option 2 ：我決定在請假當天23:59 前提供證明 (Admin 會預設Rejected, 直至你在限期前提供證明)</span>
             </label>
         </div>
         <span style="font-size: 14px;">注意：如果不能在限期前提供證明，是次請假申請將不被承認。</span>       
@@ -2517,7 +2518,6 @@
 
     <div class="container mx-auto p-4 mt-8">
         <h3>Application Status</h3>
-        <div class="table-container">
             <table id="application-status-table">
             <tr>
                 <th>Apply Date</th>
@@ -2527,7 +2527,6 @@
                 <th>Status</th>
             </tr>
             </table>
-        </div>
     </div>
 
     <div class="container" id="team-leader-section" style="display: none; margin-top: 20px;">
@@ -2586,7 +2585,6 @@
 
     <div class="container mx-auto p-4 mt-8">
         <h3>賀金 Info *14/4 起計*</h3>
-        <div class="table-container">
             <table id="employee-penalty-table">
                 <thead>
                     <tr>
@@ -2601,7 +2599,6 @@
                 </thead>
                 <tbody id="employee-penalty-list"></tbody>
             </table>
-        </div>
     </div>
 
     <div id="penalty-total" style="text-align: right; margin-top: 10px; padding: 10px; background-color: #f8f9fa; border-radius: 4px;">
@@ -2964,33 +2961,25 @@
             // Show the initial loading reminder
             const reminder = document.getElementById("reminderText");
             reminder.classList.remove("hidden");
-
             // Simulate initial delay (optional, but kept for your setup)
             await new Promise(resolve => setTimeout(resolve, 2000));
-
             try {
                 // Start loading employee-specific data in parallel
-                const appPromise = loadEmployeeApplications(currentUser.id);  // Assume this returns a Promise
-                const penaltyPromise = loadEmployeePenalties(currentUser.id);  // Assume this returns a Promise
-
+                const appPromise = loadEmployeeApplications(currentUser.id); // Assume this returns a Promise
+                const penaltyPromise = loadEmployeePenalties(currentUser.id); // Assume this returns a Promise
                 // Get visible teams (assuming this is synchronous; if async, await it here)
                 const visibleTeams = getVisibleTeamsForLeader(currentUser);
-
                 // Conditionally add team leave promise if teams exist
-                let teamPromise = Promise.resolve();  // Default to a resolved Promise if no teams
+                let teamPromise = Promise.resolve(); // Default to a resolved Promise if no teams
                 if (visibleTeams.length > 0) {
-                    teamPromise = loadTeamLeaveRecords(visibleTeams);  // Assume this returns a Promise
+                    teamPromise = loadTeamLeaveRecords(visibleTeams); // Assume this returns a Promise
                 }
-
                 // Wait for all relevant loads to complete
                 await Promise.all([appPromise, penaltyPromise, teamPromise]);
-
-                // Add 5-second buffer before showing success message
+                // Add 1.5-second buffer before showing success message
                 await new Promise(resolve => setTimeout(resolve, 1500));
-
                 // Now that everything is loaded, update the UI to reflect success
                 reminder.textContent = "Data loaded successfully!";
-
                 const modal = document.createElement('div');
                 modal.id = 'successModal';
                 modal.style.position = 'fixed';
@@ -3003,7 +2992,6 @@
                 modal.style.justifyContent = 'center';
                 modal.style.alignItems = 'center'; // Centers vertically; adjust to 'flex-start' for top positioning
                 modal.style.zIndex = '1000';
-
                 // Create modal content
                 const modalContent = document.createElement('div');
                 modalContent.style.backgroundColor = '#ffffff'; // White background as requested
@@ -3014,7 +3002,6 @@
                 modalContent.style.width = '400px'; // Fixed width for bigger size
                 modalContent.style.position = 'relative'; // For positioning the cancel icon
                 modalContent.style.boxShadow = '0 4px 8px rgba(0,0,0,0.2)'; // Subtle shadow
-
                 // Add cancel icon (top right corner)
                 const cancelIcon = document.createElement('span');
                 cancelIcon.style.position = 'absolute';
@@ -3030,42 +3017,33 @@
                     }
                 });
                 modalContent.appendChild(cancelIcon);
-
                 // Create heading container with two paragraphs for separate lines (adapted for success message)
                 const headingContainer = document.createElement('div');
                 headingContainer.style.marginBottom = '20px';
-
                 const headingLine1 = document.createElement('p');
                 headingLine1.textContent = 'Data loaded';
                 headingLine1.style.margin = '0';
                 headingLine1.style.fontSize = '1.2em';
                 headingLine1.style.fontWeight = 'bold';
-                headingLine1.style.color = 'rgba(0, 0, 0)'; 
-
+                headingLine1.style.color = 'rgba(0, 0, 0)';
                 const headingLine2 = document.createElement('p');
                 headingLine2.textContent = 'successfully!';
                 headingLine2.style.margin = '5px 0 0 0';
                 headingLine2.style.fontSize = '1.2em';
                 headingLine2.style.fontWeight = 'bold';
-                headingLine2.style.color = 'rgba(0, 0, 0)'; 
-
+                headingLine2.style.color = 'rgba(0, 0, 0)';
                 // Add green tick icon (larger for bigger popup)
                 const tickIcon = document.createElement('span');
                 tickIcon.style.color = '#28a745';
                 tickIcon.style.fontSize = '32px';
                 tickIcon.innerHTML = '✅';
-
                 headingContainer.appendChild(tickIcon);
                 headingContainer.appendChild(headingLine1);
                 headingContainer.appendChild(headingLine2);
                 modalContent.appendChild(headingContainer);
-
                 // No buttons needed for success modal; it stays until dismissed
-
                 modal.appendChild(modalContent);
                 document.body.appendChild(modal);
-
-
                 // Hide reminder after 3 seconds (popup and backdrop remain until manually closed)
                 setTimeout(() => {
                     reminder.classList.add("hidden");
@@ -3078,7 +3056,7 @@
                 setTimeout(() => {
                     reminder.classList.add("hidden");
                     reminder.textContent = "Loading Data, Please wait (around 3-5 minutes)";
-                }, 5000);  // Longer display for error
+                }, 5000); // Longer display for error
             }
         }
 
@@ -3175,7 +3153,12 @@
                 // Set up a new real-time listener for penalties (with initial await)
                 await new Promise((resolve, reject) => {
                     penaltiesRef.on('value', (snapshot) => {
-                        const employeePenalties = snapshot.val() || {};
+                        const allPenalties = snapshot.val() || {};
+                        
+                        // Filter to only 2026 penalties (based on date starting with '2026')
+                        const employeePenalties = Object.entries(allPenalties)
+                            .filter(([, penalty]) => penalty.date && penalty.date.startsWith('2026'))
+                            .reduce((acc, [key, value]) => ({...acc, [key]: value}), {});
                         
                         // Update the employee's penalty table
                         updateEmployeePenaltyTable(employeePenalties);
@@ -3321,13 +3304,14 @@
                     table.deleteRow(1);
                 }
 
-                // Sort applications by date (newest first)
-                const sortedApplications = Object.entries(applications)
-                    .sort(([, a], [, b]) => new Date(b.applyDate) - new Date(a.applyDate));
+                // Filter to only 2026 applications (based on applyDate starting with '2026')
+                const filteredApplications = Object.entries(applications).filter(([, app]) => app.leaveStartDate && app.leaveStartDate.startsWith('2026'));
 
-                for (const [id, application] of sortedApplications) {
-                    const row = table.insertRow(-1);
-                    
+                // Sort filtered applications by date (newest first)
+                const sortedApplications = filteredApplications.sort(([, a], [, b]) => new Date(b.applyDate) - new Date(a.applyDate));
+
+                // Batch build rows HTML
+                const rowsHTML = sortedApplications.map(([id, application]) => {
                     // Format the dates for display
                     const applyDate = new Date(application.applyDate);
                     const startDate = new Date(application.leaveStartDate);
@@ -3344,23 +3328,27 @@
                         showSubmitButton = new Date() <= deadline;
                     }
 
-                    row.innerHTML = `
-                        <td>${formattedApplyDate}</td>
-                        <td>${formattedStartDate}</td>
-                        <td>${formattedEndDate}</td>
-                        <td>${application.leaveType || 'N/A'}</td>
-                        <td>
-                            <span class="status-${application.status.toLowerCase().replace(' ', '-')}">${application.status || 'Pending'}</span>
-                            ${showSubmitButton ? `
-                                <button type="button" class="submit-proof-btn" onclick="submitProofLater('${id}', '${currentUser.id}')">
-                                    Submit Proof
-                                </button>
-                            ` : ''}
-                        </td>
+                    return `
+                        <tr>
+                            <td>${formattedApplyDate}</td>
+                            <td>${formattedStartDate}</td>
+                            <td>${formattedEndDate}</td>
+                            <td>${application.leaveType || 'N/A'}</td>
+                            <td>
+                                <span class="status-${application.status.toLowerCase().replace(' ', '-')}">${application.status || 'Pending'}</span>
+                                ${showSubmitButton ? `
+                                    <button type="button" class="submit-proof-btn" onclick="submitProofLater('${id}', '${currentUser.id}')">
+                                        Submit Proof
+                                    </button>
+                                ` : ''}
+                            </td>
+                        </tr>
                     `;
-                }
+                }).join('');
 
-                // Calculate and update used days
+                table.insertAdjacentHTML('beforeend', rowsHTML);
+
+                // Calculate and update used days (filter to 2026 in calculateUsedDays if needed)
                 const usedDays = await calculateUsedDays(employeeId);
                 updateDisplayedUsedDays(
                     usedDays.sickLeaveDays,
@@ -5165,6 +5153,12 @@
                             margin-bottom: 30px;
                             font-weight: bold;
                         }
+
+                        #displaymeetingname {
+                            font-size: 30px;  /* Adjust this value to make it as big as you want, e.g., 24px, 40px, etc. */
+                            font-weight: bold; /* Optional: makes the text bolder for better visibility */
+                            text-align: center; /* Optional: centers the text */
+                        }
                     </style>
                 </head>
                 <body>
@@ -5786,11 +5780,6 @@
             document.getElementById('admin-page').style.display = 'block';
             document.getElementById('employee-page').style.display = 'none';
 
-            // Hide or clear all tables
-            document.querySelectorAll('tbody').forEach(tbody => {
-                tbody.innerHTML = '<tr><td colspan="20" style="text-align:center; color:#666; padding:40px;">Click "Load All Data" to load everything</td></tr>';
-            });
-
             // Make sure the button is visible and ready
             const btn = document.getElementById('load-all-data-btn');
             btn.style.display = 'inline-block';
@@ -5814,37 +5803,60 @@
         document.getElementById('load-all-data-btn').addEventListener('click', loadAllData);
 
         document.getElementById('reset-leave-limit-btn').addEventListener('click', function() {
-        if (confirm('Are you sure you want to reset the leave limits for employees with role SDM?')) {
-            const employeesRef = firebase.database().ref('employees');
-            employeesRef.once('value').then(snapshot => {
-            const updates = {};
-            snapshot.forEach(child => {
-                const key = child.key;
-                const data = child.val();
-                if (data.role === 'SDM') {
-                updates[`${key}/sickLeaveDays`] = 0;
-                updates[`${key}/remainingNormalLeaves`] = 10;
-                updates[`${key}/remainingGoldenLeaves`] = 3;
-                updates[`${key}/overseasDays`] = 0;
-                updates[`${key}/normalLeaves`] = 10;
-                updates[`${key}/goldenLeaves`] = 3;
-                updates[`${key}/forceMajeureDays`] = 0;
-                updates[`${key}/usedForceMajeureDays`] = 0;
-                updates[`${key}/usedMondayLeaves`] = 0;
-                updates[`${key}/usedOverseasDays`] = 0;
-                updates[`${key}/usedSickLeaveDays`] = 0;
-                }
-            });
-            employeesRef.update(updates)
-                .then(() => {
-                alert('Leave limits reset successfully for SDM roles!');
-                })
-                .catch(error => {
-                console.error('Error resetting leave limits:', error);
-                alert('Failed to reset leave limits.');
+            if (confirm('Are you sure you want to reset the leave limits for all agents?')) {
+                const employeesRef = firebase.database().ref('employees');
+                employeesRef.once('value').then(snapshot => {
+                    const updates = {};
+                    snapshot.forEach(child => {
+                        const key = child.key;
+                        const data = child.val();
+                        const mdrt = data.mdrt || ''; // safeguard if mdrt is missing
+
+                        // Always reset these fields (common for all cases)
+                        updates[`${key}/sickLeaveDays`] = 0;
+                        updates[`${key}/overseasDays`] = 0;
+                        updates[`${key}/forceMajeureDays`] = 0;
+                        updates[`${key}/usedForceMajeureDays`] = 0;
+                        updates[`${key}/usedOverseasDays`] = 0;
+                        updates[`${key}/usedSickLeaveDays`] = 0;
+
+                        // Default resets (will be overridden by specific conditions)
+                        updates[`${key}/usedMondayLeaves`] = 0;
+                        updates[`${key}/goldenLeaves`] = 3;
+                        updates[`${key}/remainingGoldenLeaves`] = 3;
+                        updates[`${key}/normalLeaves`] = 10;
+                        updates[`${key}/remainingNormalLeaves`] = 10;
+
+                        // Condition 1: Non-MDRT (mdrt = 'no')
+                        if (mdrt === 'no') {
+                            // Already set defaults above — nothing extra needed
+                        }
+                        // Condition 2: MDRT
+                        else if (mdrt === 'mdrt') {
+                            updates[`${key}/normalLeaves`] = 13;
+                            updates[`${key}/remainingNormalLeaves`] = 13;
+                        }
+                        // Condition 3: COT or above (adjust the values in the array as needed)
+                        else if (mdrt === 'cot or above') {
+                            updates[`${key}/usedMondayLeaves`] = -999;
+                            updates[`${key}/goldenLeaves`] = 999;
+                            updates[`${key}/remainingGoldenLeaves`] = 999;
+                            updates[`${key}/normalLeaves`] = 999;
+                            updates[`${key}/remainingNormalLeaves`] = 999;
+                        }
+                        // Optional: else block if you want to skip or log unknown mdrt values
+                    });
+
+                    employeesRef.update(updates)
+                        .then(() => {
+                            alert('Leave limits reset successfully for all agents!');
+                        })
+                        .catch(error => {
+                            console.error('Error resetting leave limits:', error);
+                            alert('Failed to reset leave limits.');
+                        });
                 });
-            });
-        }
+            }
         });
 
         //Only one that loads data
@@ -6668,12 +6680,15 @@
                 appSnapshots.forEach(snapshot => {
                     snapshot.forEach(childSnapshot => {
                         const application = childSnapshot.val();
-                        applications.push({
-                            id: childSnapshot.key,
-                            ...application,
-                            // Ensure employeeName is available (add from teamMembers if missing)
-                            employeeName: application.employeeName || (teamMembers[application.employeeId]?.name || 'Unknown')
-                        });
+                        // Filter to only 2026 applications (based on applyDate starting with '2026')
+                        if (application.leaveStartDate && application.leaveStartDate.startsWith('2026')) {
+                            applications.push({
+                                id: childSnapshot.key,
+                                ...application,
+                                // Ensure employeeName is available (add from teamMembers if missing)
+                                employeeName: application.employeeName || (teamMembers[application.employeeId]?.name || 'Unknown')
+                            });
+                        }
                     });
                 });
 
@@ -6784,6 +6799,14 @@
             document.getElementById('home-page').style.display = 'none';
             document.getElementById('admin-page').style.display = 'none';
             document.getElementById('employee-page').style.display = 'block';
+
+            // Show update button for employee page
+            let updateBtn = document.getElementById('top-update-button');
+            if (!updateBtn) {
+                updateBtn = renderTopUpdateButton();
+                document.body.appendChild(updateBtn);
+            }
+            updateBtn.style.display = 'flex'; // Show button
 
             // Only load data if we have a current user
             if (currentUser && currentUser.id) {
@@ -7640,7 +7663,7 @@
                         <span class="display-text">${emp.mdrt}</span>
                     `;
 
-                    const teamOptions = ['', 'Honour', 'Bee', 'Novas', 'Define', 'Belong', 'Ride', 'Ark', 'Giant'];
+                    const teamOptions = ['', 'Honour', 'Bee', 'Novas', 'Define', 'Belong', 'Ride', 'Ark', 'Giant', 'Core'];
                     const teamSelect = `
                         <select class="edit-select" style="display: none;" 
                                 onchange="updateEmployeeField('${id}', 'team', this.value)">
@@ -8994,7 +9017,7 @@
                     html: `
                         <div style="margin-bottom: 20px;">
                             <p style="font-size: 14px;">Agent: ${employeeData.name}</p>
-                            <p style="font-size: 14px;">Current usedMondayLeaves: ${employeeData.usedMondayLeaves || 0}</p>
+                            <p style="font-size: 14px;">Applied Monday Leaves: ${employeeData.usedMondayLeaves || 0}</p>
                         </div>
                         <select id="action-type-select" class="swal2-select" style="
                             width: 80%; 
@@ -9557,6 +9580,284 @@
             window.leaveCalendar.addEventSource(events);
             window.leaveCalendar.render();
             console.log('Calendar events updated:', events);
+        }
+
+        function showMessage(message, type = 'info') {
+            // Create or get existing message container
+            let messageContainer = document.getElementById('update-message-container');
+            
+            if (!messageContainer) {
+                messageContainer = document.createElement('div');
+                messageContainer.id = 'update-message-container';
+                messageContainer.style.cssText = `
+                    position: fixed;
+                    top: 80px;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    z-index: 9999;
+                    min-width: 300px;
+                    max-width: 500px;
+                `;
+                document.body.appendChild(messageContainer);
+            }
+
+            const messageDiv = document.createElement('div');
+            messageDiv.style.cssText = `
+                padding: 12px 20px;
+                border-radius: 8px;
+                margin-bottom: 10px;
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                font-size: 14px;
+                animation: slideDown 0.3s ease-out;
+            `;
+
+            const colors = {
+                success: { bg: '#d4edda', border: '#c3e6cb', text: '#155724', icon: '✓' },
+                error: { bg: '#f8d7da', border: '#f5c6cb', text: '#721c24', icon: '✕' },
+                info: { bg: '#d1ecf1', border: '#bee5eb', text: '#0c5460', icon: 'ℹ' }
+            };
+
+            const color = colors[type] || colors.info;
+            messageDiv.style.backgroundColor = color.bg;
+            messageDiv.style.border = `1px solid ${color.border}`;
+            messageDiv.style.color = color.text;
+            messageDiv.innerHTML = `
+                <span style="font-weight: bold; font-size: 16px;">${color.icon}</span>
+                <span>${message}</span>
+            `;
+
+            messageContainer.appendChild(messageDiv);
+
+            setTimeout(() => {
+                messageDiv.style.animation = 'slideUp 0.3s ease-out';
+                setTimeout(() => messageDiv.remove(), 300);
+            }, 3000);
+        }
+
+        // Add animation styles
+        const updateButtonStyle = document.createElement('style');
+        updateButtonStyle.textContent = `
+            @keyframes slideDown {
+                from {
+                    transform: translateY(-20px);
+                    opacity: 0;
+                }
+                to {
+                    transform: translateY(0);
+                    opacity: 1;
+                }
+            }
+            @keyframes slideUp {
+                from {
+                    transform: translateY(0);
+                    opacity: 1;
+                }
+                to {
+                    transform: translateY(-20px);
+                    opacity: 0;
+                }
+            }
+        `;
+        document.head.appendChild(updateButtonStyle);
+
+        // Create the update button
+        const renderTopUpdateButton = () => {
+            const btn = document.createElement('button');
+            btn.id = 'top-update-button';
+            btn.style.cssText = `
+                position: fixed;
+                top: 20px;
+                left: 20px;
+                z-index: 1000;
+                background-color: white;
+                color: #0d9488;
+                padding: 10px 16px;
+                border-radius: 8px;
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+                border: 2px solid #0d9488;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                font-weight: 600;
+                font-size: 14px;
+                transition: all 0.3s ease;
+            `;
+            
+            btn.innerHTML = '🔄 檢查更新';
+            
+            btn.onmouseenter = () => {
+                btn.style.backgroundColor = '#f0fdfa';
+                btn.style.transform = 'translateY(-2px)';
+                btn.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.2)';
+            };
+            btn.onmouseleave = () => {
+                btn.style.backgroundColor = 'white';
+                btn.style.transform = 'translateY(0)';
+                btn.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.15)';
+            };
+            
+            btn.onclick = async () => {
+                if (!navigator.serviceWorker) {
+                    showMessage("不支援 Service Worker", 'error');
+                    return;
+                }
+
+                btn.disabled = true;
+                btn.style.cursor = 'not-allowed';
+                btn.style.opacity = '0.7';
+                btn.innerHTML = '⏳ 檢查中...';
+
+                try {
+                    // Specify the scope to match your SW registration
+                    const reg = await navigator.serviceWorker.getRegistration('/snext/');
+                    
+                    if (reg) {
+                        await reg.update();
+                        showMessage("已檢查最新版本！若有更新會自動提示", "success");
+                    } else {
+                        showMessage("尚未註冊 Service Worker", 'error');
+                    }
+                } catch (err) {
+                    console.error('Update check error:', err);
+                    showMessage("檢查更新失敗", 'error');
+                }
+
+                setTimeout(() => {
+                    btn.disabled = false;
+                    btn.style.cursor = 'pointer';
+                    btn.style.opacity = '1';
+                    btn.innerHTML = '🔄 檢查更新';
+                }, 2000);
+            };
+            
+            return btn;
+        };
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                userId = user.uid;
+                const db = getDatabase();
+                const employeesRef = ref(db, 'employees');
+                const userQuery = query(employeesRef, orderByChild('uid'), equalTo(userId));
+                get(userQuery).then((snapshot) => {
+                    if (snapshot.exists()) {
+                        const employeeData = snapshot.val();
+                        const employeeKey = Object.keys(employeeData)[0]; // Get the push key (e.g., -OIt5pNmdqMENE-7FPj1)
+                        setupRTDBListener(employeeKey); // Adjust setupRTDBListener to use 'employees/' + employeeKey instead of a direct UID path
+                        currentPage = 'main';  // Auto-switch to main if already logged in and employee record exists
+                        if (!document.getElementById('fa-script')) {
+                            const faScript = document.createElement('script');
+                            faScript.id = 'fa-script';
+                            faScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/js/all.min.js';
+                            document.head.appendChild(faScript);
+                        }
+                    } 
+                    isLoading = false;
+                    showEmployeeInterface();
+                    loadEmployeeData(currentUser);
+                }).catch((error) => {
+                    console.error('Error querying employee data:', error);
+                    userId = null;
+                    isLoading = false;
+                    showEmployeeInterface();
+                    loadEmployeeData(currentUser);
+                });
+            } else {
+                userId = null;
+                isLoading = false;
+                showEmployeeInterface();
+                loadEmployeeData(currentUser);
+            }
+        });
+
+        if ('serviceWorker' in navigator) {
+            let registration = null;
+
+            // Custom nice toast for update prompt (using your existing showMessage style)
+            function showUpdatePrompt(onAccept) {
+                const toast = document.createElement('div');
+                toast.className = 'fixed bottom-20 left-1/2 -translate-x-1/2 z-[100] px-6 py-4 rounded-xl bg-teal-600 text-white shadow-2xl flex flex-col items-center gap-4 max-w-md w-11/12';
+                toast.setAttribute('role', 'alertdialog');
+                toast.setAttribute('aria-live', 'assertive');
+                toast.setAttribute('aria-modal', 'true');
+                toast.innerHTML = `
+                    <i class="fas fa-sync-alt text-3xl animate-spin"></i>
+                    <div class="text-center">
+                        <p class="font-bold text-xl">有新版本可用！</p>
+                        <p class="text-sm opacity-90 mt-2">請點擊下方按鈕更新<br>（更新後會自動重新載入）</p>
+                    </div>
+                    <button id="update-now-btn" class="px-8 py-4 bg-white text-teal-600 rounded-xl font-bold text-lg hover:bg-teal-50 shadow-md">
+                        立即更新
+                    </button>
+                `;
+                appRoot.appendChild(toast);
+
+                const updateBtn = toast.querySelector('#update-now-btn');
+                updateBtn.onclick = () => {
+                    onAccept();  // 送出 skipWaiting
+                    toast.remove();
+                    showMessage("正在更新，請稍等...", "success");
+                };
+                updateBtn.focus(); // Auto-focus for accessibility
+
+                // Allow dismissing by clicking outside (optional, for better UX)
+                toast.onclick = (e) => { if (e.target === toast) toast.remove(); };
+            }
+
+            navigator.serviceWorker.register('/snext/sw-success.js')
+                .then(reg => {
+                    registration = reg;
+                    console.log('Service Worker registered:', reg.scope);
+
+                    // Force check for updates every time the app loads
+                    reg.update();
+
+                    // Detect new/updated service worker
+                    reg.addEventListener('updatefound', () => {
+                        const newWorker = reg.installing;
+                        if (!newWorker) return;
+
+                        newWorker.addEventListener('statechange', () => {
+                            if (newWorker.state === 'installed') {
+                                // 即使還沒有 controller（第一次從 Home Screen 開啟常見），也顯示提示
+                                // 等 controller 出現後會自動 reload
+                                showUpdatePrompt(() => {
+                                    if (newWorker && newWorker.state === 'installed') {
+                                        try {
+                                            newWorker.postMessage({ action: 'skipWaiting' });
+                                        } catch (err) {
+                                            console.error('Error sending skipWaiting message:', err);
+                                        }
+                                    }
+                                });
+
+                                // 額外保險：如果目前還沒有 controller，等一下再檢查一次
+                                if (!navigator.serviceWorker.controller) {
+                                    newWorker.addEventListener('statechange', function checkController() {
+                                        if (navigator.serviceWorker.controller && newWorker.state === 'activated') {
+                                            window.location.reload();
+                                        }
+                                    });
+                                }
+                            }
+                        });
+                    });
+
+                    // Optional: check for updates every hour while app is open
+                    setInterval(() => reg.update(), 60 * 60 * 1000);
+                })
+                .catch(err => {
+                    console.error('Service Worker registration failed:', err);
+                });
+
+            // When new SW takes control → reload page to use new version
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                window.location.reload();
+            });
         }
 
     </script>
