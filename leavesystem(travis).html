@@ -5105,7 +5105,7 @@
                     // Open the QR window after settings are saved
                     const qrWindow = window.open('', '_blank', 'width=600,height=800');
                     if (qrWindow) {
-                        qrWindow.document.write(createQRWindowContent(meetingName));
+                        qrWindow.document.write(createQRWindowContent(meetingName, standardTime));
                         qrWindow.document.close();
                     } else {
                         alert('Failed to open QR window. Please allow popups.');
@@ -5118,9 +5118,10 @@
             }
 
         // Function to create QR code window content
-        function createQRWindowContent(meetingName) {        
+        function createQRWindowContent(meetingName, standardTime) {        
             // Use the passed meetingName, fallback to default if somehow missing
             const displaymeetingname = meetingName;
+            const displaystandardTime = standardTime;
             return `
                 <!DOCTYPE html>
                 <html>
@@ -5164,12 +5165,25 @@
                             margin-bottom: 30px;
                             font-weight: bold;
                         }
+                        #displaymeetingname {
+                            font-size: 30px;  /* Adjust this value to make it as big as you want, e.g., 24px, 40px, etc. */
+                            font-weight: bold; /* Optional: makes the text bolder for better visibility */
+                            text-align: center; /* Optional: centers the text */
+                            margin-bottom: 15px;
+                        }
+
+                        #displaystandardTime {
+                            font-size: 30px;  /* Adjust this value to make it as big as you want, e.g., 24px, 40px, etc. */
+                            font-weight: bold; /* Optional: makes the text bolder for better visibility */
+                            text-align: center; /* Optional: centers the text */
+                        }                        
                     </style>
                 </head>
                 <body>
                     <div id="qr-container">
                         <h1 class="title">Attendance QR Code</h1>
                         <div id="displaymeetingname">${displaymeetingname}</div>
+                        <div id="displaystandardTime">${displaystandardTime}</div>
                         <div id="qr-code"></div>
                         <div id="current-time"></div>
                     </div>
